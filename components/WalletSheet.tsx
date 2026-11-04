@@ -5,6 +5,7 @@ import type { PayMethod } from '@/lib/payments';
 import { IconCheck, Spark } from './Icons';
 import { FaceScan } from './ui/FaceScan';
 import { haptic } from './ui/feedback';
+import { feel } from './ui/sensory';
 import { Sheet } from './ui/Sheet';
 
 type Line = { label: string; value: string };
@@ -53,12 +54,12 @@ export function WalletSheet({ open, merchant, amountCents, lines, savedCard, all
     try {
       await Promise.all([onPay(method, save), new Promise((r) => setTimeout(r, 1100))]);
       setState('done');
-      haptic(18);
+      feel('success');
       setTimeout(onDone, 750);
     } catch (e) {
       setState('failed');
       setError(e instanceof Error ? e.message : 'Payment did not go through.');
-      haptic(30);
+      feel('error');
       busy.current = false;
     }
   };

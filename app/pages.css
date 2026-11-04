@@ -1,4 +1,4 @@
-.link { text-decoration: underline; text-underline-offset: 3px; }
+﻿.link { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Simple pages */
 .simple-page { padding: calc(16px + var(--safe-t)) var(--gutter) 40px; max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -115,8 +115,6 @@
 .state-page { gap: 12px; }
 .state-spark { color: var(--volt); animation: state-spin 900ms var(--bounce) both; }
 @keyframes state-spin { from { transform: rotate(-90deg) scale(.4); opacity: 0; } }
-.reveal-ribbon { position: absolute; left: 0; right: 0; top: 14%; margin: 0; height: 110px; animation: reveal-ribbon 900ms var(--sheet-ease) both; }
-@keyframes reveal-ribbon { from { transform: translateX(-30%); opacity: 0; } }
 
 /* Lime reveal */
 .reveal { position: fixed; inset: 0; z-index: 90; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; background: var(--volt); color: #000; animation: reveal-out 560ms var(--sheet-ease) 1500ms both; }

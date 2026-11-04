@@ -2,8 +2,9 @@
 import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, Spark } from '../Icons';
+import { feel, installTapFeedback } from './sensory';
 
-// A light tap on phones that support it. Silent everywhere else.
+// Taps are handled globally by installTapFeedback. This remains for async moments without a tap.
 export const haptic = (ms = 8) => {
   try {
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) navigator.vibrate?.(ms);
@@ -40,19 +41,21 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       toast: (text, tone) => {
         clearTimeout(toastTimer.current);
         setToast({ id: next.current++, text, tone });
-        haptic(tone === 'error' ? 20 : 8);
+        feel(tone === 'error' ? 'error' : 'select');
         toastTimer.current = setTimeout(() => setToast(null), 3200);
       },
       banner: (b) => {
         clearTimeout(bannerTimer.current);
         setLeaving(false);
         setBanner({ ...b, id: next.current++ });
-        haptic(12);
+        feel('select');
         bannerTimer.current = setTimeout(dismissBanner, 5000);
       },
     }),
     [dismissBanner],
   );
+
+  useEffect(() => installTapFeedback(), []);
 
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);

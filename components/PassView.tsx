@@ -11,6 +11,7 @@ import { useSession } from './session';
 import { SlotPicker } from './SlotPicker';
 import { FaceScan } from './ui/FaceScan';
 import { haptic, useFeedback } from './ui/feedback';
+import { feel } from './ui/sensory';
 import { Sheet } from './ui/Sheet';
 import { WalletSheet } from './WalletSheet';
 
@@ -182,7 +183,7 @@ function DeskMode({ b, qrSvg, onCheckedIn, onClose }: { b: PassBooking; qrSvg: s
     try {
       await Promise.all([postAction(b.id, 'checkin'), new Promise((r) => setTimeout(r, 1200))]);
       setState('done');
-      haptic(20);
+      feel('success');
       onCheckedIn();
       setTimeout(onClose, 1500);
     } catch (e) {
@@ -226,7 +227,7 @@ function AddToWallet({ b, onAdded, onClose }: { b: PassBooking; onAdded: () => v
     try {
       await Promise.all([postAction(b.id, 'wallet'), new Promise((r) => setTimeout(r, 650))]);
       setState('added');
-      haptic(14);
+      feel('success');
       onAdded();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That did not work. Try again.');

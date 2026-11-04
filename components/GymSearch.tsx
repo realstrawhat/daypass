@@ -6,11 +6,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { distanceLabel, money } from '@/lib/format';
 import { gymStatus } from '@/lib/hours';
 import type { Gym, Sort } from '@/lib/gyms';
+import { CityMark } from './CityMark';
 import { FilterSheet, filterCount, NO_FILTERS, type Filters } from './FilterSheet';
 import { GymCard, RatingLine } from './GymCard';
 import { GymPhoto } from './GymPhoto';
 import { IconClose, IconExpand, IconList, IconLocate, IconMap, IconSearch, IconSliders } from './Icons';
-import { getLastCoords, locate, nearestCity, rememberCity } from './location';
+import { getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, rememberCity, watchLocation } from './location';
 import { SearchOverlay } from './SearchOverlay';
 import { useSession } from './session';
 import { haptic, useFeedback } from './ui/feedback';
@@ -81,7 +82,7 @@ export function GymSearch() {
   const [result, setResult] = useState<Result | null>(cached?.result ?? null);
   const [gyms, setGyms] = useState<Gym[]>(cached?.gyms ?? []);
   const [page, setPage] = useState(cached?.page ?? 1);
-  const [loading, setLoading] = useState(!cached && hasSearch);
+  const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
@@ -114,15 +115,37 @@ export function GymSearch() {
     });
   };
 
-  // If location is already allowed, show the dot straight away without asking again.
+  // Once location is allowed the app never asks again: it finds you, then keeps up as you move.
+  const [autoChecked, setAutoChecked] = useState(false);
   useEffect(() => {
     let live = true;
-    navigator.permissions?.query({ name: 'geolocation' }).then((p) => {
-      if (live && p.state === 'granted') locate().then((c) => live && setMe(c)).catch(() => {});
-    }).catch(() => {});
+    let stop = () => {};
+    locationAllowed().then(async (ok) => {
+      if (!live) return;
+      setAutoChecked(true);
+      if (!ok) return;
+      try {
+        const c = await locate();
+        if (!live) return;
+        setMe(c);
+        stop = watchLocation((moved) => {
+          setMe(moved);
+          // In near-me mode, refresh the gyms after moving a real distance.
+          setCoords((cur) => (cur && kmBetween(cur, moved) > 0.8 ? moved : cur));
+        });
+        if (!urlCity && !near && !area) {
+          const known = getResolvedCity();
+          setCoords(c);
+          router.replace(known ? `/gyms?city=${encodeURIComponent(known)}` : '/gyms?near=1');
+        }
+      } catch {}
+    });
     return () => {
       live = false;
+      stop();
     };
+    // Runs once when Find opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
@@ -264,7 +287,7 @@ export function GymSearch() {
     if (window.matchMedia('(max-width: 860px)').matches) setView('map');
   };
 
-  const heading = area ? 'This area' : result?.place?.name ?? (near ? 'Near you' : city ?? 'Find a gym');
+  const heading = area ? 'This area' : result?.place?.name ?? (near ? 'Near you' : city ?? 'Finding you');
   const selectedGym = gyms.find((g) => g.id === selected) ?? null;
   const count = filterCount(filters);
   const removeEquipment = (k: string) => applyFilters({ ...filters, equipment: filters.equipment.filter((e) => e !== k) });
@@ -276,7 +299,7 @@ export function GymSearch() {
     </>
   );
 
-  if (!hasSearch && ready && !near) {
+  if (!hasSearch && ready && !near && autoChecked && !me) {
     return (
       <main className="ask">
         <span className="ask-glow" aria-hidden="true" />
@@ -346,7 +369,7 @@ export function GymSearch() {
           ) : null}
         </div>
         <h1 className="search-title" aria-live="polite">
-          {loading ? <span className="sk sk-line" /> : <>{heading} <small>{error ? '' : `${total} ${total === 1 ? 'gym' : 'gyms'}`}</small></>}
+          {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{heading}</span> <small>{error ? '' : `${total} ${total === 1 ? 'gym' : 'gyms'}`}</small></>}
         </h1>
 
         {error ? (
