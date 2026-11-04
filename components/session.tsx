@@ -1,7 +1,8 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { FeedbackProvider, haptic, useFeedback } from './ui/feedback';
+import { FeedbackProvider, useFeedback } from './ui/feedback';
+import { feel } from './ui/sensory';
 import { Sheet } from './ui/Sheet';
 
 // Most visits never open the login sheet, so its code loads separately once the page is idle.
@@ -139,14 +140,15 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const toggleSaved = useCallback<Ctx['toggleSaved']>(async (gymId, gymName) => {
-    const ok = await requireLogin('Log in to save gyms', gymName ? `Keep ${gymName} on your Home screen.` : undefined);
+    const ok = await requireLogin('Log in to save gyms', gymName ? `Keep ${gymName} in your saved gyms.` : undefined);
     if (!ok) return;
     const was = dataRef.current.saved.includes(gymId);
-    haptic();
+    feel(was ? 'unsave' : 'save');
     setData((d) => ({ ...d, saved: was ? d.saved.filter((s) => s !== gymId) : [...d.saved, gymId] }));
     try {
       const res = await fetch('/api/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gymId, saved: !was }) });
       if (!res.ok) throw new Error();
+      if (!was) toast(gymName ? `${gymName} saved` : 'Saved', 'ok', { label: 'View saved', href: '/saved' });
     } catch {
       setData((d) => ({ ...d, saved: was ? [...d.saved, gymId] : d.saved.filter((s) => s !== gymId) }));
       toast('That did not save. Try again.', 'error');

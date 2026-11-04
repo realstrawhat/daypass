@@ -118,6 +118,16 @@ export async function searchGyms(input: SearchInput) {
   return { gyms: rows as unknown as Gym[], total, page: safePage, pageSize: PAGE_SIZE };
 }
 
+export async function listSavedGyms(userId: string) {
+  return db().query(
+    `SELECT g.id, g.slug, g.name, g.city, g.price_cents, g.photos, g.timezone, g.open_hour, g.close_hour, g.weekend_open_hour, g.weekend_close_hour,
+      ${GYM_SELECT_RATING}
+    FROM saved_gyms s JOIN gyms g ON g.id = s.gym_id
+    WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT 60`,
+    [userId],
+  );
+}
+
 export const GYM_SELECT_RATING = `
   (SELECT round(((g.seed_rating * g.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(g.seed_rating_count + count(r.id), 0))::numeric, 1)::float8 FROM reviews r WHERE r.is_public AND r.gym_id = g.id) AS rating,
   (SELECT g.seed_rating_count + count(r.id) FROM reviews r WHERE r.is_public AND r.gym_id = g.id)::int AS rating_count`;

@@ -15,7 +15,7 @@ const SORT_LABEL: Record<string, string> = { recommended: 'Recommended', nearest
 
 export function AccountClient({ user, passkeys }: { user: U; passkeys: number }) {
   const router = useRouter();
-  const { refresh, unread } = useSession();
+  const { refresh, unread, saved } = useSession();
   const { toast } = useFeedback();
   const [sheet, setSheet] = useState<Name>(null);
   const [city, setCity] = useState(user.home_city ?? '');
@@ -129,6 +129,7 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
         <h2 id="s-you">Your Daypass</h2>
         <ul className="rows">
           <li><Link href="/bookings"><span>Passes</span><IconChevron /></Link></li>
+          <li><Link href="/saved"><span>Saved gyms</span>{saved.length ? <span className="row-value">{saved.length}</span> : null}<IconChevron /></Link></li>
           <li><Link href="/wallet"><span>Wallet</span><IconChevron /></Link></li>
           <li><Link href="/inbox"><span>Inbox</span>{unread ? <span className="row-value">{unread} new</span> : null}<IconChevron /></Link></li>
         </ul>

@@ -16,7 +16,7 @@ export function Nav() {
     { href: '/home', match: ['/home'], label: 'Home', icon: <IconHome /> },
     { href: '/gyms', match: ['/gyms'], label: 'Find', icon: <IconSearch /> },
     { href: '/bookings', match: ['/bookings', '/wallet'], label: 'Passes', icon: <IconPass /> },
-    { href: user || !ready ? '/account' : '/login?next=/account', match: ['/account', '/inbox', '/partners'], label: user || !ready ? 'Account' : 'Log in', icon: <IconUser />, badge: unread },
+    { href: user || !ready ? '/account' : '/login?next=/account', match: ['/account', '/inbox', '/partners', '/saved'], label: user || !ready ? 'Account' : 'Log in', icon: <IconUser />, badge: unread },
   ];
   const activeIndex = items.findIndex((i) => i.match.some((m) => path === m || path.startsWith(m + '/')));
   const style = { '--active': activeIndex } as React.CSSProperties;

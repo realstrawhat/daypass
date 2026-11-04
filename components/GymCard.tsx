@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { distanceLabel, money, ratingLabel } from '@/lib/format';
 import { gymStatus, type GymHours, type GymStatus } from '@/lib/hours';
 import { GymPhoto } from './GymPhoto';
@@ -33,19 +33,40 @@ export function useGymStatus(gym: GymHours) {
 export function SaveButton({ gymId, name, tone = 'photo' }: { gymId: string; name: string; tone?: 'photo' | 'plain' }) {
   const { saved, toggleSaved } = useSession();
   const isSaved = saved.includes(gymId);
+  const pressed = useRef(false);
+  const wasSaved = useRef(isSaved);
+  const [burst, setBurst] = useState(0);
+  const [drop, setDrop] = useState(0);
+  // Only a press plays the burst, not the heart filling in when a list loads.
+  useEffect(() => {
+    if (pressed.current && isSaved !== wasSaved.current) {
+      if (isSaved) setBurst((b) => b + 1);
+      else setDrop((d) => d + 1);
+      pressed.current = false;
+    }
+    wasSaved.current = isSaved;
+  }, [isSaved]);
   return (
     <button
       type="button"
-      className={`save is-${tone}${isSaved ? ' is-on' : ''}`}
+      data-feel="none"
+      className={`save is-${tone}${isSaved ? ' is-on' : ''}${drop ? ' is-dropped' : ''}`}
       aria-pressed={isSaved}
       aria-label={isSaved ? `Remove ${name} from saved` : `Save ${name}`}
       onClick={(e) => {
         e.preventDefault();
         e.stopPropagation();
+        pressed.current = true;
         toggleSaved(gymId, name);
       }}
     >
-      <IconHeart filled={isSaved} width={20} height={20} />
+      <IconHeart key={drop} filled={isSaved} width={20} height={20} />
+      {burst ? (
+        <span key={burst} className="save-burst" aria-hidden="true">
+          <i className="save-ring" />
+          {Array.from({ length: 7 }, (_, n) => <b key={n} style={{ '--a': `${n * (360 / 7)}deg` } as React.CSSProperties} />)}
+        </span>
+      ) : null}
     </button>
   );
 }

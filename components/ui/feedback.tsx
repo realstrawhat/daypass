@@ -12,8 +12,9 @@ export const haptic = (ms = 8) => {
 };
 
 type Banner = { title: string; body: string; href?: string };
-type Toast = { id: number; text: string; tone?: 'ok' | 'error' };
-type Ctx = { toast: (text: string, tone?: Toast['tone']) => void; banner: (b: Banner) => void };
+type ToastAction = { label: string; href: string };
+type Toast = { id: number; text: string; tone?: 'ok' | 'error'; action?: ToastAction };
+type Ctx = { toast: (text: string, tone?: Toast['tone'], action?: ToastAction) => void; banner: (b: Banner) => void };
 
 const FeedbackContext = createContext<Ctx>({ toast: () => {}, banner: () => {} });
 export const useFeedback = () => useContext(FeedbackContext);
@@ -38,17 +39,17 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
 
   const value = useMemo<Ctx>(
     () => ({
-      toast: (text, tone) => {
+      toast: (text, tone, action) => {
         clearTimeout(toastTimer.current);
-        setToast({ id: next.current++, text, tone });
-        feel(tone === 'error' ? 'error' : 'select');
+        setToast({ id: next.current++, text, tone, action });
+        if (tone === 'error') feel('error');
         toastTimer.current = setTimeout(() => setToast(null), 3200);
       },
       banner: (b) => {
         clearTimeout(bannerTimer.current);
         setLeaving(false);
         setBanner({ ...b, id: next.current++ });
-        feel('select');
+        feel('notify');
         bannerTimer.current = setTimeout(dismissBanner, 5000);
       },
     }),
@@ -101,6 +102,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
           <p key={toast.id} className={`toast${toast.tone === 'error' ? ' is-error' : ''}`} role="status">
             {toast.tone !== 'error' ? <IconCheck width={16} height={16} /> : null}
             <span>{toast.text}</span>
+            {toast.action ? <Link href={toast.action.href} className="toast-action" onClick={() => setToast(null)}>{toast.action.label}</Link> : null}
           </p>
         ) : null}
       </div>

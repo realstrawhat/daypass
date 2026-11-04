@@ -8,6 +8,7 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
   const track = useRef<HTMLDivElement>(null);
   const start = useRef<{ x: number; id: number } | null>(null);
   const moved = useRef(false);
+  const armed = useRef(false);
   const [offset, setOffset] = useState(0);
   const [dragging, setDragging] = useState(false);
 
@@ -29,6 +30,7 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
       <button
         type="button"
         className="swipe-thumb"
+        data-feel="none"
         aria-label={ariaLabel}
         onPointerDown={(e) => {
           start.current = { x: e.clientX, id: e.pointerId };
@@ -41,7 +43,13 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
           if (!s || s.id !== e.pointerId) return;
           const dx = e.clientX - s.x;
           if (Math.abs(dx) > 6) moved.current = true;
-          setOffset(Math.min(maxOffset(), Math.max(0, dx)));
+          const max = maxOffset();
+          const ready = dx >= max * 0.8;
+          if (ready !== armed.current) {
+            armed.current = ready;
+            if (ready) feel('select');
+          }
+          setOffset(Math.min(max, Math.max(0, dx)));
         }}
         onPointerUp={(e) => {
           const s = start.current;

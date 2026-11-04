@@ -432,7 +432,7 @@ test('open now matches each gym\'s own hours', async () => {
 });
 
 test('private screens send guests to login, and bad booking input is refused', async () => {
-  for (const path of ['/wallet', '/inbox', '/staff']) {
+  for (const path of ['/wallet', '/inbox', '/staff', '/saved']) {
     const res = await fetch(BASE + path, { redirect: 'manual' });
     assert.equal(res.status, 307, path);
     assert.ok(res.headers.get('location').includes('/login'), path);

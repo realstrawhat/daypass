@@ -7,7 +7,7 @@ import { dateLabel, timeLabel } from '@/lib/format';
 import { CityMark } from './CityMark';
 import { FeatureCard, PickCard, type CardGym } from './GymCard';
 import { GymPhoto } from './GymPhoto';
-import { IconArrow, IconBell, IconLocate, IconSearch, Spark } from './Icons';
+import { IconArrow, IconBell, IconHeart, IconLocate, IconSearch, Spark } from './Icons';
 import { generalArea, locate, locationAllowed, nearestCity, setResolvedCity } from './location';
 import { useSession, type NextBooking } from './session';
 import { useFeedback } from './ui/feedback';
@@ -249,6 +249,9 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
           <div className="home-actions">
             {user ? (
               <>
+                <Link href="/saved" className="round round-frost" aria-label={saved.length ? `Saved gyms, ${saved.length}` : 'Saved gyms'}>
+                  <IconHeart filled={saved.length > 0} width={20} height={20} />
+                </Link>
                 <Link href="/inbox" className="round round-frost" aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'}>
                   <IconBell />{unread ? <b className="count-badge">{unread}</b> : null}
                 </Link>
@@ -301,12 +304,6 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
         </ul>
       </section>
 
-      {savedGyms.length ? (
-        <RailSection id="saved" title="Saved">
-          {savedGyms.map((g) => <li key={g.id}><PickCard gym={g} /></li>)}
-        </RailSection>
-      ) : null}
-
       {!finding && rest.length ? (
         <RailSection
           id="picks"
@@ -329,6 +326,12 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
           </li>
         ))}
       </RailSection>
+
+      {savedGyms.length ? (
+        <RailSection id="saved" title={<span className="two-tone">Your <em>saved gyms</em></span>} action={<Link href="/saved">See all</Link>}>
+          {savedGyms.map((g) => <li key={g.id}><PickCard gym={g} /></li>)}
+        </RailSection>
+      ) : null}
 
       <Link href="/partners" className="home-partner">
         <i className="glow-blob" aria-hidden="true" />

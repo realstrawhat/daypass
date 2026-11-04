@@ -1,16 +1,10 @@
 import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
-import { GYM_SELECT_RATING } from '@/lib/gyms';
+import { listSavedGyms } from '@/lib/gyms';
 
 export const GET = handle(async () => {
   const user = await requireUser();
-  const rows = await db().query(
-    `SELECT g.id, g.slug, g.name, g.city, g.price_cents, g.photos, g.timezone, g.open_hour, g.close_hour, g.weekend_open_hour, g.weekend_close_hour,
-      ${GYM_SELECT_RATING}
-    FROM saved_gyms s JOIN gyms g ON g.id = s.gym_id
-    WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT 20`,
-    [user.id],
-  );
+  const rows = await listSavedGyms(user.id);
   return Response.json({ gyms: rows }, { headers: { 'Cache-Control': 'private, no-store' } });
 });
 
