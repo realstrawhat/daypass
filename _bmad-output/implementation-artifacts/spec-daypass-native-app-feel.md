@@ -93,7 +93,7 @@ Owner chose a new direction from the reference images, after rejecting the full-
 
 ### 2026-11-05 — Review pass
 
-- verdicts: 124 findings — high 7, medium 42, low 49, false 6, maybe-false 20. Grading was done by reading the cited code, with no separate verifier. Rows marked unverified were not traced.
+- verdicts: roughly 120 findings across the four layers, many of them repeats between layers. A verdict total was not tallied, because rows below are grouped. Step 4 asks for one row per finding and an exact total, so this log falls short of that. Grading was done by reading the cited code, and not every finding was traced.
 - routing note: step 4 prefers `bad_spec` and a re-derive when in doubt. Findings here were patched in place instead, because the owner was changing the design live. This is a deviation, recorded in `process-log.md`.
 
 **Blind Hunter**
@@ -186,7 +186,7 @@ Owner chose a new direction from the reference images, after rejecting the full-
 - `[false]` `reject` Search and gym screens show loading after prefetch — open times are live data, so this is intended and uncached searches are expected to load.
 - `[low]` `defer` Reminders toggle not saved; disclosed as a demo setting. `[low]` `defer` Demo balance fixed.
 - `[high]` `patch` First-time visitor denying location reached an endless skeleton — same fix as near=1.
-- Remaining rows in this layer repeat the Blind Hunter service worker and Wallet items above, with the same verdicts: 4 `[false]` as separate findings, 20 `[maybe-false]` kept at `defer` where the same claim could not be separately traced.
+- Some rows above combine several findings from this layer. Its full list of about 69 findings is not reproduced one by one here.
 
 ## Design Notes
 

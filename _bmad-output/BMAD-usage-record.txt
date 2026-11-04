@@ -1062,7 +1062,8 @@ subagent, so the owner's feedback could be applied as it came. This is a deviati
 
 Step 4, review: all four reviewers ran as separate agents against a diff of everything since
 the baseline revision: Blind Hunter, Edge Case Hunter, Verification Gap and Intent Alignment.
-They reported about 124 findings. The triage is logged in the spec under Review Triage Log.
+They reported roughly 120 findings, many of them repeats. The triage is logged in the spec
+under Review Triage Log, grouped instead of one row per finding.
 Confirmed faults were fixed and 13 tests added, taking the suite to 33 passing tests.
 
 Deviations in step 4:
