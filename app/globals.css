@@ -1,4 +1,4 @@
-﻿:root {
+:root {
   --black: #000;
   --s1: #131415;
   --s2: #1c1d1f;
@@ -31,7 +31,7 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html { -webkit-text-size-adjust: 100%; background: var(--black); }
+html { -webkit-text-size-adjust: 100%; background: var(--black); overflow-x: clip; }
 html.sheet-open { overflow: hidden; }
 body { margin: 0; min-height: 100svh; background: var(--black); color: var(--white); font-family: var(--body); font-size: 1rem; line-height: 1.5; font-weight: 500; overflow-x: clip; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }
 h1, h2, h3, p, ul, ol, dl, dd, figure { margin: 0; padding: 0; }
@@ -149,7 +149,7 @@ button, a { -webkit-user-select: none; user-select: none; -webkit-touch-callout:
 /* Real colour so people can see the gym, slightly deepened so it sits with black and lime. */
 .photo.is-color { filter: saturate(.94) contrast(1.060) brightness(.96); }
 .photo.is-mono { filter: grayscale(1) contrast(1.060); }
-.photo-empty { position: absolute; inset: 0; display: grid; place-items: center; background: var(--s3); color: var(--volt); }
+.photo-empty { position: absolute; inset: 0; display: grid; place-items: center; padding-bottom: 34%; background: var(--s2); color: var(--volt); }
 
 .status-dot { display: inline-flex; align-items: center; gap: 7px; }
 .status-dot::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--mute); }

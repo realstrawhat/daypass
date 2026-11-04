@@ -369,7 +369,7 @@ export function GymSearch() {
           ) : null}
         </div>
         <h1 className="search-title" aria-live="polite">
-          {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{heading}</span> <small>{error ? '' : `${total} ${total === 1 ? 'gym' : 'gyms'}`}</small></>}
+          {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{error ? heading : `${total} ${total === 1 ? 'gym' : 'gyms'} ${near && !result?.place ? 'near you' : area ? 'in this area' : `in ${heading}`}`}</span></>}
         </h1>
 
         {error ? (

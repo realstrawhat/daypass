@@ -40,8 +40,8 @@ const REVIEWS = [
 ];
 
 // Room shots lead each gym, because people judge a venue by the room. Action shots follow.
-export const ROOM_PHOTOS = ['g01', 'g02', 'g03', 'g06', 'g15', 'g16', 'g17', 'g19', 'g20', 'g21', 'g22', 'g23', 'g24'];
-export const ACTION_PHOTOS = ['g04', 'g05', 'g07', 'g08', 'g09', 'g10', 'g12', 'g13', 'g14', 'g18', 'g25', 'g26', 'g27', 'g28', 'g29', 'g30', 'g31', 'g32', 'g33', 'g34', 'g35', 'g36'];
+export const ROOM_PHOTOS = ['g01', 'g03', 'g06', 'g15', 'g16', 'g19', 'g20', 'g22', 'g23', 'g24'];
+export const ACTION_PHOTOS = ['g04', 'g05', 'g07', 'g08', 'g10', 'g12', 'g14', 'g18', 'g26', 'g27', 'g28', 'g30', 'g31', 'g32', 'g33', 'g34', 'g35', 'g36'];
 
 export const hashText = (s) => {
   let h = 2166136261;

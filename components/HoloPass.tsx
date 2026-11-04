@@ -34,6 +34,7 @@ export function HoloPass({ pass, stamp = false }: { pass: PassData; stamp?: bool
         el.style.setProperty('--rx', `${(0.5 - y) * 14}deg`);
         el.style.setProperty('--ry', `${(x - 0.5) * 18}deg`);
         el.style.setProperty('--shift', `${(x + y) * 100}%`);
+        el.style.setProperty('--turn', `${(x + y) * 100}`);
       });
     };
     const clamp = (n: number) => Math.min(1, Math.max(0, n));

@@ -17,7 +17,8 @@ export function GymPhoto({ src, name, sizes, priority, tone = 'color' }: Props) 
   }
   return (
     <Image
-      className={`photo is-${tone}${loaded ? ' is-loaded' : ''}`}
+      // The main photo shows immediately. Waiting for JavaScript to fade it in would delay the first screen.
+      className={`photo is-${tone}${loaded || priority ? ' is-loaded' : ''}`}
       src={src}
       alt={`Inside ${name}`}
       fill

@@ -1,4 +1,4 @@
-﻿.link { text-decoration: underline; text-underline-offset: 3px; }
+.link { text-decoration: underline; text-underline-offset: 3px; }
 
 /* Simple pages */
 .simple-page { padding: calc(16px + var(--safe-t)) var(--gutter) 40px; max-width: 1180px; margin: 0 auto; display: grid; grid-template-columns: minmax(0, 1fr); gap: 16px; }
@@ -36,7 +36,7 @@
 .ticket.is-next .ticket-tag { background: #000; color: var(--volt); }
 
 /* Pass */
-.pass-page { position: relative; padding: calc(12px + var(--safe-t)) var(--gutter) 40px; }
+.pass-page { position: relative; overflow-x: clip; padding: calc(12px + var(--safe-t)) var(--gutter) 40px; }
 .pass-back { position: absolute; left: var(--gutter); top: calc(12px + var(--safe-t)); z-index: 2; }
 .pass-layout { display: grid; grid-template-columns: minmax(0, 420px) minmax(0, 1fr); gap: clamp(24px, 5vw, 72px); max-width: 1080px; margin: 0 auto; align-items: start; }
 .pass-col { display: grid; gap: 14px; min-width: 0; }
@@ -72,7 +72,7 @@
 @keyframes pass-drop { from { translate: 0 -40px; scale: .92; opacity: 0; } }
 .holo-face { position: absolute; inset: 0; display: flex; flex-direction: column; padding: clamp(20px, 6%, 28px); border-radius: 34px; overflow: hidden; backface-visibility: hidden; -webkit-backface-visibility: hidden; color: #fff; background: radial-gradient(120% 90% at var(--mx) var(--my), #2c2e30 0%, #0b0b0c 62%); box-shadow: 0 34px 70px -24px rgba(0,0,0,.8), inset 0 0 0 1px rgba(255,255,255,.14); }
 .holo-back { transform: rotateY(180deg); }
-.holo-foil { position: absolute; inset: 0; pointer-events: none; opacity: .34; mix-blend-mode: screen; background: repeating-linear-gradient(105deg, rgba(255,95,210,0) 0 16px, rgba(255,95,210,.2) 24px, rgba(84,246,255,.2) 34px, rgba(215,255,62,.2) 44px, rgba(255,95,210,0) 60px); background-size: 240% 100%; background-position: var(--shift) 0; }
+.holo-foil { position: absolute; inset: 0; pointer-events: none; opacity: .2; mix-blend-mode: screen; background: repeating-linear-gradient(105deg, rgba(255,95,210,0) 0 16px, rgba(255,95,210,.2) 24px, rgba(84,246,255,.2) 34px, rgba(215,255,62,.2) 44px, rgba(255,95,210,0) 60px); background-size: 240% 100%; background-position: var(--shift) 0; }
 .holo-top { position: relative; display: flex; justify-content: space-between; align-items: center; font-size: .86rem; }
 .holo-brand { font-family: var(--display); font-size: 1.300rem; }
 .holo-kind { padding: 5px 12px; border-radius: 99px; box-shadow: inset 0 0 0 1px rgba(255,255,255,.34); }
@@ -86,7 +86,7 @@
 .holo-qr svg, .holo-qr span { display: block; width: 100%; height: 100%; }
 .holo-code span { display: block; font-size: .78rem; color: var(--mute-ink); }
 .holo-code strong { font-size: 1.200rem; font-weight: 800; letter-spacing: .02em; }
-.sticker { position: absolute; right: 5%; top: 13%; width: 32%; aspect-ratio: 1; border-radius: 50%; transform: rotate(14deg); background: repeating-linear-gradient(115deg, rgba(255,255,255,.3) 0 2px, rgba(255,255,255,0) 2px 7px), conic-gradient(from calc(var(--shift) * 3.600deg) at 50% 50%, #ff5fd2, #54f6ff, #d7ff3e, #ffb050, #9a78ff, #ff5fd2, #54f6ff, #d7ff3e, #ff5fd2); box-shadow: 0 8px 20px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.75); }
+.sticker { position: absolute; right: 5%; top: 13%; width: 32%; aspect-ratio: 1; border-radius: 50%; transform: rotate(14deg); background: repeating-linear-gradient(115deg, rgba(255,255,255,.3) 0 2px, rgba(255,255,255,0) 2px 7px), conic-gradient(from calc(var(--turn, 90) * 3.600deg) at 50% 50%, #ff5fd2, #54f6ff, #d7ff3e, #ffb050, #9a78ff, #ff5fd2, #54f6ff, #d7ff3e, #ff5fd2); box-shadow: 0 8px 20px rgba(0,0,0,.45), inset 0 0 0 2px rgba(255,255,255,.75); }
 .holo-stage.is-new .sticker { animation: stamp 620ms var(--bounce) 2500ms both; }
 @keyframes stamp { from { transform: rotate(-30deg) scale(2.400); opacity: 0; } }
 .sticker::after { content: ''; position: absolute; inset: 0; border-radius: 50%; background: radial-gradient(circle at var(--mx) var(--my), rgba(255,255,255,.7), rgba(255,255,255,0) 46%); pointer-events: none; }

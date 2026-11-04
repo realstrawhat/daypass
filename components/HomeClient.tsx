@@ -49,7 +49,7 @@ function HeroSlide({ gym, first, morph }: { gym: CardGym; first: boolean; morph:
         <h2>{gym.name}</h2>
         <div className="hero-actions">
           <span className="hero-price">{money(gym.price_cents)}</span>
-          <span className="hero-cta">{status?.nextSlot ? `Book ${status.nextSlot}` : 'See times'} <i aria-hidden="true"><IconArrow /></i></span>
+          <span className="hero-cta">{status?.nextSlot ? `Book ${status.nextSlot.replace(/^(Today|Tomorrow)/, (w) => w.toLowerCase())}` : 'See times'} <i aria-hidden="true"><IconArrow /></i></span>
         </div>
       </div>
     </Link>
@@ -208,7 +208,7 @@ export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) 
         <header className="hero-top">
           <div className="hero-hello">
             <p><Spark /> {ready && user ? `${hello}, ${user.name.split(' ')[0]}` : hello || ' '}</p>
-            <small>{openCount === null ? ' ' : `${openCount} ${openCount === 1 ? 'gym' : 'gyms'} open ${place}`}</small>
+            <small>{openCount === null ? ' ' : openCount === 0 ? `Closed for now. Book ahead for tomorrow` : `${openCount} ${openCount === 1 ? 'gym' : 'gyms'} open ${place}`}</small>
           </div>
           <div className="home-actions">
             {user ? (

@@ -1,4 +1,4 @@
-﻿import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
+import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
 import { payHold } from '@/lib/bookings';
 import { db } from '@/lib/db';
 import { PAY_METHODS, type PayMethod } from '@/lib/payments';

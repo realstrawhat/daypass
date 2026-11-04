@@ -1,4 +1,4 @@
-﻿/* Login */
+/* Login */
 .welcome { min-height: 100svh; display: grid; grid-template-columns: minmax(0, 1.250fr) minmax(0, 1fr); }
 .welcome-art { position: relative; overflow: hidden; background: var(--s1); display: flex; flex-direction: column; justify-content: space-between; padding: calc(16px + var(--safe-t)) clamp(16px, 3vw, 44px) clamp(36px, 5vh, 56px); min-height: 280px; }
 .welcome-art > img { object-fit: cover; object-position: center 30%; filter: grayscale(1) contrast(1.100) brightness(.6); }
@@ -116,7 +116,7 @@
 .rate-nudge strong { font-weight: 800; }
 .rate-nudge svg { flex: none; color: var(--volt); }
 
-.rail-section { display: grid; gap: 10px; margin-top: 10px; min-width: 0; }
+.rail-section { display: grid; gap: 10px; margin-top: 10px; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 340px; }
 .rail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .rail-head h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.700rem, 3vw, 2.400rem); line-height: 1.100; }
 .rail-head a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; flex: none; min-height: 24px; }
@@ -168,8 +168,8 @@
 .filter-sort::-webkit-scrollbar { display: none; }
 .applied { display: flex; flex-wrap: wrap; gap: 6px; }
 .applied button { display: inline-flex; align-items: center; gap: 4px; min-height: 32px; padding: 3px 10px; border-radius: 99px; background: var(--volt); color: #000; font-size: .82rem; font-weight: 700; animation: pop var(--t-2) var(--spring); }
-.search-title { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(2.100rem, 4.600vw, 3.800rem); line-height: 1.060; margin: 4px 0 12px; }
-.search-title small { font-family: var(--body); font-size: .9rem; text-transform: none; color: var(--mute); font-weight: 600; }
+.search-title { font-size: .94rem; font-weight: 700; color: var(--text-2); line-height: 1.300; min-height: 34px; margin: 2px 0 8px; }
+
 .gym-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .gym-skeleton { display: grid; gap: 10px; padding: 8px; border-radius: 30px; background: var(--s1); }
 .gym-card { width: 100%; aspect-ratio: 1 / 1.060; border-radius: 30px; content-visibility: auto; contain-intrinsic-size: auto 380px; }

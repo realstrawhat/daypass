@@ -427,11 +427,13 @@ export async function createDemoUser() {
     ['iron-gym-amsterdam', 41], ['iron-gym-prague', 58], ['iron-gym-barcelona', 77], ['iron-gym-vienna', 96],
   ] as const;
   for (const [i, [slug, days]] of history.entries()) {
+    // Believable training times, mostly after work.
+    const hour = [17, 7, 18, 16, 6, 17, 8, 18][i];
     await db()`
       INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
-      SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('hour', now()) - make_interval(days => ${days}::int),
+      SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int),
         g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int, 'confirmed', ${`sample-${i}`}, true,
-        date_trunc('hour', now()) - make_interval(days => ${days}::int)
+        date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int)
       FROM gyms g WHERE g.slug = ${slug}`;
   }
   await addMessage(userId, 'welcome', 'Welcome to Daypass', 'This is a demo account with sample visits. Payments, email, Face ID and Wallet are simulated, so try anything.');

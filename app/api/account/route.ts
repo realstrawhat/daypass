@@ -1,4 +1,4 @@
-﻿import { destroySession, handle, HttpError, readJson, requireUser } from '@/lib/auth';
+import { destroySession, handle, HttpError, readJson, requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
 
 const SORTS = ['recommended', 'nearest', 'price_asc', 'price_desc', 'rating'];

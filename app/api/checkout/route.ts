@@ -1,4 +1,4 @@
-﻿import { handle, readJson, requireUser } from '@/lib/auth';
+import { handle, readJson, requireUser } from '@/lib/auth';
 import { createHold } from '@/lib/bookings';
 
 export const POST = handle(async (req) => {
