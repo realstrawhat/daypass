@@ -1,4 +1,5 @@
 'use client';
+import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { dateLabel, distanceLabel, money, timeLabel } from '@/lib/format';
@@ -8,10 +9,11 @@ import { PickCard, RatingLine, SaveButton, useGymStatus, type CardGym } from './
 import { GymPhoto } from './GymPhoto';
 import { IconArrow, IconBell, IconLocate, IconSearch, Spark } from './Icons';
 import { locate, locationAllowed, nearestCity, setResolvedCity } from './location';
-import { SearchOverlay } from './SearchOverlay';
 import { useSession, type NextBooking } from './session';
 import { useFeedback } from './ui/feedback';
 import { SharedPhoto } from './ui/Page';
+
+const SearchOverlay = dynamic(() => import('./SearchOverlay').then((m) => m.SearchOverlay), { ssr: false });
 
 const CITIES = ['Amsterdam', 'Berlin', 'Paris', 'Lisbon', 'Barcelona', 'Prague', 'Vienna', 'Rome'];
 const SLIDE_MS = 5600;
@@ -35,7 +37,7 @@ function countdown(iso: string) {
 
 function HeroSlide({ gym, first, morph }: { gym: CardGym; first: boolean; morph: boolean }) {
   const status = useGymStatus(gym);
-  const photo = <GymPhoto src={gym.photos[0]} name={gym.name} priority={first} sizes="100vw" />;
+  const photo = <GymPhoto src={gym.photos[0]} name={gym.name} priority={first} sizes="(max-width: 700px) 150vw, 100vw" />;
   return (
     <Link href={`/gyms/${gym.slug}`} transitionTypes={['nav-forward']} className="hero-slide">
       {morph ? <SharedPhoto name={`gym-${gym.id}`} className="hero-photo">{photo}</SharedPhoto> : <div className="hero-photo">{photo}</div>}

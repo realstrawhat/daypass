@@ -32,10 +32,10 @@ export function GymGallery({ gym, title }: { gym: { id: string; name: string; ph
         {photos.map((p, i) =>
           i === 0 ? (
             <SharedPhoto key="hero" name={`gym-${gym.id}`} className="gallery-slide">
-              <GymPhoto src={p} name={gym.name} priority sizes="(max-width: 860px) 100vw, 70vw" />
+              <GymPhoto src={p} name={gym.name} priority sizes="(max-width: 860px) 150vw, 70vw" />
             </SharedPhoto>
           ) : (
-            <div key={p} className="gallery-slide"><GymPhoto src={p} name={gym.name} sizes="(max-width: 860px) 100vw, 70vw" /></div>
+            <div key={p} className="gallery-slide"><GymPhoto src={p} name={gym.name} sizes="(max-width: 860px) 150vw, 70vw" /></div>
           ),
         )}
       </div>

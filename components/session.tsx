@@ -1,8 +1,12 @@
 'use client';
 import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { AuthForm } from './AuthForm';
+import dynamic from 'next/dynamic';
 import { FeedbackProvider, haptic, useFeedback } from './ui/feedback';
 import { Sheet } from './ui/Sheet';
+
+// Most visits never open the login sheet, so its code loads separately once the page is idle.
+const loadAuthForm = () => import('./AuthForm').then((m) => m.AuthForm);
+const AuthForm = dynamic(loadAuthForm, { ssr: false });
 
 export type SessionUser = {
   name: string;
@@ -136,6 +140,12 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
   const markRead = useCallback(() => setData((d) => ({ ...d, unread: 0 })), []);
 
   const value = useMemo<Ctx>(() => ({ ...data, ready, refresh, requireLogin, toggleSaved, markRead }), [data, ready, refresh, requireLogin, toggleSaved, markRead]);
+
+  // Ready before the first tap on Book, so the sheet never opens empty.
+  useEffect(() => {
+    const t = setTimeout(() => { void loadAuthForm(); }, 2500);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <SessionContext.Provider value={value}>

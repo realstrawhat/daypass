@@ -29,6 +29,22 @@ export function FilterSheet({ open, onClose, value, onApply, countFor }: Props) 
   const [draft, setDraft] = useState<Filters>(value);
   const [count, setCount] = useState<number | null>(null);
 
+  // Closing a sheet steps back past its own history entry, which would undo a change to the
+  // address made while it was open. So the filters are written once that step has finished.
+  const apply = () => {
+    const chosen = draft;
+    let done = false;
+    const run = () => {
+      if (done) return;
+      done = true;
+      window.removeEventListener('popstate', run);
+      setTimeout(() => onApply(chosen), 0);
+    };
+    window.addEventListener('popstate', run);
+    setTimeout(run, 250);
+    onClose();
+  };
+
   useEffect(() => {
     if (open) setDraft(value);
   }, [open, value]);
@@ -108,7 +124,7 @@ export function FilterSheet({ open, onClose, value, onApply, countFor }: Props) 
 
       <div className="filter-actions">
         <button type="button" className="btn btn-ghost" disabled={filterCount(draft) === 0} onClick={() => setDraft(NO_FILTERS)}>Clear</button>
-        <button type="button" className="btn btn-volt" onClick={() => { onApply(draft); onClose(); }}>
+        <button type="button" className="btn btn-volt" onClick={apply}>
           {count === null ? 'Show gyms' : count === 0 ? 'No gyms match' : `Show ${count} ${count === 1 ? 'gym' : 'gyms'}`}
         </button>
       </div>

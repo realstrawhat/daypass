@@ -95,7 +95,7 @@ export function HoloPass({ pass, stamp = false }: { pass: PassData; stamp?: bool
           </dl>
           <div className="holo-foot">
             <div className="holo-qr" aria-hidden="true"><span dangerouslySetInnerHTML={{ __html: pass.qrSvg }} /></div>
-            <div className="holo-code"><span>Show at the desk</span><strong>{pass.code}</strong></div>
+            <div className="holo-code"><span>{pass.state === 'void' ? 'No longer valid' : pass.state === 'used' ? 'Already used' : 'Show at the desk'}</span><strong>{pass.code}</strong></div>
           </div>
           <div className="sticker" aria-hidden="true">
             <svg viewBox="0 0 120 120">
