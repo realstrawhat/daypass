@@ -1,0 +1,1050 @@
+HOW BMAD WAS USED: DAYPASS (GYM DAY PASS APP)
+Unit 7 workshop record
+Generated from the Claude Code session log. Times are UTC, 4 November 2026.
+Private details (email addresses, other sites) are removed. Nothing else in the
+quoted messages and reports was reworded.
+
+==============================================================================
+1. SUMMARY
+==============================================================================
+
+BMad Method v6.12.4 was installed in the project and its automated build
+workflow, bmad-build-auto, was used to plan and review the app.
+
+Who did what: the student gave the instructions, reference images and
+feedback. Claude Code, an AI coding agent, carried out the BMad steps, wrote
+all the code, and ran the checks. The student did not hold separate chats with
+BMad, because BMad is a set of instruction files that an AI tool follows. The
+closest thing to BMad "conversations" are the student's instructions (section
+3) and the four reviewer runs (sections 5 and 8).
+
+Scope: the brief asks for one story. The student asked for the whole build
+pack, so the whole pack was built. Story 3, "Book an appointment", is the best
+one to present.
+
+Live app: https://daypass-six.vercel.app
+
+==============================================================================
+2. BMAD WORKFLOW STEP BY STEP
+==============================================================================
+
+11:08  Install
+    Ran the BMad installer with the BMad Method module. It created _bmad/ and
+    29 skills in .agents/skills/.
+
+11:13  Boilerplate
+    Compared the course zip with the install file by file. It was the same
+    BMad version, so only AGENTS.md and .gitignore were added. Its .claude
+    copy of the skills was left out at the student's request.
+
+11:25  Start workflow
+    Ran BMad's render_skill.py for bmad-build-auto with uv. It produced the
+    workflow steps used below.
+
+11:29  Step 1: Clarify and route
+    Read the step. Project intent came from the student's prompt and the build
+    pack PDF. There is no Git repository, so the version control check did not
+    apply.
+
+11:31  Step 2: Plan
+    Wrote the spec from BMad's template: spec-daypass-full-scope.md. It holds
+    the intent, rules, edge-case table, tasks, and a line-by-line trace of the
+    build pack to features.
+
+11:32 to 12:00  Step 3: Implement
+    Claude Code wrote the app, including the database, booking rules, screens
+    and tests. See the deviations in section 4.
+
+12:01  Step 4: Review
+    Launched BMad's four independent reviewers on all the source code. See
+    sections 5 and 8.
+
+12:07 to 12:11  Fix
+    Fixed the confirmed serious bugs and recorded the rest in the spec's
+    Review Triage Log.
+
+12:12 to 12:20  Change requests
+    Login changes were recorded in the spec's Change Log and the process log,
+    then implemented and tested. See section 6.
+
+
+==============================================================================
+3. THE STUDENT'S INSTRUCTIONS (QUOTED)
+==============================================================================
+
+[2026-11-04 11:06:02] Asked to install BMad in the project folder
+    "https://docs.bmad-method.org/ INSTALL THIS INTO THE FILE DIR NOT IN
+    CLAUDE im not using this mainstreram"
+
+[2026-11-04 11:11:47] Asked to add the course boilerplate
+    ""C:\Users\rockz\Downloads\bmad-boilerplate-mmis-main.zip" add this to
+    file dir its the boiler plate set of instrutuioons"
+
+[2026-11-04 11:21:22] Asked for the full build using BMad, automated
+    "I WANT YOU TO BUILD A  FULL STACK GYM APP
+    "<project>\Gym_App_Product_Build_Pack - Copy.pdf" TAKE THIS AND THIS IS
+    FOR MY PROJECT YOU HAVE 40 MIMNS I WANT HIGH END HIGH END DESIGN NOT
+    GENRICE CLAUDE DESIGN I WANT YOU TO SEE REF IMAGES FROM THE REF FOLDER AND
+    COPY OR TAKE INSPOFROMT I WANT IT SMOOTH DESIGN AND USER FLOW EVERYTHING
+    SHOULD WORK AND SHOULD MATCH MY PROJECT PUT IT ON VERCEL [email removed]
+    ASAP AND STUFF AND DO EVERYTHING USE BMAD OFC BUT AUTOMATE EVERYTHING
+    START TIME CONSTRAINT SKILL 50 MINS AND TELL ME WT ARE U DOIN AND GIVE ME
+    PREVIEW LINK SO I CAN WT IS HAPPENMING USE STOCK IMG IF NEEDED AND ALSO
+    USE INTERNET AND ALSO SHOULD BE REPSONSIVE AND EVERYTHING NO GENRICE
+    CLAUDE DESGIN GOOD DESIGN AND TYPOGRAPHY AND TAKE INSPO"
+
+[2026-11-04 11:21:34] Reminder to use BMad
+    "USE BMOD TOOO"
+
+[2026-11-04 11:26:18] Set scope: everything in the build pack
+    "MAKE SURE EVERYTIHNG IN PDF IS MENTIONED IS IN THE APP BTW"
+
+[2026-11-04 11:34:58] Shared the workshop brief
+    "Workshop
+    Implement one useful story from your Unit 7 pack using the boilerplate.
+    Download it from
+    GitHub: Code → Download ZIP, then extract it.
+    Work individually. You may support one another within your Unit 7 team.
+    Use BMad to plan,
+    implement and check your story.
+    Record failures and corrections, including what went wrong, what you
+    changed and how you
+    checked the result.
+    
+    Review and improve
+    Ask another student who was not part of your Unit 7 team to test your
+    implementation. Test
+    their implementation in return.
+    Gather and document their feedback. Use the BMad workflow to clarify the
+    changes, review
+    the plan, implement the feedback and check the result.
+    Document the feedback and your implementation process: the decisions you
+    made, the
+    changes you implemented and the results of your checks.
+
+
+     this wt we have to do btw"
+
+[2026-11-04 11:28:30] Asked whether BMad was really being used
+    "ARE YOU USING BMOD???"
+
+[2026-11-04 12:00:34] Asked to use BMad features as the assignment requires
+    "use bmod features as per assigment"
+
+[2026-11-04 11:53:55] Feedback on the live preview
+    "i dont the ux is good it doesnt feel like an app its ranther like a
+    website bs"
+
+[2026-11-04 11:54:08] Change request, later reversed
+    "like i want to see the login at start idc"
+
+[2026-11-04 12:12:11] Change request, misread by the AI
+    "login should be mandatory isnt should be at start  so chane it its not
+    right as per my prof"
+
+[2026-11-04 12:18:16] Correction
+    "no i meant login isnt mandatory wth"
+
+[2026-11-04 12:18:31] Clarification
+    "login should be when you try to book or pay  tihnk"
+
+[2026-11-04 17:19:01] Asked for this record
+    "anyway record every bmad conversation and wt it did as a txt and i can
+    show my professor how i used it"
+
+
+==============================================================================
+4. WHERE THE BMAD PROCESS WAS NOT FOLLOWED
+==============================================================================
+
+- Step 3 says a fresh subagent should implement from the spec. Claude Code
+wrote the code itself in the main session, so live feedback could be applied
+straight away.
+- The steps were not read in strict order. Steps 3 and 4 were first read at
+12:00, after the code was written.
+- The workflow asks for a logged row per review finding. The triage log
+summarises by root cause instead, so the spec remains at status in-review, not
+done.
+- The Edge Case Hunter's report arrived after the fixes were deployed. Its
+findings are recorded in section 8, but most were not verified or fixed.
+- There is no Git repository, so the reviewers read a generated diff of all
+source files, and there is no baseline revision.
+- The Matrix Test Audit in step 3 was not formally carried out. Tests cover
+many rows of the edge-case table, but the directions, no-photo and location-
+denied rows have no automated test.
+- BMad's separate workflows for the product brief, PRD, architecture, UX and
+epics were not run, because the Unit 7 build pack already holds that planning.
+- The peer test has not happened yet. No peer feedback exists in this record.
+
+==============================================================================
+5. WHAT THE BMAD REVIEW CHANGED
+==============================================================================
+
+Reviewers
+  Blind Hunter: launched 2026-11-04 12:01:41, report logged 2026-11-04 12:06:06
+    Reads only the code, with no project context, and lists what is wrong or
+    missing.
+  Edge Case Hunter: launched 2026-11-04 12:01:45, report logged 2026-11-04 12:10:32
+    Follows unusual situations through the code and reports what breaks.
+  Verification Gap: launched 2026-11-04 12:01:48, report logged 2026-11-04 12:07:23
+    Checks whether the tests would catch a break in each behaviour.
+  Intent Alignment: launched 2026-11-04 12:01:57, report logged 2026-11-04 12:06:18
+    Compares what was asked for with what was built.
+
+Fixed as a result (from the spec's Review Triage Log)
+- Phone layout: an entrance animation trapped the map and sticky controls,
+leaving a blank area on the Find screen.
+- Checkout: reusing a checkout key could pay for the previously held slot. Now
+refused, with a new test.
+- Checkout could get stuck after closing the wallet following a decline or
+expired hold.
+- A gym's price rise could be charged without being shown to the person.
+- Login could redirect to an outside site through a crafted link.
+- Abandoned checkouts kept slots looking full until someone else checked out.
+- Accounts waiting for deletion could still log in.
+- New gyms showed a 0.0 rating and ranked last. They now show "New".
+- Tests: added checks for invalid times, login and logout, and reading another
+person's pass. The 24-hour test now reports a skip instead of passing
+silently.
+
+Still open (not fixed)
+- Regular users get logged out 30 days after logging in, not after 30 days
+unused (NFR5).
+- A difference is charged before a booking move is secured. This is harmless
+while payments are simulated.
+- About 40 smaller Edge Case Hunter findings are unverified, such as missing
+input checks and error handling.
+- No automated account erasure, offline pass, staff check-in, rate limiting or
+content security policy.
+- Sample visit reviews count publicly towards one gym's rating.
+
+==============================================================================
+6. CHANGE REQUESTS AND A MISTAKE
+==============================================================================
+
+Website feel: the student said the app felt like a website and asked for login
+at the start. The landing page was replaced with a login screen, Home, and app
+navigation.
+
+Login, misread: the student later wrote that login was not right "as per my
+prof". Claude Code read the message as "make login mandatory", locked every
+screen, and deployed it. The student corrected this.
+
+Login, final: the app now opens on Home, guests can browse, and login appears
+when booking. This matches the build pack's story map (Book an appointment,
+Signup / Login, Make payment). The mistake is logged in the spec's Change Log
+and the process log.
+
+==============================================================================
+7. CHECKS RUN (FROM THE LOG)
+==============================================================================
+
+2026-11-04 11:50:51  Deploy to Vercel: started in the background
+2026-11-04 11:59:42  Tests: 0 passed, 1 failed
+2026-11-04 12:00:16  Tests: 9 passed, 0 failed
+2026-11-04 12:00:55  Deploy to Vercel: started in the background
+2026-11-04 12:08:32  Tests: 13 passed, 0 failed
+2026-11-04 12:09:41  Deploy to Vercel: finished
+2026-11-04 12:13:40  Tests: 13 passed, 1 failed
+2026-11-04 12:14:39  Tests: 14 passed, 0 failed
+2026-11-04 12:15:26  Deploy to Vercel: finished
+2026-11-04 12:19:57  Tests: 14 passed, 0 failed
+2026-11-04 12:21:45  Deploy to Vercel: finished
+
+Latest test suite: 14 tests against the real database. Topics are guest
+access, 20 results per page, declined payment, double payment, racing for a
+last spot, reschedule, two changes at once, reused checkout keys, invalid
+times, login and logout, reading another person's pass, the 24-hour rule,
+refunds, and price differences between gyms.
+
+The 24-hour test depends on the time of day and can report a skip. The tests
+do not read the payment records directly, so "charges once" is shown through
+booking and spot counts only.
+
+Browser walkthroughs were also run by the AI at phone size, including a guest
+booking on the live link. No human tester has used the app yet.
+
+Limits: gyms, prices and reviews are invented sample data, payment is
+simulated at the student's request, and speed, accessibility and uptime
+targets (NFR1, 3, 4, 8, 9, 10) have not been measured or proven.
+
+==============================================================================
+8. REVIEWER PROMPTS AND FULL REPORTS (UNEDITED APART FROM PRIVATE DETAILS)
+==============================================================================
+
+------------------------------------------------------------------------------
+BLIND HUNTER
+------------------------------------------------------------------------------
+
+Prompt given to the reviewer:
+
+Conduct a review of CONTENT.
+Look for what's missing, not only what's wrong.
+Compute your finding floor N from the diff file's size: N = min(floor(sqrt(kB) + 1), 10), where kB is the file's size in kilobytes. State the arithmetic in one line, then find at least N issues to fix or improve.
+Output a Markdown list of findings only — no severity, priority, or ranking.
+If the content is empty, stop and say so.
+If you have zero findings, re-check and keep thinking; do not stop with an empty list.
+
+CONTENT: the unified diff at `<scratchpad>\daypass-review.diff`. Read that file — it is the content under review.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+Report:
+
+N = min(floor(sqrt(239.504 kB) + 1), 10) = min(floor(15.48 + 1), 10) = min(16, 10) = 10.
+
+- **Reused idempotency key can book the wrong slot (`components/BookingPanel.tsx`, `createHold` in `lib/bookings.ts`).** `key` is created once per panel and only rotates inside `pay()`, after a decline. `createHold` returns any prior row with that key and never compares gym or time.
+  - Pick 10:00, open the wallet, close it, pick 11:00, book again. The server returns the 10:00 hold, the wallet shows 11:00, and paying confirms 10:00.
+  - The same lookup returns `failed` and `expired` rows. Closing the wallet after a decline, or letting a hold run out, leaves checkout failing with `hold_ended` until the page reloads, because `holdId` is only cleared on `declined`.
+  - The fix is a new key per slot selection, plus a server check that the key matches the gym and slot and that the row is still a live hold.
+
+- **`changeBooking` charges before it knows the move will succeed (`lib/bookings.ts`).** `charge()` runs before the atomic SQL. If that statement then fails with `slot_full`, `stale`, `too_late` or a unique violation, the customer has paid the difference. There is no refund, payment row or compensation path. Concurrent PATCHes can each charge, while only one wins.
+
+- **Price can change without the buyer seeing it (`changeBooking`, `ChangeFlow`, `BookingPanel`).** The client compares against `b.price_cents` or the price rendered with the page, and the server uses the gym's current price. No expected amount is sent.
+  - If a partner raises the price after booking, the UI shows no difference and `confirm()` sends no method. The server then charges the gap to the default `demo-card`.
+  - The wallet total at first checkout can also differ from the held `price_cents`.
+  - The server should require an expected amount, and require an explicit method whenever `difference > 0`.
+
+- **The payment boundary is not what its comment says (`lib/payments.ts`).** The comment says a real provider "would replace `charge` and nothing else", but:
+  - `charge` takes no idempotency key, so concurrent `payHold` calls would each charge.
+  - Nothing returns a provider reference, and there is no `payments` column to store one.
+  - No refund function exists. `cancelBooking` and the refund branch of `changeBooking` just insert `refund/succeeded` rows.
+  - `cancelBooking` hardcodes `method = 'demo-card'`, even for wallet payments.
+
+- **Holds have no visible expiry and stale holds block availability (`lib/gyms.ts`, `lib/bookings.ts`, `WalletSheet`).**
+  - `getAvailability` never calls `releaseExpiredHolds`, and there is no cron in `vercel.json`. An expired hold keeps a slot full until someone runs checkout somewhere.
+  - `hold_expires_at` is returned but the UI ignores it, so there is no countdown.
+  - Closing the wallet does not release the hold.
+  - The expiry error is shown with "Choose another card to try again", which cannot work.
+  - `bookings` has no partial index on `(hold_expires_at) WHERE status = 'hold'`, yet this update runs on every checkout.
+
+- **Account deletion is only a flag (`app/api/account/route.ts`, `lib/auth.ts`, `scripts/setup-db.mjs`).** The UI and privacy notice promise erasure within 30 days, but nothing in the diff does it.
+  - Neither `getCurrentUser` nor the password and passkey login paths check `deletion_requested_at`, so the user can log straight back in with no sign the request is pending and no way to withdraw it.
+  - Upcoming bookings are not cancelled, refunded or released.
+  - A future hard delete cascades through `bookings` and `payments`, which removes financial records and reduces other partners' "Commission owed".
+  - `owner_user_id ON DELETE SET NULL` would leave a deleted partner's gyms live with no owner.
+
+- **No account recovery or credential management (`app/api/auth/[action]/route.ts`, `AccountClient`).** There is no forgotten-password flow, email verification, password change or email change. Passkeys cannot be listed or removed, so a lost device stays trusted. There is no "log out everywhere". A mistyped signup email or a forgotten password locks the user out, and the 409 then stops them re-registering.
+
+- **No transactional messages.** Nothing sends a booking confirmation, a change or cancel notice, or a reminder. The "day-before reminder" exists only if the user imports the `.ics` file. Calendar events do not update after a cancel, because the route returns 404 instead of a `CANCEL` or tombstone event.
+
+- **Nothing verifies a pass at the gym.** The QR encodes `DAYPASS:<code>` and the pass says "Show at the desk", but there is no lookup or check-in endpoint, no redeemed state and no partner arrivals list. Staff cannot confirm that a code is real, for today, not cancelled or not already used. Cancelled passes still render their QR, only visually voided. Partner "Visits" counts confirmed bookings, including future ones, rather than actual visits.
+
+- **Pass needs a live connection at the door.** `app/manifest.ts` declares `display: standalone`, but no service worker or cached pass exists, and the wallet is preview-only. A gym basement with poor signal means the code cannot be shown. Caching the pass, or at least the code, on the device would close this.
+
+- **New partner gyms display a fake 0.0 rating and sink in ranking (`app/api/partners/route.ts`, `lib/gyms.ts`).** Partner inserts leave `seed_rating_count = 0`, so the rating formula yields NULL.
+  - `Number(null).toFixed(1)` renders "0.0" on gym pages, search cards and home picks.
+  - The whole `recommended` expression becomes NULL, so `NULLS LAST` puts these gyms at the bottom regardless of distance or price.
+  - A "New" state and a neutral ranking fallback are missing.
+
+- **Partner listing has gaps (`app/api/partners/route.ts`, `PartnerClient`).**
+  - It goes live instantly with `is_demo = false` and no verification.
+  - `lat` and `lng` have no range check and no check against the city. `null` or whitespace coerces to 0, which counts as a valid pin at 0,0.
+  - The form has no opening hours, so defaults are published under "Details confirmed by the gym".
+  - It has no photos, and no way to edit details, block times, pause or delist after creation.
+  - "Confirm details" is tied to saving a price.
+  - The 90-day rule is not enforced, so overdue gyms stay listed and bookable.
+  - "Commission owed" has no invoicing or settlement path.
+
+- **Review integrity and reviewer privacy (`addReview`, `addSamplePastVisit`, `getReviews`).**
+  - `addReview` does not exclude `is_sample`, so every new account can post a real public review of `iron-gym-amsterdam` without visiting, and it counts toward the rating.
+  - Owners can book and rate their own gym.
+  - `getReviews` publishes the user's full `users.name`, while seed reviews use "Mara K." The privacy notice never says reviews are public.
+  - There is no report, moderation or delete path.
+
+- **Public GET requests write unbounded demo data (`app/api/gyms/route.ts`, `ensureCityHasGyms`, `seedCity`).**
+  - An unauthenticated `?city=` triggers about 96 sequential database round trips and permanently adds rows, with no rate limit.
+  - A timeout partway leaves `n > 0`, so that city never finishes seeding.
+  - Same-name cities such as Paris, Texas collide on slug (always `iron-gym-paris`, and any other repeated name), and those gyms are silently skipped.
+  - `geocodeCity` has no timeout. A geocoder outage returns "No place called X… check the spelling", or a 500 if the fetch throws.
+  - Taking only `count=1` gives users no way to choose between ambiguous places. A partner's gym can get the wrong country or timezone this way.
+
+- **Open redirect in `safeNext` (`app/login/page.tsx`).** `/\evil.com` passes the `startsWith('/')` and not `startsWith('//')` checks. Browsers treat `\` as `/`, so `window.location.assign(next)` in `LoginClient` and the server `redirect()` for logged-in users can both land on an external site after login. It should parse the value with `new URL(next, origin)` and require the same origin.
+
+- **No abuse controls on sensitive endpoints.** Login, register, passkey and checkout have no rate limit or lockout. One account can hold every slot at a gym, repeatedly and for free, because active holds are not capped. Login also returns faster for unknown emails, since scrypt only runs when a row exists.
+
+- **Security headers are incomplete (`next.config.mjs`).** There is no `Content-Security-Policy`, `frame-ancestors` or `X-Frame-Options`, so account deletion, cancellation and checkout screens can be framed. No CSP backs up the `dangerouslySetInnerHTML` in `HoloPass`, and this config has no allowlist for the map tile hosts.
+
+- **The location and privacy claims are not supported (`app/api/gyms/route.ts`, `GymSearch`, `app/privacy/page.tsx`).**
+  - Coordinates go in the GET query string (`/api/gyms?lat=&lng=`), so platform request logs can capture them despite the comment "not stored or logged".
+  - The notice omits OpenFreeMap, which receives tile requests around the user's position, and Open-Meteo, which receives typed cities and home city.
+  - It also omits public review names, a contact, retention periods and legal basis.
+  - Signup has no acknowledgement of the notice, and there is no terms or refund page.
+
+- **24-hour rule is not disclosed before purchase (`BookingPanel`, `WalletSheet`).** The panel always says "Free to change or cancel until 24 hours before", including for slots under 24 hours away, which are never changeable. Buyers only learn this after paying. Also missing are the no-show policy, what happens if a gym closes or cancels, and what to bring. Times are never labelled as gym-local, which matters when booking another city from a different timezone.
+
+- **A session becomes "Past visit" the moment it starts (`app/bookings/[id]/page.tsx`, `addReview`).** `isPast` is `start <= now`, although the calendar models a one-hour session. At 10:01 someone at the desk sees "Past visit", loses the manage actions, and is asked to rate a visit that has barely begun. This should use the session end.
+
+- **Client flows stick on network failure.** `CancelFlow.confirm`, `RateVisit.submit`, `PartnerClient.submit` and `removeAccount` do not catch fetch or `res.json()` errors. Their busy states then stay on "Cancelling" or "Saving", or the action fails silently. `ChangeFlow.openGyms` stays on "Loading gyms" forever if the fetch rejects. `savePrefs` and `removeCard` also lack a catch, and `removeCard` gives no failure message. `HeroSearch` writes to `sessionStorage` unguarded, so a storage error leaves "Locating" stuck.
+
+- **Server input errors surface as 500s (`app/api/*`, `lib/gyms.ts`).** Most routes call `req.json()` with no catch, so malformed JSON gives 500 rather than 400. `app/api/partners` PATCH casts an unvalidated `id` to `::uuid`. Passkey verification lets library exceptions fall through as "Something went wrong". `home_city` and `max_price_cents` accept negative or unbounded values. `bbox` has no size limit, so one request can compute correlated ratings across the whole `gyms` table.
+
+- **Search state is not restorable (`components/GymSearch.tsx`).**
+  - Sort, filters, page, bbox and view live only in component state. Browser back from a gym page drops them, and a results URL cannot be shared.
+  - `/gyms?near=me` deletes its stored location on first read, so back triggers another geolocation request.
+  - Pressing "Near me" from a `?city=` page leaves the old city in the URL.
+  - A saved max price such as €12 has no matching `PRICES` option, so the filter is active while the select does not reflect it.
+
+- **`role="radio"` controls lack radio keyboard behaviour (`SlotPicker`, `RateVisit`, `WalletSheet`).** Each radio is a separate tab stop with no arrow-key handling or roving `tabindex`, which breaks the pattern screen-reader users expect. The rating stars also expose only an exact `aria-checked`, while the visual fill suggests a range. The skip link targets a non-focusable `<div id="main">`.
+
+- **Tests miss the highest-risk paths and can pass without checking (`tests/booking-rules.test.mjs`).**
+  - The 24-hour test silently `return`s when no near slot exists or the hold fails, so it passes without asserting anything.
+  - "Paying twice charges once" only checks spot count, and never counts charges or `payments` rows.
+  - "Only the owner can see a booking" only tries a stranger's DELETE, not pay, PATCH, calendar or the page.
+  - Nothing covers hold expiry, key reuse with a different slot, reviews, partners, passkeys, account deletion, or timezone and DST slot logic.
+  - The suite needs a running server, live Open-Meteo and whatever database is configured. It leaves QA users and bookings behind.
+  - `tests` and `scripts` are excluded from `tsc`, and there is no lint script or CI config.
+
+- **Project setup and schema evolution are missing (`package.json`, `scripts/setup-db.mjs`).**
+  - The project has no README or `.env.example`, so `DATABASE_URL`, `db:setup` and the test prerequisites are undocumented.
+  - `next`, `react`, `react-dom`, the Neon driver and `typescript` are declared as `"latest"`, so any reinstall that regenerates the lockfile can cross a major version.
+  - `CREATE TABLE IF NOT EXISTS` is the only migration mechanism, so later column or constraint changes are silently skipped on existing databases.
+  - Nothing purges expired `sessions`.
+
+------------------------------------------------------------------------------
+EDGE CASE HUNTER
+------------------------------------------------------------------------------
+
+Prompt given to the reviewer:
+
+Read `<project>\_bmad\render\bmad-build-auto\gym-app-fa2baa172927\231f2d5a69a5c36b5fea/review-prompts/edge-case-hunter.md` completely and follow it as your review instructions.
+
+claims_file (leave unread until your instructions call for it): <project>\_bmad-output\implementation-artifacts\spec-daypass-full-scope.md
+
+Review content: the unified diff at `<scratchpad>\daypass-review.diff`. Read that file — it is the content under review.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. If the instruction file is unreadable, report that exact failure and stop. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+Report:
+
+1. components/BookingPanel.tsx:30-48, lib/bookings.ts:61-62
+   When: User closes wallet, picks another slot; reused idempotency key returns the original hold.
+   Result: Wallet shows the new slot but pays for and books the old one.
+   Suggested guard: client: rotate key.current and clear holdId on slot change; server: if (prior[0] && (prior[0].gym_id !== gymId || new Date(prior[0].starts_at).toISOString() !== iso)) throw new HttpError(409, 'key_reused')
+
+2. lib/bookings.ts:61-62, components/BookingPanel.tsx:43-48
+   When: Decline-then-close or expired hold, then Book again reuses key; prior row is failed/expired.
+   Result: Every later payment returns 409 hold_ended until the page is fully reloaded.
+   Suggested guard: if (prior[0] && ['hold','confirmed'].includes(prior[0].status)) return prior; otherwise reject so the client rotates its key
+
+3. components/BookingPanel.tsx:79, components/WalletSheet.tsx:103
+   When: Pay fails with hold_expired or hold_ended; only code 'declined' clears holdId.
+   Result: Sheet says choose another card; every retry hits the same dead hold.
+   Suggested guard: if (['declined','hold_expired','hold_ended'].includes(data.code)) holdId.current = null; show the choose-another-card hint only for declined
+
+4. lib/bookings.ts:163-166, lib/bookings.ts:210-213
+   When: Difference charged, then atomic move returns no row or raises unique violation.
+   Result: Customer charged difference with no move, no payment row and no refund.
+   Suggested guard: reserve and move first, then charge; or on every failure path after charge(), record and issue a refund
+
+5. lib/bookings.ts:113, lib/bookings.ts:141-142
+   When: Hold expires after the expiry check; confirm updates nothing; fallback returns the expired booking.
+   Result: API returns 200 after charging; client redirects to a 404 pass with no booking.
+   Suggested guard: const now = await getOwned(userId, id); if (now.status !== 'confirmed') throw new HttpError(409, 'Your ten-minute hold ran out.', 'hold_expired')
+
+6. lib/bookings.ts:115-127
+   When: Concurrent decline loses to a successful pay; failed CTE updates zero rows, 402 still thrown.
+   Result: User told no booking was made while a confirmed paid booking exists.
+   Suggested guard: RETURN the failed row; if none, re-read the booking and return it when status is confirmed
+
+7. components/BookingActions.tsx:132, components/BookingActions.tsx:162, lib/bookings.ts:161-162
+   When: Owner changed price since booking; same-gym time change computes client difference as zero.
+   Result: Silent charge to default demo-card, or unexpected refund, with no wallet shown.
+   Suggested guard: initialise gym price from slots response d.gym.price_cents; server: if (difference > 0 && !input.method) throw new HttpError(409, 'price_changed')
+
+8. app/api/bookings/[id]/route.ts:10-11
+   When: Empty-string or other falsy method skips the PAY_METHODS guard.
+   Result: Difference charge succeeds and payment row stores an invalid method.
+   Suggested guard: if (method !== undefined && !PAY_METHODS.includes(method)) throw new HttpError(400, 'Choose a way to pay.')
+
+9. components/BookingPanel.tsx:43-48, components/BookingPanel.tsx:115
+   When: Owner changes price after page render; hold snapshots a different price than the rendered prop.
+   Result: Wallet displays one total while payHold charges another.
+   Suggested guard: store data.booking.price_cents from the hold response and pass it as amountCents
+
+10. lib/gyms.ts:157
+   When: startsAt has non-zero seconds or milliseconds, for example 10:00:30Z, via direct API.
+   Result: New slot row bypasses capacity, gym-held hours and the one-per-slot unique index.
+   Suggested guard: if (p.min !== 0 || startsAt.getUTCSeconds() !== 0 || startsAt.getUTCMilliseconds() !== 0) return false
+
+11. lib/gyms.ts:155, lib/gyms.ts:181
+   When: Direct request for an hour after the last picker day but within 22x24 hours.
+   Result: Bookings are accepted for hours that availability never offers.
+   Suggested guard: validate against the end of local day BOOKING_DAYS - 1, the same boundary getAvailability lists
+
+12. lib/gyms.ts:174-177, lib/bookings.ts:180
+   When: Hold expired but no createHold or payHold has run; booked count remains stale.
+   Result: Free spot stays hidden, or a change fails slot_full, until another checkout runs.
+   Suggested guard: await releaseExpiredHolds() at the start of getAvailability and changeBooking
+
+13. app/api/checkout/route.ts:7
+   When: Request omits key; String(undefined) passes the missing-key guard in createHold.
+   Result: All keyless requests share key 'undefined' and receive that user's first booking.
+   Suggested guard: createHold(user.id, String(body.gymId), String(body.startsAt), typeof body.key === 'string' ? body.key : '')
+
+14. lib/auth.ts:81-91, app/api/account/route.ts:8, app/api/checkout/route.ts:6, app/api/partners/route.ts:15
+   When: Malformed JSON or a JSON null body reaches req.json or a property read.
+   Result: Client mistakes return 500 across PATCH and POST handlers and pollute error logs.
+   Suggested guard: shared readJson(req): catch SyntaxError and non-object bodies, then throw new HttpError(400, 'Invalid request.')
+
+15. app/api/gyms/route.ts:39-40, lib/gyms.ts:52, lib/gyms.ts:73
+   When: Public query has maxPrice=10.5, page=1.55 or page=1e20.
+   Result: Postgres int or bigint cast error becomes 500 on public search.
+   Suggested guard: accept only Number.isSafeInteger values, clamp page to a maximum, and bound maxPrice to the int range
+
+16. lib/gyms.ts:89
+   When: Requested page exceeds results; no rows makes the window count unavailable.
+   Result: Reports zero gyms and hides the pager, trapping the user on an empty page.
+   Suggested guard: when rows is empty and page > 1, run a separate count or re-query the last valid page
+
+17. app/api/account/route.ts:11
+   When: PATCH sends empty string, zero, negative or over-int max_price_cents.
+   Result: Saved filter hides every gym, or int overflow returns 500.
+   Suggested guard: treat '' as null, then require an integer within 100..20000 or return 400
+
+18. components/GymSearch.tsx:37, components/GymSearch.tsx:188-190
+   When: Saved max price, such as 12 euros, matches no PRICES option.
+   Result: Select shows Any price while a hidden filter still removes gyms.
+   Suggested guard: append an option for the current maxPrice when it is not listed in PRICES
+
+19. lib/gyms.ts:65, components/GymSearch.tsx:229, app/gyms/[slug]/page.tsx:54, app/gyms/[slug]/page.tsx:84, app/home/page.tsx:99
+   When: Partner gym has no reviews and zero seed count; rating is NULL.
+   Result: Unrated gym displays 0.0 stars and always ranks last under Recommended.
+   Suggested guard: g.rating == null ? 'New' : Number(g.rating).toFixed(1); give the recommended score a neutral rating via coalesce
+
+20. app/api/partners/route.ts:23-25
+   When: Entrance coordinates are out of range, JSON null, or far from the chosen city.
+   Result: Listing missing from city search; gym map fails; directions point elsewhere.
+   Suggested guard: require b.lat and b.lng non-null, abs(lat) <= 90, abs(lng) <= 180, and distance to place under 50 km
+
+21. app/api/partners/route.ts:31
+   When: Fractional capacity such as 1.5 reaches the int cast.
+   Result: Listing request fails with generic 500 instead of a validation message.
+   Suggested guard: Math.min(50, Math.max(1, Math.round(Number(b.capacity)) || 4))
+
+22. app/api/partners/route.ts:40-43
+   When: PATCH id is not a UUID; no shape check before the uuid cast.
+   Result: Postgres cast error returns 500 instead of 404.
+   Suggested guard: if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, 'Gym not found on your account.')
+
+23. app/api/auth/[action]/route.ts:25-28
+   When: addSamplePastVisit or createSession throws after the user row is inserted.
+   Result: Signup returns 500; retry says the email already has an account.
+   Suggested guard: wrap the sample visit in try/catch so it cannot fail signup; on session failure return a log-in prompt
+
+24. app/api/auth/[action]/route.ts:32-36, app/api/passkey/[action]/route.ts:78, lib/auth.ts:64
+   When: User with deletion_requested_at logs in again by password or passkey.
+   Result: Account pending erasure becomes fully usable with an ambiguous deletion state.
+   Suggested guard: reject login when deletion_requested_at is set, or explicitly clear it after telling the user
+
+25. app/api/account/route.ts:21-23
+   When: Deletion requested while the user has upcoming confirmed bookings or active holds.
+   Result: Slots stay occupied and paid sessions are stranded with the user logged out.
+   Suggested guard: in the deletion flow, cancel and refund future bookings and release held spots
+
+26. app/api/passkey/[action]/route.ts:50, app/api/passkey/[action]/route.ts:69-75
+   When: Verify call throws on mismatched challenge, origin, or malformed response.
+   Result: Generic 500 replaces the password-fallback message; the friendly branch is largely bypassed.
+   Suggested guard: try { result = await verify...(...) } catch { throw new HttpError(401, 'Face ID could not be verified. Use your password.') }
+
+27. app/api/passkey/[action]/route.ts:53
+   When: Credential already belongs to another account; excludeCredentials only covers the current user.
+   Result: Setup fails with generic 500.
+   Suggested guard: catch unique violation 23505 and throw new HttpError(409, 'This passkey is already in use.')
+
+28. app/login/page.tsx:8
+   When: next=/\evil.com passes both startsWith checks; browsers normalise the backslash to a slash.
+   Result: Post-login redirect sends the user to an attacker-controlled external site.
+   Suggested guard: n && n.startsWith('/') && !/^\/[\/\\]/.test(n) ? n : '/home'
+
+29. app/api/auth/[action]/route.ts:32-35
+   When: Repeated failed login attempts for one email or from one IP.
+   Result: Unlimited password guessing and unbounded scrypt CPU load.
+   Suggested guard: count recent failures per email and IP; return 429 once over a limit
+
+30. lib/gyms.ts:221
+   When: Geocoder returns a non-OK or rate-limit response.
+   Result: User told the city does not exist during a geocoder outage.
+   Suggested guard: if (!res.ok) throw new HttpError(503, 'City search is unavailable. Try again.'); return null only when no result exists
+
+31. lib/gyms.ts:220, app/home/page.tsx:28
+   When: Geocoder connection hangs; fetch has no timeout on home render or search.
+   Result: Home page and search stall until the platform kills the request.
+   Suggested guard: fetch(url, { signal: AbortSignal.timeout(5000), next: { revalidate: 86400 } })
+
+32. lib/gyms.ts:229-234
+   When: Gym sits inside the wider seed-check box but outside the 25 km search bounds.
+   Result: No seeding occurs and the city search returns no gyms.
+   Suggested guard: count gyms using the same radius bounds searchGyms uses before deciding not to seed
+
+33. lib/gyms.ts:234, scripts/seed-data.mjs:99-113
+   When: Seeding fails or times out partway through its sequential inserts.
+   Result: n > 0 blocks any retry; the city stays partially seeded permanently.
+   Suggested guard: insert the city in one transaction, or re-seed whenever demo count is below expected
+
+34. app/api/gyms/route.ts:20-22
+   When: Anonymous requests iterate many distinct city names on the public endpoint.
+   Result: Unbounded demo-gym growth and repeated write bursts against the database.
+   Suggested guard: rate limit seeding per IP and globally, or require a logged-in user before seedCity
+
+35. components/GymMap.tsx:128-134, lib/gyms.ts:60-61
+   When: Viewport crosses the antimeridian, or getBounds returns longitude beyond 180.
+   Result: Area search silently omits gyms visible on the map.
+   Suggested guard: wrap longitudes to -180..180 and query two ranges when west > east
+
+36. components/GymSearch.tsx:89-95
+   When: Area search in city mode after a failed search; result and coords are null.
+   Result: API returns 400 asking for location; Search this area cannot recover.
+   Suggested guard: when bbox is set and no centre exists, send the bbox midpoint as lat and lng
+
+37. components/GymSearch.tsx:67-70, components/GymSearch.tsx:162
+   When: Location denied from results; an ask-screen city chip keeps old page, bbox and coords.
+   Result: Chosen city is ignored by stale bbox, or opens on a stale empty page.
+   Suggested guard: in the chip handler: setCoords(null); setBbox(null); setPage(1)
+
+38. components/GymSearch.tsx:114
+   When: Search fetch rejects or the response body is not JSON.
+   Result: Raw browser network or JSON parse text is shown to the user.
+   Suggested guard: use data.error only for parsed API errors; otherwise show 'Search did not finish. Try again.'
+
+39. components/HeroSearch.tsx:22
+   When: sessionStorage.setItem throws because storage is blocked or full.
+   Result: Navigation never happens and the Locating button stays disabled.
+   Suggested guard: wrap setItem in try/catch, then still navigate to /gyms?near=me or call setLocating(false)
+
+40. components/BookingActions.tsx:146-150
+   When: Slots API returns error JSON; d.days is undefined and set before the throw.
+   Result: Sheet shows Loading free times indefinitely beside the error.
+   Suggested guard: if (!r.ok) throw new Error(d.error); call setDays only after validating d.days
+
+41. components/BookingActions.tsx:154-160, components/BookingActions.tsx:192
+   When: Gym list fetch rejects, or the response contains no other gyms.
+   Result: List stays on Loading gyms, or shows nothing with no explanation.
+   Suggested guard: try/catch that calls setOthers([]) and sets an error; render a message when the filtered list is empty
+
+42. components/BookingActions.tsx:109-120, components/PartnerClient.tsx:53-65, components/RateVisit.tsx:13-30
+   When: Network failure or non-JSON response during cancel, listing or rating.
+   Result: Button stays busy indefinitely with no error shown.
+   Suggested guard: wrap fetch and res.json in try/catch; set the error and clear the busy state in catch
+
+43. components/AccountClient.tsx:22-28, components/AccountClient.tsx:30-33, components/AccountClient.tsx:53-56, components/AccountClient.tsx:58-68, components/PartnerClient.tsx:16-23
+   When: Fetch rejects while saving preferences, removing card, logging out, deleting, or saving price.
+   Result: Action fails with an unhandled rejection and no feedback to the user.
+   Suggested guard: wrap each handler in try/catch and render a visible failure message
+
+44. components/GymMap.tsx:55-57
+   When: Style request fails without an HTTP status, such as offline or DNS failure.
+   Result: Blank map, without the could-not-load message written for this connection case.
+   Suggested guard: if (!m.isStyleLoaded()) setFailed(true) regardless of e.error.status
+
+45. components/GymMap.tsx:47, components/GymMap.tsx:119-126
+   When: Result centre arrives before async map creation; centre effect no-ops and never retries.
+   Result: Zero-result search leaves the map showing Amsterdam.
+   Suggested guard: keep the latest centre in a ref, or add ready to the centre effect dependencies
+
+46. components/BookingPanel.tsx:108
+   When: User logs in through the booking dialog; props and Nav keep the logged-out snapshot.
+   Result: Saved payment is not preselected and navigation still shows Log in.
+   Suggested guard: call router.refresh() after setSignedIn(true), then use the refreshed savedCard
+
+47. lib/bookings.ts:232, app/bookings/[id]/page.tsx:60
+   When: Booking paid with demo-wallet is later cancelled.
+   Result: Refund is recorded and displayed as going to the demo card.
+   Suggested guard: look up the original charge method and use it for the refund row and banner text
+
+48. app/api/account/route.ts:10, app/home/page.tsx:27-33, app/home/page.tsx:89
+   When: Saved home city cannot be geocoded.
+   Result: Home shows Amsterdam picks; See all opens a no-place error.
+   Suggested guard: validate with geocodeCity on PATCH; build the See all link from centre.name
+
+49. lib/bookings.ts:285-293
+   When: New account rates its auto-created is_sample visit.
+   Result: Throwaway signups can alter Iron Gym's public rating and review list.
+   Suggested guard: if (b.is_sample) keep the review private or exclude it from rating aggregates and public reviews
+
+50. lib/bookings.ts:65-69, lib/bookings.ts:171-204
+   When: User books or moves to the same hour at a different gym.
+   Result: User pays for two passes covering the same hour.
+   Suggested guard: reject when the user has another hold or confirmed booking with the same starts_at
+
+51. app/api/bookings/[id]/calendar/route.ts:5
+   When: Partner gym name or address contains a bare carriage return.
+   Result: Stray control character can corrupt the ICS line or inject a property.
+   Suggested guard: s.replace(/\\/g, '\\\\').replace(/([,;])/g, '\\$1').replace(/\r?\n|\r/g, '\\n')
+
+52. tests/booking-rules.test.mjs:128-132
+   When: No slot under 23 hours exists, or the hold fails; test returns early.
+   Result: 24-hour rule reports passing while nothing was asserted.
+   Suggested guard: use t.skip with a reason, or fail unless a controlled fixture slot is created
+
+53. tests/booking-rules.test.mjs:59-80
+   When: Test title claims one charge, but no assertion reads payment records.
+   Result: A double charge would still pass this test.
+   Suggested guard: query payments for the booking and assert exactly one succeeded charge row
+
+54. lib/auth.ts:42, lib/auth.ts:52-67
+   When: J2 stay logged in: session ends only after 30 unused days; visits move window.
+   Result: Active users are logged out 30 days after login despite regular use.
+   Suggested guard: Cookie maxAge is set once in createSession; visits update only last_seen_at and never reissue the cookie
+
+55. app/api/account/route.ts:22
+   When: NFR6: account deletion request with a 30-day window; account erased within 30 days.
+   Result: Users are promised erasure, but their data is retained indefinitely.
+   Suggested guard: Only sets deletion_requested_at; no job or cron exists and no code reads the value to erase anything
+
+56. app/api/gyms/route.ts:11, components/GymSearch.tsx:93-94
+   When: NFR6: location never stored; code comment adds coordinates are not stored or logged.
+   Result: Precise user coordinates may persist in access logs, contradicting the privacy promise.
+   Suggested guard: Exact lat and lng are sent in the GET query string, which platform request logs can record
+
+57. app/api/partners/route.ts:43, lib/gyms.ts:60-61, components/PartnerClient.tsx:36
+   When: Assumption: gyms confirm details every 90 days.
+   Result: Unconfirmed listings stay bookable while the gym page says gyms confirm every 90 days.
+   Suggested guard: Overdue changes only an owner note; search and booking ignore confirmed_at, and seeded gyms have no confirmer
+
+58. app/api/bookings/[id]/calendar/route.ts:27, app/bookings/[id]/page.tsx:35, app/home/page.tsx:62
+   When: J2 later: day-before reminder.
+   Result: Users who do not download the ICS may get no day-before reminder.
+   Suggested guard: Only a VALARM in the downloaded ICS; Google Calendar link sets none; in-app notice uses 48 hours
+
+
+------------------------------------------------------------------------------
+VERIFICATION GAP
+------------------------------------------------------------------------------
+
+Prompt given to the reviewer:
+
+Read `<project>\_bmad\render\bmad-build-auto\gym-app-fa2baa172927\231f2d5a69a5c36b5fea/review-prompts/verification-gap.md` completely and follow it as your review instructions.
+
+Review content: the unified diff at `<scratchpad>\daypass-review.diff`. Read that file — it is the content under review.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. If the instruction file is unreadable, report that exact failure and stop. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+Report:
+
+Verification-gap review of `daypass-review.diff`. The whole app is new code, so every part is new behaviour.
+
+**How far I looked**
+- The only project test is `tests/booking-rules.test.mjs`. It has 9 API tests that run against a live server, and I read all of it.
+- There is no `.github` folder and no vitest, jest, playwright or cypress config.
+- I ran symbol searches over `app`, `components`, `lib`, `scripts` and `tests`.
+- A case-insensitive search of the test file for `commission|slot_invalid|hold_expired|hold_ended|payments|verifyPassword|/api/auth/login|logout|saveCard|/api/account|minRating|maxPrice|bbox|page=|lat=|calendar|/api/reviews` returned zero hits.
+
+---
+
+### Slot validity rules are never tested with an invalid slot
+
+- **Changed surface:** `isValidSlot` rejects past, out-of-window, non-hour, closed-hour and gym-held times with `slot_invalid` — `lib/gyms.ts:151-161`.
+- **Impacted consumer or site:** `createHold` at `lib/bookings.ts:57` and `changeBooking` at `lib/bookings.ts:157`, reached through `POST /api/checkout` and `PATCH /api/bookings/[id]`.
+- **Existing test evidence:** `Regression gap`. Every `startsAt` in the test file comes from the `/slots` API response (`freeSlots`, `later`, `pick`). `slot_invalid` has zero hits in tests. `isValidSlot` appears only in `lib/gyms.ts` and `lib/bookings.ts`.
+- **Missing verification:** a POST or PATCH with a closed-hour time, a held time, a past time and a `:30` time, each asserting 409 with `code: 'slot_invalid'`.
+- **Demonstration:** make `isValidSlot` return `true` for any valid date. All 9 tests still pass because they only submit slots the API already offered.
+- **Consequence:** a direct API call could book a closed gym or a slot the gym held back.
+- **Disposition:** `patch` — add `invalid slots are refused` to `tests/booking-rules.test.mjs`.
+
+### Slot times are only exercised for Amsterdam
+
+- **Changed surface:** gym-local time conversion in `localToUtc` (`lib/gyms.ts:127`), `localParts` (`lib/gyms.ts:133`) and `getAvailability` (`lib/gyms.ts:174`).
+- **Impacted consumer or site:** slot labels from `app/api/gyms/[id]/slots/route.ts`, used by `components/SlotPicker.tsx`, plus the seeded `Europe/Lisbon` gyms and partner gyms with a geocoded timezone.
+- **Existing test evidence:** `Regression gap`. `freeSlots` and the price-difference test only query `city=Amsterdam` (test lines 30, 161). No test compares a slot's `label` with its `startsAt`. `localToUtc` appears only in `lib/gyms.ts`.
+- **Missing verification:** for a non-Amsterdam-offset city such as Lisbon, assert that each `startsAt` formatted in `gym.timezone` equals the slot `label`, and that the slot falls inside opening hours.
+- **Demonstration:** hard-code `Europe/Amsterdam` inside `localToUtc`. Amsterdam results do not change, so all tests pass, while Lisbon slots are an hour off.
+- **Consequence:** visitors outside the Amsterdam offset could book and arrive at the wrong hour.
+- **Disposition:** `patch` — add `slot labels match the gym's local time` for Lisbon.
+
+### "Only the owner can see a booking" does not exercise the read path
+
+- **Changed surface:** the `b.user_id` and `b.status IN ('confirmed','cancelled')` filters in `getBookingView` and `listBookings` — `lib/bookings.ts:265,271`. The source comment says "A hold is never shown as a booking".
+- **Impacted consumer or site:** the pass page at `app/bookings/[id]/page.tsx:25`, the calendar route at `app/api/bookings/[id]/calendar/route.ts:11`, and the lists at `app/bookings/page.tsx:32` and `app/home/page.tsx:36`.
+- **Existing test evidence:** `Broken-verification gap`. The test at line 143 has this title, but its only stranger check is `DELETE` returning 404 (line 151). That goes through `getOwned`, a separate query. `getBookingView` and `listBookings` have no references in tests, and no test fetches the calendar route or a booking page.
+- **Missing verification:** a stranger's GET of `/api/bookings/{id}/calendar` and `/bookings/{id}` must not return the code. An unpaid hold's id must also return not-found on those routes.
+- **Demonstration:** remove the owner filter from `getBookingView`, or remove the status filter. All tests pass because none of them reach that query.
+- **Consequence:** another user's pass code could leak, or an unpaid hold could show "You are booked" with a QR code.
+- **Disposition:** `patch` — add a stranger and unpaid-hold read test that uses the calendar route and the page status.
+
+### "Paying twice charges once" never observes a charge
+
+- **Changed surface:** the charge and the `payments` rows in `payHold`, `changeBooking` and `cancelBooking` — `lib/bookings.ts:113,124,136,198,231`.
+- **Impacted consumer or site:** the `payments` ledger. A search found only INSERTs and the schema, so no app code reads it and only a direct database query can observe it.
+- **Existing test evidence:** `Broken-verification gap`. Test lines 76-79 assert two 200s and one fewer spot. The spot is taken in `createHold`, so that assertion says nothing about payment. The refund and difference tests read only response fields (lines 154, 170, 173). "payments" has zero hits in tests.
+- **Missing verification:** a query against `DATABASE_URL` asserting exactly one succeeded `charge` row after the double pay, one `refund` row after a cancel, and matching `adjustment` and `refund` rows after gym moves.
+- **Demonstration:** delete the `paid` or `refunded` insert step. Every test still passes.
+- **Consequence:** the money record could be empty or wrong while the suite stays green.
+- **Disposition:** `patch` — add ledger assertions to the existing payment, cancel and price-difference tests.
+
+### Moves between gyms check the response numbers, not the slots or commission
+
+- **Changed surface:** the `freed` step using `cur.gym_id` at `lib/bookings.ts:195`, `commission_cents` on move at line 188, and the declined-difference path at line 165.
+- **Impacted consumer or site:** availability at the old gym through `getAvailability`, and the partner totals at `app/partners/page.tsx:17`.
+- **Existing test evidence:** `Regression gap`. The cross-gym test at lines 168-173 asserts status, `difference` and `refund`. `difference` is calculated in JavaScript at line 161 before the SQL runs. The slot-freed assertions (lines 105-106) use a single gym, so they cannot tell the old gym from the new one. No test pays a difference with `demo-decline`.
+- **Missing verification:** after a cross-gym move, assert the old gym's spot returned and the new gym's spot was taken. Also assert that a declined difference returns 402 and leaves the booking unchanged.
+- **Demonstration:** change `s.gym_id = cur.gym_id` to the new gym id. The same-gym test still passes because the ids match, and the cross-gym test never reads slots. The old gym's spot stays lost.
+- **Consequence:** capacity could leak at the old gym while the new gym's other slot is wrongly freed. A partner's commission could also be wrong.
+- **Disposition:** `patch` — extend the price-difference test and add a declined-difference test.
+
+### The 24-hour test can pass without asserting, and leaves the 23-30 hour band untested
+
+- **Changed surface:** the server 24-hour rule at `lib/bookings.ts:152,177,220,225`.
+- **Impacted consumer or site:** `PATCH` and `DELETE /api/bookings/[id]`, plus the client copy of the rule, `canChange` (`lib/format.ts:19`), used at `app/bookings/[id]/page.tsx:32`.
+- **Existing test evidence:** `Broken-verification gap`. Test lines 129 and 132 use a bare `return` when no slot is under 23 hours or the hold is not 200, and that reports as a pass rather than a skip. The test uses slots under 23 hours, while the allowed path uses slots over 30 hours (line 37), so the band in between is never exercised. `canChange` has no references in tests.
+- **Missing verification:** fail or explicitly skip instead of returning. Assert a case just inside and just outside 24 hours by backdating `starts_at` in the database.
+- **Demonstration:** change the window to 23 hours, or make holds on near slots return non-200. In both cases the test stays green.
+- **Consequence:** the spec's server-side rule (`spec-daypass-full-scope.md:30`) could drift without any failure.
+- **Disposition:** `patch` — remove the silent returns and add the boundary cases.
+
+### Hold expiry is untested
+
+- **Changed surface:** `releaseExpiredHolds` at `lib/bookings.ts:36` and the expired or ended hold branches at lines 107-110.
+- **Impacted consumer or site:** `POST /api/checkout/[id]/pay` and slot availability.
+- **Existing test evidence:** `Regression gap`. `hold_expired` and `releaseExpiredHolds` appear only in `lib/bookings.ts`. No test waits out or backdates a hold.
+- **Missing verification:** backdate `hold_expires_at`, then assert that payment returns 409 `hold_expired` and that the spot comes back.
+- **Demonstration:** delete the expiry check at line 108, and an expired hold can be paid. Alternatively, drop the slot decrement and spots are lost permanently. No test fails either way.
+- **Consequence:** the ten-minute hold promise is unprotected.
+- **Disposition:** `patch` — add a test using direct database access.
+
+### Login, logout and sessions are never run
+
+- **Changed surface:** password check at `lib/auth.ts:28`, login at `app/api/auth/[action]/route.ts:32-38`, session expiry in `getCurrentUser`, and the passkey routes.
+- **Impacted consumer or site:** `components/AuthForm.tsx` (`/api/auth/${mode}`) and `components/LoginClient.tsx:6`.
+- **Existing test evidence:** `Regression gap`. The only auth call in tests is register, with a status-only assertion (test lines 24-25). `verifyPassword`, `logout` and `/api/auth/login` have zero hits in tests. `api/passkey` appears only in `AccountClient.tsx` and `AuthForm.tsx`.
+- **Missing verification:** login with the right password gives 200, the wrong password gives 401, a duplicate email gives 409, and logout invalidates the session.
+- **Demonstration:** make `verifyPassword` return `true`. Anyone can log in as any email, and all tests pass.
+- **Consequence:** an authentication bypass could ship unnoticed.
+- **Disposition:** `patch` — add a password and session test. Passkey coverage can wait, because it needs a virtual authenticator harness and is optional for this change.
+
+### Partner listing, repricing and commission have no tests
+
+- **Changed surface:** owner check and price limits at `app/api/partners/route.ts:8,42-43`, commission calculation at `lib/bookings.ts:49`.
+- **Impacted consumer or site:** `components/PartnerClient.tsx` and the partner totals at `app/partners/page.tsx:17`.
+- **Existing test evidence:** `Regression gap`. `api/partners` appears only in `PartnerClient.tsx`. "commission" has zero hits in tests.
+- **Missing verification:** a non-owner's PATCH returns 404, out-of-range prices return 400, and a paid booking stores 15% commission.
+- **Demonstration:** drop `AND owner_user_id = ...`. Any logged-in user can reprice any gym, and all tests pass.
+- **Consequence:** unauthorized price changes or wrong commission totals could ship.
+- **Disposition:** `patch` — add `partner routes enforce ownership and price limits`, plus a commission check.
+
+### Search filters, sorting, paging and map-area search are not asserted
+
+- **Changed surface:** `lib/gyms.ts:51,72-73,81-82,87`, and the `lat`/`lng` path in `app/api/gyms/route.ts`.
+- **Impacted consumer or site:** `components/GymSearch.tsx:96-98`, the saved price and sort preferences at `GymSearch.tsx:36-37`, and the gym list in `ChangeFlow`, which searches by coordinates.
+- **Existing test evidence:** `Regression gap`. Test lines 42-43 assert only count, price and distance presence. `sort=price_asc` is used at line 161 to pick gyms, with no ordering assertion. `minRating`, `maxPrice`, `bbox`, `page=` and `lat=` have zero hits in tests.
+- **Missing verification:** results respect `maxPrice` and `minRating`, sort order holds, page 2 differs from page 1, and results stay inside `bbox`.
+- **Demonstration:** delete the price filter at line 73. A user's saved price limit stops working, and all tests pass.
+- **Consequence:** filters could silently stop working.
+- **Disposition:** `patch` — add search-parameter tests.
+
+### Rating a visit and the sample visit are untested
+
+- **Changed surface:** `addReview` future-visit guard at `lib/bookings.ts:288`, stars validation at `app/api/reviews/route.ts:8`, and `addSamplePastVisit`.
+- **Impacted consumer or site:** `components/RateVisit.tsx`, the gym rating calculation at `lib/gyms.ts:65`, and the rate banners on the home and bookings pages.
+- **Existing test evidence:** `Regression gap`. `api/reviews` appears only in `RateVisit.tsx`. `addReview` and `addSamplePastVisit` have no references in tests. `client()` checks only the register status.
+- **Missing verification:** a future booking returns 409, stars of 0 or 6 return 400, a past visit's review changes the gym's `rating_count`, and a new account has its sample visit.
+- **Demonstration:** remove the guard at line 288. Users can rate visits that have not happened, and all tests pass.
+- **Consequence:** public gym ratings could be inflated or corrupted.
+- **Disposition:** `patch` — add a review test. It needs a way to read the sample booking's id, such as a direct database query.
+
+### The calendar file and its day-before reminder are untested
+
+- **Changed surface:** `app/api/bookings/[id]/calendar/route.ts:21,27`. `process-log.md:51` records the calendar alert as the reminder feature.
+- **Impacted consumer or site:** the "Download calendar file" link in `components/BookingActions.tsx`.
+- **Existing test evidence:** `Regression gap`. "calendar" has zero hits in tests.
+- **Missing verification:** a confirmed booking returns `text/calendar` containing `TRIGGER:-P1D` and a `DTSTART` that matches `starts_at`. A cancelled booking returns 404.
+- **Demonstration:** drop the `VALARM` block, and no test fails.
+- **Consequence:** the reminder could silently disappear.
+- **Disposition:** `patch` — add a calendar test.
+
+### Account preferences, saved payment and deletion request are untested
+
+- **Changed surface:** `app/api/account/route.ts:9-13,21-24` and `app/api/checkout/[id]/pay/route.ts:13`.
+- **Impacted consumer or site:** `components/AccountClient.tsx`, `GymSearch.tsx:36-37`, and `components/WalletSheet.tsx:28`.
+- **Existing test evidence:** `Regression gap`. `api/account` appears only in `AccountClient.tsx`. `saveCard` appears only in `BookingPanel.tsx`, `WalletSheet.tsx` and the pay route, with zero hits in tests.
+- **Missing verification:** saved preferences read back correctly, `remove_card` clears the card, a wrong confirmation word returns 400, and a deletion request ends all of the user's sessions.
+- **Demonstration:** remove `DELETE FROM sessions` at line 23. Other devices stay logged in after the "You have been logged out" message, and all tests pass.
+- **Consequence:** account and privacy promises could stop being true without any failure.
+- **Disposition:** `patch` — add an account test.
+
+### No automated step runs the test suite
+
+- **Changed surface:** the `test` and `build` scripts in `package.json`, and `vercel.json`.
+- **Impacted consumer or site:** every behaviour in the 9 tests.
+- **Existing test evidence:** `Broken-verification gap`. There is no `.github` folder. `vercel.json` sets only `regions`, and `.vercelignore` excludes `tests`. `npm test` needs a separately started server. A search for the test command found it only in `package.json` and two `_bmad-output` documents, where the spec lists it as a check to run (`spec-daypass-full-scope.md:114`) and the process log records a past run.
+- **Missing verification:** an automatic run of `npm test` before deploy.
+- **Demonstration:** break the double-booking guard and deploy with Vercel. The build succeeds and no test runs.
+- **Consequence:** the existing tests only protect the product when someone remembers to run them.
+- **Disposition:** `defer` — a student demo can reasonably run them by hand, and adding CI needs a separate test database first.
+
+---
+
+## Other findings
+
+- **Wrong slot paid for.** `components/BookingPanel.tsx:30` keeps one idempotency key while the panel is open, and `createHold` returns any earlier booking with that key without comparing gym or time (`lib/bookings.ts:61-62`). If someone holds slot A, closes the wallet, picks slot B and books, the sheet shows B but the payment confirms A.
+- **Checkout stuck until reload.** With the same reused key, closing the wallet after a decline or an expired hold returns the old `failed` or `expired` row, and paying gives 409 `hold_ended`. The message says to pick a slot again, but that cannot help until the page is reloaded. The retry in `BookingPanel.tsx:72-73` only runs while the wallet stays open after a decline.
+- **Silent charge or refund on a same-gym time change.** `ChangeFlow` starts with the booked price (`components/BookingActions.tsx:132`), so it shows no difference. The server uses the gym's current price (`lib/bookings.ts:161-164`). If a partner changed the price after booking, the user is charged on `demo-card` by default, or refunded, without seeing it.
+- **Charge taken before the spot is secured.** `changeBooking` charges at `lib/bookings.ts:164`, before the atomic move. A `slot_full`, `stale` or `already_booked` result leaves that charge with no ledger row and no reversal.
+- **Concurrent pays both call `charge`.** `payHold` calls `charge` at line 113 before its guarded update, and no idempotency key is passed. This is harmless while simulated, but `lib/payments.ts` says a real provider would replace `charge` and nothing else.
+- **Open redirect after login.** `safeNext` (`app/login/page.tsx:8`) accepts `/\evil.example/x`. I checked this with Node: `new URL` resolves it to `https://evil.example/x`, and `LoginClient.tsx:6` passes it to `window.location.assign`.
+- **Deletion request has no follow-through.** Only `app/api/account/route.ts:22` writes `deletion_requested_at`, and nothing acts on it. Login still works afterwards, and no job erases the account, though the UI and privacy page promise erasure within 30 days. `process-log.md:52` already notes that erasure is not automated.
+- **Expired holds keep showing as taken.** `getAvailability` (`lib/gyms.ts:174`) never releases expired holds. A slot stays unavailable until someone's checkout triggers `releaseExpiredHolds`.
+- **Price filter shows the wrong value.** A saved limit such as €12 is accepted, but the filter options are only any, €10, €15 and €20 (`GymSearch.tsx:188`). The select then falls back to showing "Any price" while the €12 limit still applies.
+- **New partner gyms show a 0.0 rating.** They have a zero seed count, so `rating` is NULL, and `Number(null).toFixed(1)` displays "0.0" (`app/gyms/[slug]/page.tsx:54,84`).
+- **Tests leave data behind.** The test file has no cleanup, and `process-log.md:43` records running it against the real database. Each run leaves QA accounts and confirmed bookings that use up real slots.
+
+------------------------------------------------------------------------------
+INTENT ALIGNMENT
+------------------------------------------------------------------------------
+
+Prompt given to the reviewer:
+
+You are an intent-alignment auditor. You have no other context about how this change was produced. Here is the verbatim intent this work started from:
+
+I WANT YOU TO BUILD A FULL STACK GYM APP "<project>\Gym_App_Product_Build_Pack - Copy.pdf" TAKE THIS AND THIS IS FOR MY PROJECT YOU HAVE 40 MIMNS I WANT HIGH END HIGH END DESIGN NOT GENRICE CLAUDE DESIGN I WANT YOU TO SEE REF IMAGES FROM THE REF FOLDER AND COPY OR TAKE INSPOFROMT I WANT IT SMOOTH DESIGN AND USER FLOW EVERYTHING SHOULD WORK AND SHOULD MATCH MY PROJECT PUT IT ON VERCEL [email removed] ASAP AND STUFF AND DO EVERYTHING USE BMAD OFC BUT AUTOMATE EVERYTHING ... USE STOCK IMG IF NEEDED AND ALSO USE INTERNET AND ALSO SHOULD BE REPSONSIVE AND EVERYTHING NO GENRICE CLAUDE DESGIN GOOD DESIGN AND TYPOGRAPHY AND TAKE INSPO
+
+MAYBE WALLET PREVIEW TOO FAKE PREVIEW LIKE COPY APPLE PAY THINGY AS A PAKE PAYMENT AND STUFF AND EVERYTHING LIKE DAY PASS WITH HOLOGRAM STICKER EFFECT
+
+MAKE SURE EVERYTIHNG IN PDF IS MENTIONED IS IN THE APP BTW
+
+dont make it statickpage kinda of thing i want want multiple page kinda thing
+
+i dont the ux is good it doesnt feel like an app its ranther like a website
+
+like i want to see the login at start idc
+
+The diff is the unified diff at `<scratchpad>\daypass-review.diff`. Read that file — it is the change under review.
+
+Your task is strictly descriptive — do not prescribe additional work. Report: (1) the defensible readings of the intent, enumerated; (2) which reading this diff implements; (3) where the readings and the diff diverge — specifically, which surface the intent's expectations live at versus which surface the diff's changes and its tests exercise.
+
+Do not invoke any skill, and do not spawn subagents of your own — you are the reviewer. Return your findings as text in your final message; do not route them through any findings-reporting tool the host may offer.
+
+Report:
+
+## Summary
+
+The diff builds the product the PDF describes. The intent's most repeated expectations are about how the app looks and feels in a person's hands, and nothing in the diff's test suite exercises that surface. All 9 tests call the JSON API and never load a page.
+
+On a phone-sized viewport, the "feels like an app" work partly fails on the deployed app. The map on Find is out of place, and two "sticky" controls sit at the bottom of the page instead of the bottom of the screen.
+
+**What I looked at**
+- The whole diff is new files against `/dev/null`, with no git history. It shows the end state only, so the later pivot from "website" to "app" can't be seen as a change.
+- I read these sections line by line: pages, auth and account routes, `Nav`, `Welcome`, `HoloPass`, `WalletSheet`, `BookingPanel`, the wallet preview, the test file and config.
+- `lib/*` and `GymSearch`, plus most of the CSS, I only sampled or grepped.
+- I also read the PDF, including its story-map images, and the spec in `_bmad-output`.
+- I viewed 2 of the 8 REF images.
+- I probed production (`https://daypass-six.vercel.app`) as a guest in Chrome emulation at 390x844. I did not log in, book or pay on the live app, and did not test Safari or a real phone.
+
+## 1. Defensible readings of the intent
+
+**A. Scope: "everything in PDF"**
+- A1: Every FR, NFR, MVP story and below-the-line "later" story exists as a working feature.
+- A2: Each item is at least represented or mentioned ("IS MENTIONED IS IN THE APP"), so simulated stand-ins count.
+- A3: PDF statements such as "external payment provider" and "Face ID" must be met literally.
+
+**B. "Feels like an app, not a website"** (the latest correction, so it carries the most weight)
+- B1: Structural: app shell, tab bar, no marketing page, separate routes.
+- B2: Experiential: on a phone it behaves like a native app, with fixed chrome, a map under a sheet, sheets and transitions. The judge is how it feels in use.
+- B3: Literal: installable or standalone, not running in a browser tab.
+
+**C. "See the login at start, idc"**
+- C1: The first screen is login, and skipping it is allowed.
+- C2: A hard gate: nothing is usable until logged in. "idc" can be read as "I don't care that the PDF says browse first".
+- C3: Login appears at start for new users, and returning users go straight in.
+
+**D. Design: "high end, not generic, copy or take inspo from REF"**
+- D1: Borrow the visual language (palette, type, motifs).
+- D2: Close copying of specific REF screens and compositions.
+- D3: The test is subjective and belongs to the user: does it read as generic?
+
+**E. Wallet and pass: "maybe wallet preview, fake preview, copy Apple Pay, fake payment, day pass with hologram sticker"**
+- E1: A fake checkout that visibly mimics Apple Pay.
+- E2: A generic phone-wallet-style sheet, clearly labelled as a demo, with no Apple marks.
+- E3: "Wallet preview" means seeing the pass in a wallet, separate from paying. The intent doesn't clearly choose between this and E1 or E2, and "maybe" makes it soft.
+
+**F. Delivery**
+- F1: Live on Vercel under [email removed], reachable by anyone.
+- F2: "Use BMAD" means running the full method.
+- F3: "Use BMAD" means a lightweight automated pass ("automate everything").
+- F4: "Everything should work" means verified end to end on the deployed app, not only at code level.
+
+## 2. Which reading this diff implements
+
+| Area | Reading implemented | Evidence |
+|---|---|---|
+| Scope | A1 for features, A2 for stand-ins | See the stand-ins listed below |
+| App feel | B1 fully, B2 attempted, B3 partly | `Nav.tsx` tab bar and side rail, `template.tsx` page entrance, `loading.tsx`, bottom-sheet dialogs, "map-backed sheet" CSS. `manifest.ts` is `standalone`. No service worker or install prompt in the diff |
+| Login | C1 plus C3 | `app/page.tsx` renders `Welcome`, and logged-in users go to `/home`. "Look around first" links to `/home`. Live: guests get 200 and "Hi there" at `/home`. No middleware; only `/bookings`, `/bookings/[id]` and `/account` redirect in code |
+| Design | D1 | Black and acid lime, Anton caps, notched sheet, greyscale photos, day pills. The spec names which REF supplied each idea |
+| Wallet and pass | E2 plus E3 | "Demo Pay" sheet with stacked cards and a white pay button. Separate "Add to wallet" preview, and a holographic `HoloPass` with a sticker |
+| Delivery | F1 mostly, F3 | Details below |
+
+**Stand-ins for PDF items (A2 rather than A3)**
+- The external provider is a local `charge()` function. It sits behind a boundary where a real provider could replace it.
+- Face ID is a WebAuthn passkey.
+- The day-before reminder is an `.ics` alarm plus an in-app banner for visits under 48 hours. The diff has no push or email.
+- "Updated confirmation" is an on-screen banner and a version number.
+- The 30-day account deletion only writes `deletion_requested_at` and ends sessions. I found no code that later erases the account, and `vercel.json` has no cron.
+
+**Delivery detail**
+- The Vercel CLI user is `[account removed]`, in scope `monamobile`. I did not see the email address itself.
+- The production alias is public and returns 200. The hashed deployment URL redirects to Vercel SSO.
+- BMAD output is one quick-spec-style document with `review_loop_iteration: 0` and an empty triage log. It is outside the diff.
+
+## 3. Where the readings and the diff diverge
+
+**Surface mismatch: expectations versus tests**
+
+| Surface | Intent's expectations live here | Diff changes it | Tests exercise it |
+|---|---|---|---|
+| Rendered screens on a phone: layout, motion, flow | Yes, most of the intent (B, C, D, E, "smooth", "responsive") | Yes: CSS, components, pages | No |
+| Page routing and first screen | Yes (C, "multiple pages") | Yes | No |
+| JSON API and database rules | Only indirectly ("everything should work", NFR7, FR8) | Yes | Yes, all 9 tests |
+| Deployed URL | Yes (F1, F4) | Config only | Only if `BASE_URL` is set; the default is localhost |
+
+- `npm test` runs only `tests/booking-rules.test.mjs`. The other verification commands in the spec are typecheck and build.
+- The spec's own acceptance criteria (each traceability line on the deployed app, 360 px with no horizontal scroll) are listed as manual checks. The diff contains no record of them.
+- The "under 24 hours" test exits early and passes without asserting anything when no such slot exists or the hold fails. Even at the API level, that rule may go unchecked on a given run.
+
+**Observed on production at 390x844**
+
+This is the sharpest divergence, on the surface the user's last correction was about. `.page-enter` uses `animation: page-in ... both`. After the animation it still acts as the containing block for fixed-position children, as measured below (`offsetParent` is `page-enter` and the computed transform is an identity matrix).
+
+- **Find (`/gyms?city=Amsterdam`):**
+  - `.search-map` computes to `position: fixed; top: 0`, but its rect starts at y=304, directly behind the list sheet.
+  - The top 304 px of the first screen is empty black.
+  - 20 map markers exist in the DOM, but the map isn't visible on first view. This affects FR1 and AC1 on phones, and the spec's "map-backed list sheet".
+- **View toggle:** `.view-toggle` is at y≈7688 in a 7898 px page, so the only way to the map view is at the very bottom of the list.
+- **Gym page:** `.book-bar` is at y≈2770 of 2998, not above the tab bar. The sticky "Choose a time" bar isn't sticky.
+- **Working as intended:**
+  - The tab bar sits outside `.page-enter` and is correctly fixed at y=770.
+  - There is no horizontal scroll (`scrollWidth` 390).
+  - The start screen renders as a login sheet with Face ID and "Look around first".
+  - 20 gyms per page are returned.
+
+So B1 holds, while B2 is undercut on the very screens that were meant to deliver it. The reduced-motion rule and other browsers may behave differently; I did not measure them.
+
+**Other divergences by reading**
+- **Login (C2):** if the user meant a hard gate, the diff doesn't implement it. "Look around first" and direct links open `/home`, `/gyms`, gym pages and `/partners` without logging in. The spec records this as a deliberate choice to keep the PDF's browse-first journey, which the user's "idc" may or may not have waived.
+- **Apple Pay (E1):**
+  - The user wrote "copy Apple Pay". The diff is "Demo Pay", with a white button, a visible "Declined test card / Always fails" option, and no double-click or Face ID confirmation moment.
+  - The spec and `lib/payments.ts` say the owner chose this. Nothing in the verbatim intent you gave me records that choice, so I can't confirm it.
+- **Hologram on iPhone:** `HoloPass` listens for `deviceorientation`, and the diff never calls `requestPermission`. From my knowledge of iOS Safari, tilt-driven foil probably won't respond there. This is an inference, not a measurement.
+- **Design (D2):**
+  - Some REF elements are thinned out. The lime ribbon, the most distinctive motif from the Fitness & Activity reference, is `display: none` at phone widths.
+  - The hand-written font is used in one place I could find (`.ask-or`).
+  - D3 can't be judged from code or by any test in the diff, only by the user.
+- **Scope (A3):** the provider, Face ID, reminder and account erasure items above satisfy A2 but not a literal reading. NFR1, NFR4 and NFR9 have no test evidence in the diff. The spec openly says NFR3, NFR8 and NFR10 can't be proved by software, so that gap is declared.
+- **Outside the diff entirely:** the deployment, the BMAD process, the stock images (binaries in `public/img`) and how closely REF was followed. The diff's only link to these is `vercel.json`, the design CSS and image paths.
+
+**Files**
+- Diff: `<scratchpad>\daypass-review.diff`
+- Spec: `<project>\_bmad-output\implementation-artifacts\spec-daypass-full-scope.md`
+
+
+==============================================================================
+9. RELATED FILES
+==============================================================================
+
+- _bmad-output/implementation-artifacts/spec-daypass-full-scope.md: the BMad
+spec, Change Log and Review Triage Log
+- _bmad-output/implementation-artifacts/process-log.md: failures and
+corrections
+- _bmad-output/implementation-artifacts/peer-feedback-template.md: to fill in
+with the peer tester
+- tests/booking-rules.test.mjs: the automated tests
