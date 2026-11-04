@@ -130,6 +130,30 @@ const statements = [
     days_ago int NOT NULL
   )`,
   `CREATE INDEX IF NOT EXISTS seed_reviews_gym ON seed_reviews(gym_id)`,
+  `ALTER TABLE users ADD COLUMN IF NOT EXISTS is_demo boolean NOT NULL DEFAULT false`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_in_at timestamptz`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS wallet_added_at timestamptz`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS refund_reason text`,
+  `ALTER TABLE gyms ADD COLUMN IF NOT EXISTS facts jsonb NOT NULL DEFAULT '{}'`,
+  `ALTER TABLE reviews ADD COLUMN IF NOT EXISTS is_public boolean NOT NULL DEFAULT true`,
+  `CREATE TABLE IF NOT EXISTS messages (
+    id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    booking_id uuid REFERENCES bookings(id) ON DELETE CASCADE,
+    kind text NOT NULL,
+    title text NOT NULL,
+    body text NOT NULL,
+    read_at timestamptz,
+    created_at timestamptz NOT NULL DEFAULT now()
+  )`,
+  `CREATE INDEX IF NOT EXISTS messages_user ON messages(user_id, created_at DESC)`,
+  `CREATE UNIQUE INDEX IF NOT EXISTS messages_one_reminder ON messages(booking_id, kind) WHERE kind = 'reminder'`,
+  `CREATE TABLE IF NOT EXISTS saved_gyms (
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    gym_id uuid NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
+    created_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, gym_id)
+  )`,
 ];
 
 for (const s of statements) await sql.query(s);
@@ -137,8 +161,10 @@ console.log('schema ready');
 
 const { seedCity, CITIES } = await import('./seed-data.mjs');
 for (const city of CITIES) {
-  const n = await seedCity(sql, city);
-  console.log(`${city.name}: ${n} gyms`);
+  // Only seed an empty city, so running setup again never adds duplicates.
+  const [{ existing }] = await sql`SELECT count(*)::int AS existing FROM gyms WHERE city = ${city.name}`;
+  const n = existing === 0 ? await seedCity(sql, city) : 0;
+  console.log(`${city.name}: ${existing + n} gyms`);
 }
 const [{ count }] = await sql`SELECT count(*)::int AS count FROM gyms`;
 console.log('total gyms', count);

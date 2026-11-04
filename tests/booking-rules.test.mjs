@@ -57,6 +57,83 @@ const later = (slots) => slots.filter((s) => new Date(s.startsAt).getTime() > Da
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const key = () => crypto.randomUUID();
 
+async function demoClient() {
+  let cookie = '';
+  const call = async (path, options = {}) => {
+    const res = await fetch(BASE + path, { ...options, redirect: 'manual', headers: { 'Content-Type': 'application/json', cookie }, body: options.body ? JSON.stringify(options.body) : undefined });
+    const set = res.headers.get('set-cookie');
+    if (set) cookie = set.split(';')[0];
+    let data = null;
+    try { data = await res.clone().json(); } catch {}
+    return { status: res.status, data };
+  };
+  assert.equal((await call('/api/auth/demo', { method: 'POST' })).status, 200);
+  return call;
+}
+
+test('demo login gives a working session with an upcoming pass and messages', async () => {
+  const call = await demoClient();
+  const me = await call('/api/auth/me');
+  assert.equal(me.data.user.is_demo, true);
+  assert.ok(me.data.next?.id, 'has an upcoming pass');
+  assert.ok(me.data.unread >= 2, 'has inbox messages');
+  assert.ok(me.data.toRate?.id, 'has a visit to rate');
+});
+
+test('wallet, desk check-in, staff check and locked changes all work', async () => {
+  const call = await demoClient();
+  const { data } = await call('/api/auth/me');
+  const { id, code } = data.next;
+  assert.equal((await call(`/api/bookings/${id}/wallet`, { method: 'POST', body: {} })).status, 200);
+  const early = await call('/api/staff', { method: 'POST', body: { code } });
+  assert.equal(early.data.result, 'wrong_date', 'a future pass is the wrong date at the desk');
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: 'DP-NOPE1' } })).data.result, 'unknown');
+  const checkin = await call(`/api/bookings/${id}/checkin`, { method: 'POST', body: {} });
+  assert.ok(checkin.data.checked_in_at);
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code } })).data.result, 'used');
+  assert.equal((await call(`/api/bookings/${id}`, { method: 'DELETE' })).data.code, 'checked_in');
+});
+
+test('refused entry refunds in full and frees the spot, once', async () => {
+  const call = await demoClient();
+  const { data } = await call('/api/auth/me');
+  const refund = await call(`/api/bookings/${data.next.id}/refused`, { method: 'POST', body: { reason: 'The gym was closed' } });
+  assert.equal(refund.status, 200);
+  assert.ok(refund.data.refund_cents > 0);
+  assert.equal((await call(`/api/bookings/${data.next.id}/refused`, { method: 'POST', body: { reason: 'again' } })).status, 409);
+  assert.equal((await call('/api/auth/me')).data.next, null);
+});
+
+test('saving a gym needs a login and then persists', async () => {
+  const search = await (await fetch(`${BASE}/api/gyms?city=Amsterdam`)).json();
+  const gymId = search.gyms[0].id;
+  const guest = await fetch(`${BASE}/api/saved`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gymId, saved: true }) });
+  assert.equal(guest.status, 401);
+  const call = await demoClient();
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId, saved: true } })).status, 200);
+  assert.ok((await call('/api/auth/me')).data.saved.includes(gymId));
+});
+
+test('malformed requests get a clear 400, not a server error', async () => {
+  const res = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{not json' });
+  assert.equal(res.status, 400);
+});
+
+test('search filters, coordinates and pages work', async () => {
+  const cheap = await (await fetch(`${BASE}/api/gyms?city=Amsterdam&maxPrice=1200`)).json();
+  assert.ok(cheap.gyms.every((g) => g.price_cents <= 1200));
+  const kit = await (await fetch(`${BASE}/api/gyms?city=Amsterdam&equipment=Sauna`)).json();
+  assert.ok(kit.gyms.every((g) => g.equipment.includes('Sauna')));
+  const near = await fetch(`${BASE}/api/gyms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: 52.3676, lng: 4.9041, sort: 'nearest' }) });
+  const body = await near.json();
+  assert.ok(body.gyms.length >= 20);
+  const page2 = await (await fetch(`${BASE}/api/gyms?city=Amsterdam&page=2`)).json();
+  const page1 = await (await fetch(`${BASE}/api/gyms?city=Amsterdam`)).json();
+  const firstIds = new Set(page1.gyms.map((g) => g.id));
+  assert.ok(page2.gyms.length > 0 && !page2.gyms.some((g) => firstIds.has(g.id)), 'page 2 shows different gyms');
+  assert.equal(page2.page, 2);
+});
+
 test('search returns at least 20 gyms per page with distance and price', async () => {
   const r = await (await fetch(`${BASE}/api/gyms?city=Amsterdam`)).json();
   assert.ok(r.gyms.length >= 20);

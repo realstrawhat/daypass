@@ -1,23 +1,32 @@
-import { handle, HttpError } from '@/lib/auth';
+import { handle, HttpError, readJson } from '@/lib/auth';
 import { ensureCityHasGyms, geocodeCity, searchGyms, type Sort } from '@/lib/gyms';
 
 const SORTS: Sort[] = ['recommended', 'nearest', 'price_asc', 'price_desc', 'rating'];
-const num = (v: string | null) => {
-  if (v === null || v === '') return null;
+const num = (v: unknown) => {
+  if (v === null || v === undefined || v === '') return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 };
+const int = (v: unknown, max: number) => {
+  const n = num(v);
+  return n === null ? null : Math.min(max, Math.max(0, Math.round(n)));
+};
 
-// Coordinates are used for this one response. They are not stored or logged.
-export const GET = handle(async (req) => {
-  const q = new URL(req.url).searchParams;
-  let lat = num(q.get('lat'));
-  let lng = num(q.get('lng'));
+type Params = Record<string, unknown>;
+
+async function run(p: Params) {
+  let lat = num(p.lat);
+  let lng = num(p.lng);
   let place: { name: string; country: string } | null = null;
 
-  const city = q.get('city');
+  const city = typeof p.city === 'string' ? p.city : null;
   if (city) {
-    const found = await geocodeCity(city);
+    let found;
+    try {
+      found = await geocodeCity(city);
+    } catch {
+      throw new HttpError(503, 'City search is unavailable right now. Try again in a moment.', 'geocoder');
+    }
     if (!found) throw new HttpError(404, `No place called "${city.slice(0, 60)}" was found. Check the spelling or try a nearby city.`, 'no_place');
     await ensureCityHasGyms(found);
     lat = found.lat;
@@ -26,22 +35,35 @@ export const GET = handle(async (req) => {
   }
   if (lat === null || lng === null || Math.abs(lat) > 90 || Math.abs(lng) > 180) throw new HttpError(400, 'Share your location or type a city.');
 
-  const sortParam = q.get('sort') as Sort;
-  const bboxParts = q.get('bbox')?.split(',').map(Number);
+  const bboxParts = typeof p.bbox === 'string' ? p.bbox.split(',').map(Number) : null;
   const bbox = bboxParts?.length === 4 && bboxParts.every(Number.isFinite) ? (bboxParts as [number, number, number, number]) : null;
+  const equipment = typeof p.equipment === 'string' && p.equipment ? p.equipment.split('|').slice(0, 8) : [];
 
   const result = await searchGyms({
     lat,
     lng,
     bbox,
-    sort: SORTS.includes(sortParam) ? sortParam : 'recommended',
-    minRating: num(q.get('minRating')),
-    maxPriceCents: num(q.get('maxPrice')),
-    page: num(q.get('page')) ?? 1,
+    sort: SORTS.includes(p.sort as Sort) ? (p.sort as Sort) : 'recommended',
+    minRating: num(p.minRating),
+    maxPriceCents: int(p.maxPrice, 100000),
+    openNow: p.openNow === true || p.openNow === '1',
+    equipment,
+    page: int(p.page, 500) ?? 1,
   });
+  return { ...result, center: { lat, lng }, place };
+}
 
-  return Response.json(
-    { ...result, center: { lat, lng }, place },
-    { headers: { 'Cache-Control': 'private, no-store' } },
-  );
+// City searches are the same for everyone, so the edge can answer them instantly.
+export const GET = handle(async (req) => {
+  const params = Object.fromEntries(new URL(req.url).searchParams);
+  const body = await run(params);
+  const isCity = typeof params.city === 'string' && !params.bbox;
+  return Response.json(body, { headers: { 'Cache-Control': isCity ? 'public, s-maxage=30, stale-while-revalidate=300' : 'private, no-store' } });
+});
+
+// Coordinates travel in the body, never the URL, so request logs can't record them.
+// They are used for this one response and are not stored.
+export const POST = handle(async (req) => {
+  const body = await run(await readJson(req));
+  return Response.json(body, { headers: { 'Cache-Control': 'private, no-store' } });
 });

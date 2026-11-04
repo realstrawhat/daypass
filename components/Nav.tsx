@@ -1,35 +1,48 @@
 'use client';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useSession } from './session';
 import { IconHome, IconPass, IconSearch, IconStore, IconUser, Spark } from './Icons';
+import { haptic } from './ui/feedback';
 
-export function Nav({ user }: { user: { name: string } | null }) {
+const HIDE_ON = ['/login', '/staff'];
+
+export function Nav() {
   const path = usePathname();
-  // The login screen is full screen, with no app navigation.
-  if (path === '/login') return null;
+  const { user, ready, unread } = useSession();
+  if (HIDE_ON.includes(path)) return null;
 
-  const isActive = (p: string) => path === p || path.startsWith(p + '/');
   const items = [
-    { href: '/home', match: '/home', label: 'Home', icon: <IconHome /> },
-    { href: '/gyms', match: '/gyms', label: 'Find', icon: <IconSearch /> },
-    { href: '/bookings', match: '/bookings', label: 'Passes', icon: <IconPass /> },
-    { href: user ? '/account' : '/login?next=/account', match: '/account', label: user ? 'Account' : 'Log in', icon: <IconUser /> },
+    { href: '/home', match: ['/home'], label: 'Home', icon: <IconHome /> },
+    { href: '/gyms', match: ['/gyms'], label: 'Find', icon: <IconSearch /> },
+    { href: '/bookings', match: ['/bookings', '/wallet'], label: 'Passes', icon: <IconPass /> },
+    { href: user || !ready ? '/account' : '/login?next=/account', match: ['/account', '/inbox', '/partners'], label: user || !ready ? 'Account' : 'Log in', icon: <IconUser />, badge: unread },
   ];
+  const activeIndex = items.findIndex((i) => i.match.some((m) => path === m || path.startsWith(m + '/')));
+  const style = { '--active': activeIndex } as React.CSSProperties;
 
   return (
     <>
       <nav className="rail" aria-label="Main">
         <Link href="/home" className="rail-logo" aria-label="Daypass home"><Spark /></Link>
-        <div className="rail-items">
-          {items.map((i) => (
-            <Link key={i.label} href={i.href} aria-current={isActive(i.match) ? 'page' : undefined}>{i.icon}<span>{i.label}</span></Link>
+        <div className="rail-items" style={style}>
+          {activeIndex >= 0 ? <i className="nav-thumb" aria-hidden="true" /> : null}
+          {items.map((i, n) => (
+            <Link key={i.label} href={i.href} aria-current={n === activeIndex ? 'page' : undefined} onClick={() => haptic(6)}>
+              {i.icon}<span>{i.label}</span>
+              {i.badge ? <b className="nav-badge" aria-label={`${i.badge} unread`}>{i.badge}</b> : null}
+            </Link>
           ))}
         </div>
-        <Link href="/partners" className="rail-foot" aria-current={isActive('/partners') ? 'page' : undefined}><IconStore /><span>Gyms</span></Link>
+        <Link href="/partners" className="rail-foot"><IconStore /><span>Gyms</span></Link>
       </nav>
-      <nav className="tabbar" aria-label="Main">
-        {items.map((i) => (
-          <Link key={i.label} href={i.href} aria-current={isActive(i.match) ? 'page' : undefined}>{i.icon}<span>{i.label}</span></Link>
+      <nav className="tabbar" aria-label="Main" style={style}>
+        {activeIndex >= 0 ? <i className="nav-thumb" aria-hidden="true" /> : null}
+        {items.map((i, n) => (
+          <Link key={i.label} href={i.href} aria-current={n === activeIndex ? 'page' : undefined} onClick={() => haptic(6)}>
+            {i.icon}<span>{i.label}</span>
+            {i.badge ? <b className="nav-badge" aria-label={`${i.badge} unread`}>{i.badge}</b> : null}
+          </Link>
         ))}
       </nav>
     </>

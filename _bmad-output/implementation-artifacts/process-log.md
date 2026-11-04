@@ -41,6 +41,17 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 | 14 | BMad review: changing slot after closing the wallet could pay for the old slot | Each selection gets a new checkout key, and the server refuses a key used for a different slot | New automated test |
 | 15 | BMad review: open redirect after login, expired holds blocking slots, pending-deletion accounts able to log in, silent charge after a price rise, new gyms showing 0.0 | Fixed each one | Type check, tests and code review of the change. Not each one was driven by hand |
 | 16 | A message about login and the professor was misread as "make login mandatory", so every screen was locked behind login and deployed. The owner meant the opposite | Reverted the lock. The start screen was also removed, so the app opens on Home and asks for login when booking, as the build pack's story map shows | New automated test checks guests can browse and cannot book, plus a check on the live link |
+| 17 | Refreshing sample data added 150 duplicate gyms, because changing the generator changed its random order | Removed only those rows, which had no bookings, and setup now seeds only empty cities | City counts read back at 24 each |
+| 18 | Owner feedback: some features did not work and the app did not feel like an app | Second BMad spec, `spec-daypass-native-app-feel.md`. Static browsing pages, drag-to-dismiss sheets, push banners, search overlay, filters, and working simulations of Wallet, inbox, Face ID, desk check-in and refused-entry refunds | Back-end tests, plus a browser check on the live link |
+| 19 | Owner feedback: black and white photos make it hard to judge a gym | Colour on every gym photo, with black and white kept for the login screen and city tiles | Live browser check |
+| 20 | Owner feedback: the design was good but not exciting | Photo-led cards, swipeable Home, cinematic gym page, hologram moment, lime ribbon, designed loading and error states | Live browser check |
+| 21 | Owner feedback: the map did not show their location | Added a you-are-here dot and a locate button. Location stays in memory only | Live browser check |
+
+## Second round: BMad process notes
+
+- The spec was written before this round's code, which is an improvement on the first round.
+- Claude Code again wrote the code directly instead of a fresh subagent, so the owner's changes could be applied as they came.
+- The owner asked to push, deploy and then test, so the live check and the BMad review run after the first deploy of this round.
 
 ## Checks run
 

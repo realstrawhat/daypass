@@ -2,263 +2,398 @@
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { distanceLabel, money, ratingLabel } from '@/lib/format';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { distanceLabel, money } from '@/lib/format';
+import { gymStatus } from '@/lib/hours';
 import type { Gym, Sort } from '@/lib/gyms';
+import { FilterSheet, filterCount, NO_FILTERS, type Filters } from './FilterSheet';
+import { GymCard, RatingLine } from './GymCard';
 import { GymPhoto } from './GymPhoto';
-import { IconArrow, IconList, IconLocate, IconMap, IconSearch, IconStar } from './Icons';
+import { IconClose, IconExpand, IconList, IconLocate, IconMap, IconSearch, IconSliders } from './Icons';
+import { getLastCoords, locate, nearestCity, rememberCity } from './location';
+import { SearchOverlay } from './SearchOverlay';
+import { useSession } from './session';
+import { haptic, useFeedback } from './ui/feedback';
 
 const GymMap = dynamic(() => import('./GymMap').then((m) => m.GymMap), { ssr: false, loading: () => <div className="map-wrap map-loading" /> });
 
-type Prefs = { home_city: string | null; default_sort: string; max_price_cents: number | null } | null;
 type Result = { gyms: Gym[]; total: number; page: number; pageSize: number; center: { lat: number; lng: number }; place: { name: string; country: string } | null };
 
 const SORTS: { id: Sort; label: string }[] = [
   { id: 'recommended', label: 'Recommended' },
   { id: 'nearest', label: 'Nearest' },
   { id: 'price_asc', label: 'Lowest price' },
-  { id: 'price_desc', label: 'Highest price' },
   { id: 'rating', label: 'Top rated' },
+  { id: 'price_desc', label: 'Highest price' },
 ];
-const PRICES = [{ v: null, l: 'Any price' }, { v: 1000, l: 'Up to €10' }, { v: 1500, l: 'Up to €15' }, { v: 2000, l: 'Up to €20' }];
-const RATINGS = [{ v: null, l: 'Any rating' }, { v: 4, l: '4.0 and up' }, { v: 4.5, l: '4.5 and up' }];
 
-export function GymSearch({ prefs }: { prefs: Prefs }) {
+// Results stay in memory for the visit, so going back to a search is instant and keeps its place.
+const cache = new Map<string, { result: Result; gyms: Gym[]; page: number }>();
+
+async function fetchPage(params: URLSearchParams, coords: { lat: number; lng: number } | null): Promise<Result> {
+  const res = coords
+    ? await fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...Object.fromEntries(params), ...coords }) })
+    : await fetch(`/api/gyms?${params}`);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Search did not finish. Try again.');
+  return data;
+}
+
+const apiParams = (q: { city: string | null; sort: Sort; filters: Filters; area: string | null }, page = 1) => {
+  const p = new URLSearchParams({ sort: q.sort, page: String(page) });
+  if (q.city) p.set('city', q.city);
+  if (q.area) p.set('bbox', q.area);
+  if (q.filters.maxPrice != null) p.set('maxPrice', String(q.filters.maxPrice));
+  if (q.filters.minRating != null) p.set('minRating', String(q.filters.minRating));
+  if (q.filters.openNow) p.set('openNow', '1');
+  if (q.filters.equipment.length) p.set('equipment', q.filters.equipment.join('|'));
+  return p;
+};
+
+export function GymSearch() {
   const params = useSearchParams();
   const router = useRouter();
-  const cityParam = params.get('city');
-  const near = params.get('near') === 'me';
+  const { user, ready } = useSession();
+  const { toast } = useFeedback();
 
-  const [mode, setMode] = useState<'ask' | 'ready'>(cityParam || near || prefs?.home_city ? 'ready' : 'ask');
-  const [cityInput, setCityInput] = useState(cityParam ?? '');
-  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(null);
-  const [city, setCity] = useState<string | null>(cityParam ?? (near ? null : prefs?.home_city ?? null));
-  const [sort, setSort] = useState<Sort>((prefs?.default_sort as Sort) || 'recommended');
-  const [maxPrice, setMaxPrice] = useState<number | null>(prefs?.max_price_cents ?? null);
-  const [minRating, setMinRating] = useState<number | null>(null);
-  const [bbox, setBbox] = useState<[number, number, number, number] | null>(null);
-  const [page, setPage] = useState(1);
-  const [result, setResult] = useState<Result | null>(null);
-  const [loading, setLoading] = useState(false);
+  const near = params.get('near') === '1';
+  const urlCity = params.get('city');
+  const area = params.get('area');
+  // A saved home city is the default when no search was asked for.
+  const city = urlCity ?? (!near && ready ? user?.home_city ?? null : null);
+  const sort = (params.get('sort') as Sort) || (user?.default_sort as Sort) || 'recommended';
+  const paramEquipment = params.get('equipment');
+  const filters = useMemo<Filters>(() => ({
+    maxPrice: params.get('maxPrice') ? Number(params.get('maxPrice')) : user?.max_price_cents ?? null,
+    minRating: params.get('minRating') ? Number(params.get('minRating')) : null,
+    openNow: params.get('openNow') === '1',
+    equipment: paramEquipment ? paramEquipment.split('|') : [],
+  }), [params, paramEquipment, user?.max_price_cents]);
+
+  const [coords, setCoords] = useState<{ lat: number; lng: number } | null>(() => (near ? getLastCoords() : null));
+  const [locError, setLocError] = useState('');
+  const [me, setMe] = useState<{ lat: number; lng: number } | null>(() => getLastCoords());
+  const [locating, setLocating] = useState(false);
+  const hasSearch = !!city || (near && !!coords);
+  const key = useMemo(() => JSON.stringify({ city, area, sort, filters, coords: near ? coords : null }), [city, area, sort, filters, coords, near]);
+
+  const cached = cache.get(key);
+  const [result, setResult] = useState<Result | null>(cached?.result ?? null);
+  const [gyms, setGyms] = useState<Gym[]>(cached?.gyms ?? []);
+  const [page, setPage] = useState(cached?.page ?? 1);
+  const [loading, setLoading] = useState(!cached && hasSearch);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
-  const [note, setNote] = useState('');
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'map'>('list');
-  const listRef = useRef<HTMLDivElement>(null);
+  const [overlay, setOverlay] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [showPill, setShowPill] = useState(false);
   const request = useRef(0);
+  const sentinel = useRef<HTMLDivElement>(null);
+  const topMark = useRef<HTMLDivElement>(null);
+  const moreLock = useRef(false);
 
-  const locate = useCallback(() => {
-    if (!navigator.geolocation) {
-      setMode('ask');
-      setNote('This browser cannot share your location. Type a city instead.');
-      return;
+  // Update the address bar rather than navigate, so Back returns to this exact search.
+  const setQuery = useCallback((changes: Record<string, string | null>) => {
+    const next = new URLSearchParams(window.location.search);
+    for (const [k, v] of Object.entries(changes)) {
+      if (v === null) next.delete(k);
+      else next.set(k, v);
     }
-    setNote('Finding your location');
-    navigator.geolocation.getCurrentPosition(
-      (p) => {
-        setNote('');
-        setCity(null);
-        setCityInput('');
-        setBbox(null);
-        setPage(1);
-        setCoords({ lat: p.coords.latitude, lng: p.coords.longitude });
-        setMode('ready');
-      },
-      () => {
-        setMode('ask');
-        setNote('Location is off. Type a city instead.');
-      },
-      { timeout: 8000, maximumAge: 60000 },
-    );
+    window.history.replaceState(window.history.state, '', `/gyms?${next}`);
+  }, []);
+
+  const applyFilters = (f: Filters) => {
+    setQuery({
+      maxPrice: f.maxPrice != null ? String(f.maxPrice) : null,
+      minRating: f.minRating != null ? String(f.minRating) : null,
+      openNow: f.openNow ? '1' : null,
+      equipment: f.equipment.length ? f.equipment.join('|') : null,
+    });
+  };
+
+  // If location is already allowed, show the dot straight away without asking again.
+  useEffect(() => {
+    let live = true;
+    navigator.permissions?.query({ name: 'geolocation' }).then((p) => {
+      if (live && p.state === 'granted') locate().then((c) => live && setMe(c)).catch(() => {});
+    }).catch(() => {});
+    return () => {
+      live = false;
+    };
   }, []);
 
   useEffect(() => {
-    if (!near || city) return;
-    let stored: string | null = null;
-    try {
-      stored = sessionStorage.getItem('daypass-loc');
-      sessionStorage.removeItem('daypass-loc');
-    } catch {}
-    if (stored) setCoords(JSON.parse(stored));
-    else locate();
-  }, [near, city, locate]);
+    if (!near || coords) return;
+    let live = true;
+    locate().then((c) => {
+      if (!live) return;
+      setCoords(c);
+      setMe(c);
+    }).catch((e: Error) => {
+      if (!live) return;
+      setLocError(e.message);
+      setOverlay(true);
+    });
+    return () => {
+      live = false;
+    };
+  }, [near, coords]);
 
   useEffect(() => {
-    if (mode !== 'ready' || (!city && !coords)) return;
-    const id = ++request.current;
-    const q = new URLSearchParams({ sort, page: String(page) });
-    if (city && !bbox) q.set('city', city);
-    else if (coords || result?.center) {
-      const c = coords ?? result!.center;
-      q.set('lat', String(c.lat));
-      q.set('lng', String(c.lng));
+    if (!hasSearch) return;
+    const hit = cache.get(key);
+    if (hit) {
+      setResult(hit.result);
+      setGyms(hit.gyms);
+      setPage(hit.page);
+      setLoading(false);
+      setError('');
+      return;
     }
-    if (bbox) q.set('bbox', bbox.join(','));
-    if (maxPrice != null) q.set('maxPrice', String(maxPrice));
-    if (minRating != null) q.set('minRating', String(minRating));
+    const id = ++request.current;
     setLoading(true);
     setError('');
-    fetch(`/api/gyms?${q}`)
-      .then(async (r) => {
-        const data = await r.json();
-        if (!r.ok) throw new Error(data.error);
-        return data as Result;
-      })
-      .then((data) => {
+    fetchPage(apiParams({ city, sort, filters, area }), near ? coords : null)
+      .then(async (data) => {
         if (id !== request.current) return;
+        // Nothing listed near you yet: open your city, which fills in sample gyms.
+        if (near && coords && data.total === 0 && filterCount(filters) === 0) {
+          const found = await nearestCity(coords);
+          if (id !== request.current) return;
+          if (found) {
+            toast(`Showing gyms in ${found}`);
+            router.replace(`/gyms?city=${encodeURIComponent(found)}`);
+            return;
+          }
+        }
+        cache.set(key, { result: data, gyms: data.gyms, page: 1 });
+        if (data.place) rememberCity(data.place.name);
         setResult(data);
+        setGyms(data.gyms);
+        setPage(1);
         setLoading(false);
       })
       .catch((e: Error) => {
         if (id !== request.current) return;
         setError(e.message || 'Search did not finish. Try again.');
         setResult(null);
+        setGyms([]);
         setLoading(false);
       });
-    // result.center is only a fallback for area searches, so it must not retrigger this.
+    // key already covers every input to this request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, city, coords, sort, page, maxPrice, minRating, bbox]);
+  }, [key, hasSearch]);
 
-  const submitCity = (e: React.FormEvent) => {
-    e.preventDefault();
-    const value = cityInput.trim();
-    if (!value) return;
-    setCoords(null);
-    setBbox(null);
-    setPage(1);
-    setCity(value);
-    setNote('');
-    setMode('ready');
-    router.replace(`/gyms?city=${encodeURIComponent(value)}`, { scroll: false });
+  const total = result?.total ?? 0;
+  const hasMore = gyms.length < total;
+
+  const loadMore = useCallback(async () => {
+    if (moreLock.current || !hasMore || loading) return;
+    moreLock.current = true;
+    setLoadingMore(true);
+    try {
+      const nextPage = page + 1;
+      const data = await fetchPage(apiParams({ city, sort, filters, area }, nextPage), near ? coords : null);
+      setGyms((prev) => {
+        const seen = new Set(prev.map((g) => g.id));
+        const merged = [...prev, ...data.gyms.filter((g) => !seen.has(g.id))];
+        if (result) cache.set(key, { result, gyms: merged, page: nextPage });
+        return merged;
+      });
+      setPage(nextPage);
+    } catch {
+      toast('More gyms did not load. Scroll to try again.', 'error');
+    } finally {
+      moreLock.current = false;
+      setLoadingMore(false);
+    }
+    // Same inputs as the search above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hasMore, loading, page, key, result]);
+
+  useEffect(() => {
+    const el = sentinel.current;
+    if (!el || !hasMore) return;
+    const io = new IntersectionObserver(([e]) => e.isIntersecting && loadMore(), { rootMargin: '600px' });
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasMore, loadMore]);
+
+  // The Map button only appears once the map has scrolled out of sight.
+  useEffect(() => {
+    const el = topMark.current;
+    if (!el) return;
+    const io = new IntersectionObserver(([e]) => setShowPill(!e.isIntersecting));
+    io.observe(el);
+    return () => io.disconnect();
+  }, [hasSearch]);
+
+  const countFor = useCallback(async (f: Filters) => {
+    try {
+      const data = await fetchPage(apiParams({ city, sort, filters: f, area }), near ? coords : null);
+      return data.total;
+    } catch {
+      return null;
+    }
+    // Reads the current search location.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [city, sort, area, near, coords]);
+
+  const nearMe = async () => {
+    setLocating(true);
+    try {
+      const c = await locate();
+      setCoords(c);
+      setMe(c);
+      haptic(8);
+      router.replace('/gyms?near=1');
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'Location is off. Type a city instead.', 'error');
+    } finally {
+      setLocating(false);
+    }
   };
 
-  const selectFromMap = (id: string) => {
+  const selectPin = (id: string) => {
+    haptic(6);
     setActiveId(id);
-    setView('list');
-    requestAnimationFrame(() => document.getElementById(`gym-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }));
+    setSelected(id);
+    if (window.matchMedia('(max-width: 860px)').matches) setView('map');
   };
 
-  const searchBar = (
-    <form className="search-bar" onSubmit={submitCity} role="search">
-      <IconSearch />
-      <label htmlFor="city" className="sr">City</label>
-      <input id="city" value={cityInput} onChange={(e) => setCityInput(e.target.value)} placeholder="Type a city" autoComplete="address-level2" />
-      <button type="button" className="search-locate" onClick={locate} aria-label="Use my location"><IconLocate /><span>Near me</span></button>
-      <button type="submit" className="search-go">Search</button>
-    </form>
+  const heading = area ? 'This area' : result?.place?.name ?? (near ? 'Near you' : city ?? 'Find a gym');
+  const selectedGym = gyms.find((g) => g.id === selected) ?? null;
+  const count = filterCount(filters);
+  const removeEquipment = (k: string) => applyFilters({ ...filters, equipment: filters.equipment.filter((e) => e !== k) });
+
+  const overlays = (
+    <>
+      <SearchOverlay open={overlay} onClose={() => { setOverlay(false); setLocError(''); }} note={locError} />
+      <FilterSheet open={filtersOpen} onClose={() => setFiltersOpen(false)} value={filters} onApply={applyFilters} countFor={countFor} />
+    </>
   );
 
-  if (mode === 'ask') {
+  if (!hasSearch && ready && !near) {
     return (
       <main className="ask">
+        <span className="ask-glow" aria-hidden="true" />
         <h1>Where do you want to train?</h1>
         <p>Share your location to see the closest gyms. It is used for this search only and never saved.</p>
-        <button type="button" className="btn btn-volt ask-btn" onClick={locate}><IconLocate /> Use my location</button>
-        <p className="ask-or">or type a city</p>
-        {searchBar}
-        {note ? <p className="note" role="status">{note}</p> : null}
-        <ul className="chips ask-chips">
-          {['Amsterdam', 'Berlin', 'Lisbon', 'Barcelona', 'Paris', 'Prague', 'Vienna', 'Rome'].map((c) => (
-            <li key={c}><button type="button" className="chip" onClick={() => { setCityInput(c); setCity(c); setMode('ready'); router.replace(`/gyms?city=${c}`, { scroll: false }); }}>{c}</button></li>
-          ))}
-        </ul>
+        <button type="button" className="btn btn-volt ask-btn" onClick={nearMe}><IconLocate /> Use my location</button>
+        <button type="button" className="btn btn-ghost ask-btn" onClick={() => setOverlay(true)}><IconSearch /> Search a city</button>
+        {overlays}
       </main>
     );
   }
 
-  const heading = bbox ? 'Gyms in this area' : result?.place ? `Gyms in ${result.place.name}` : 'Gyms near you';
-  const pages = result ? Math.max(1, Math.ceil(result.total / result.pageSize)) : 1;
-
   return (
     <main className="search" data-view={view}>
-      <div className="search-list" ref={listRef}>
-        <i className="search-handle" aria-hidden="true" />
-        <div className="search-head">
-          <h1>{heading}</h1>
-          {searchBar}
-          {note ? <p className="note" role="status">{note}</p> : null}
-          <div className="filters">
-            <div className="filter-sort" role="group" aria-label="Sort gyms">
-              {SORTS.map((s) => (
-                <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { setSort(s.id); setPage(1); }}>{s.label}</button>
-              ))}
-            </div>
-            <div className="filter-selects">
-              <label><span className="sr">Maximum price</span>
-                <select value={maxPrice ?? ''} onChange={(e) => { setMaxPrice(e.target.value ? Number(e.target.value) : null); setPage(1); }}>
-                  {PRICES.map((p) => <option key={p.l} value={p.v ?? ''}>{p.l}</option>)}
-                </select>
-              </label>
-              <label><span className="sr">Minimum rating</span>
-                <select value={minRating ?? ''} onChange={(e) => { setMinRating(e.target.value ? Number(e.target.value) : null); setPage(1); }}>
-                  {RATINGS.map((p) => <option key={p.l} value={p.v ?? ''}>{p.l}</option>)}
-                </select>
-              </label>
-            </div>
+      <aside className="search-map" aria-label="Map">
+        <GymMap
+          gyms={gyms}
+          center={result?.center ?? coords}
+          activeId={activeId}
+          onSelect={selectPin}
+          onBackground={() => setSelected(null)}
+          onAreaSearch={(b) => setQuery({ area: b.join(','), city: urlCity })}
+          padding={{ top: 72, bottom: view === 'map' ? 200 : 72, left: 40, right: 40 }}
+          me={me}
+          onLocate={nearMe}
+          locating={locating}
+        />
+        {view === 'list' ? (
+          <button type="button" className="round round-glass map-expand" aria-label="Show full map" onClick={() => { setView('map'); haptic(6); }}><IconExpand /></button>
+        ) : (
+          <div className="map-topbar">
+            <button type="button" className="search-pill" onClick={() => setOverlay(true)}>
+              <IconSearch /> <span>{heading}</span>
+            </button>
+            <button type="button" className="round round-solid" aria-label={`Filters${count ? `, ${count} on` : ''}`} onClick={() => setFiltersOpen(true)}>
+              <IconSliders />{count ? <b className="count-badge">{count}</b> : null}
+            </button>
           </div>
-          <p className="result-count" role="status" aria-live="polite">
-            {loading ? 'Searching' : error ? '' : result ? `${result.total} ${result.total === 1 ? 'gym' : 'gyms'}${pages > 1 ? `, page ${result.page} of ${pages}` : ''}` : ''}
-          </p>
+        )}
+        {selectedGym ? <PinPreview key={selectedGym.id} gym={selectedGym} onClose={() => setSelected(null)} /> : null}
+      </aside>
+
+      <div className="search-list">
+        <div ref={topMark} className="search-top-mark" aria-hidden="true" />
+        <i className="sheet-handle" aria-hidden="true" />
+        <div className="search-head">
+          <div className="search-bar-row">
+            <button type="button" className="search-pill" onClick={() => setOverlay(true)}>
+              <IconSearch /> <span>{heading}</span>
+            </button>
+            <button type="button" className="round round-solid" aria-label={`Filters${count ? `, ${count} on` : ''}`} onClick={() => setFiltersOpen(true)}>
+              <IconSliders />{count ? <b className="count-badge">{count}</b> : null}
+            </button>
+          </div>
+          <div className="filter-sort" role="group" aria-label="Sort gyms">
+            {SORTS.map((s) => (
+              <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { setQuery({ sort: s.id }); haptic(4); }}>{s.label}</button>
+            ))}
+          </div>
+          {count ? (
+            <ul className="applied" aria-label="Active filters">
+              {filters.maxPrice != null ? <li><button type="button" onClick={() => applyFilters({ ...filters, maxPrice: null })}>Up to {money(filters.maxPrice)} <IconClose width={14} height={14} /></button></li> : null}
+              {filters.minRating != null ? <li><button type="button" onClick={() => applyFilters({ ...filters, minRating: null })}>{filters.minRating.toFixed(1)}+ <IconClose width={14} height={14} /></button></li> : null}
+              {filters.openNow ? <li><button type="button" onClick={() => applyFilters({ ...filters, openNow: false })}>Open now <IconClose width={14} height={14} /></button></li> : null}
+              {filters.equipment.map((k) => <li key={k}><button type="button" onClick={() => removeEquipment(k)}>{k} <IconClose width={14} height={14} /></button></li>)}
+            </ul>
+          ) : null}
         </div>
+        <h1 className="search-title" aria-live="polite">
+          {loading ? <span className="sk sk-line" /> : <>{heading} <small>{error ? '' : `${total} ${total === 1 ? 'gym' : 'gyms'}`}</small></>}
+        </h1>
 
         {error ? (
-          <div className="empty"><h2>No results</h2><p>{error}</p></div>
-        ) : !loading && result && result.gyms.length === 0 ? (
+          <div className="empty"><h2>No results</h2><p>{error}</p><button type="button" className="btn btn-ghost" onClick={() => setOverlay(true)}>Search another city</button></div>
+        ) : loading ? (
+          <ul className="gym-grid" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <li key={i} className="gym-skeleton"><span className="sk sk-photo" /><span className="sk sk-line" /><span className="sk sk-line is-short" /></li>)}</ul>
+        ) : gyms.length === 0 ? (
           <div className="empty">
             <h2>No gyms match</h2>
-            <p>{coords && !bbox ? 'Nothing within 25 km of you yet. Type a city to look elsewhere.' : 'Widen your filters, or move the map and search that area.'}</p>
-            {maxPrice != null || minRating != null ? <button type="button" className="btn btn-ghost" onClick={() => { setMaxPrice(null); setMinRating(null); }}>Clear filters</button> : null}
+            <p>{count ? 'Try removing a filter.' : 'Move the map and search that area, or try another city.'}</p>
+            {count ? <button type="button" className="btn btn-ghost" onClick={() => applyFilters(NO_FILTERS)}>Clear filters</button> : <button type="button" className="btn btn-ghost" onClick={() => setOverlay(true)}>Search another city</button>}
           </div>
         ) : (
-          <ul className={`gym-grid${loading ? ' is-loading' : ''}`}>
-            {result?.gyms.map((g, i) => (
-              <li key={g.id} id={`gym-${g.id}`}>
-                <Link
-                  href={`/gyms/${g.slug}`}
-                  className={`gym-card${activeId === g.id ? ' is-active' : ''}${i % 5 === 1 ? ' is-volt' : ''}`}
-                  onMouseEnter={() => setActiveId(g.id)}
-                  onFocus={() => setActiveId(g.id)}
-                >
-                  <div className="gym-card-photo">
-                    <GymPhoto src={g.photos[0]} name={g.name} priority={i < 2} sizes="(max-width: 520px) 92vw, (max-width: 1200px) 45vw, 24vw" />
-                    <span className="gym-price">{money(g.price_cents)}</span>
-                  </div>
-                  <div className="gym-card-body">
-                    <h2>{g.name}</h2>
-                    <p className="gym-meta">
-                      <span className="gym-rate"><IconStar /> {ratingLabel(g.rating)}</span>
-                      {g.distance_km != null ? <span>{distanceLabel(Number(g.distance_km))} away</span> : null}
-                    </p>
-                    <i className="gym-go" aria-hidden="true"><IconArrow /></i>
-                  </div>
-                </Link>
+          <ul className="gym-grid">
+            {gyms.map((g, i) => (
+              <li key={g.id} id={`gym-${g.id}`} className="reveal-in">
+                <GymCard gym={g} active={activeId === g.id} priority={i < 2} onHover={() => setActiveId(g.id)} />
               </li>
             ))}
           </ul>
         )}
-
-        {pages > 1 && !error ? (
-          <nav className="pager" aria-label="Result pages">
-            <button type="button" className="btn btn-ghost" disabled={page <= 1 || loading} onClick={() => { setPage(page - 1); listRef.current?.scrollIntoView({ behavior: 'smooth' }); }}>Previous page</button>
-            <button type="button" className="btn btn-white" disabled={page >= pages || loading} onClick={() => { setPage(page + 1); listRef.current?.scrollIntoView({ behavior: 'smooth' }); }}>Next page</button>
-          </nav>
-        ) : null}
-        <p className="fine">Listings are sample data for this demo.</p>
+        <div ref={sentinel} className="load-more" aria-live="polite">{loadingMore ? <span className="spinner" aria-label="Loading more gyms" /> : null}</div>
+        {!loading && !hasMore && gyms.length > 0 ? <p className="fine end-note">That is every gym here. Listings are sample data for this demo.</p> : null}
       </div>
 
-      <aside className="search-map" aria-label="Map">
-        <GymMap
-          gyms={result?.gyms ?? []}
-          center={result?.center ?? coords}
-          activeId={activeId}
-          onSelect={selectFromMap}
-          onAreaSearch={(b) => { setBbox(b); setPage(1); }}
-        />
-      </aside>
-
-      <button type="button" className="view-toggle" onClick={() => setView(view === 'list' ? 'map' : 'list')}>
-        {view === 'list' ? <><IconMap /> Show map</> : <><IconList /> Show list</>}
+      <button type="button" className={`view-toggle${view === 'map' || showPill ? ' is-on' : ''}`} tabIndex={view === 'map' || showPill ? 0 : -1} onClick={() => { const v = view === 'list' ? 'map' : 'list'; setView(v); setSelected(null); haptic(6); if (v === 'map') window.scrollTo({ top: 0 }); }}>
+        {view === 'list' ? <><IconMap /> Map</> : <><IconList /> List</>}
       </button>
+      {overlays}
     </main>
+  );
+}
+
+function PinPreview({ gym, onClose }: { gym: Gym; onClose: () => void }) {
+  const status = gymStatus(gym);
+  return (
+    <div className="pin-preview">
+      <Link href={`/gyms/${gym.slug}`} transitionTypes={['nav-forward']} className="pin-preview-link">
+        <div className="pin-preview-photo"><GymPhoto src={gym.photos[0]} name={gym.name} sizes="120px" /></div>
+        <div className="pin-preview-copy">
+          <strong>{gym.name}</strong>
+          <span className="pin-preview-meta"><RatingLine rating={gym.rating} count={gym.rating_count} />{gym.distance_km != null ? <span>{distanceLabel(Number(gym.distance_km))}</span> : null}</span>
+          <span className={`status-dot${status.open ? ' is-open' : ''}`}>{status.line}</span>
+          <b>{money(gym.price_cents)} <small>one visit</small></b>
+        </div>
+      </Link>
+      <button type="button" className="round round-sm" aria-label="Close preview" onClick={onClose}><IconClose /></button>
+    </div>
   );
 }

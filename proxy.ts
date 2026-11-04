@@ -1,7 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 
-// Browsing is open to everyone. Only a person's own passes and account need a login.
-// The pages also check the session themselves, so a made-up cookie gets nowhere.
+// Browsing is open to everyone. Only a person's own screens need a login.
+// Those pages also check the session themselves, so a made-up cookie gets nowhere.
 export function proxy(request: NextRequest) {
   if (request.cookies.has('daypass_session')) return NextResponse.next();
   const { pathname, search } = request.nextUrl;
@@ -11,5 +11,5 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/bookings/:path*', '/account'],
+  matcher: ['/bookings/:path*', '/account', '/wallet', '/inbox', '/staff'],
 };

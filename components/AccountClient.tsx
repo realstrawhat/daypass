@@ -2,39 +2,69 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
-import { startRegistration } from '@simplewebauthn/browser';
+import { IconChevron } from './Icons';
+import { useSession } from './session';
+import { useFeedback } from './ui/feedback';
+import { Sheet } from './ui/Sheet';
 
-type U = { name: string; email: string; home_city: string | null; default_sort: string; max_price_cents: number | null; saved_card: { brand: string; last4: string } | null };
+type U = { name: string; email: string; home_city: string | null; default_sort: string; max_price_cents: number | null; saved_card: { brand: string; last4: string } | null; is_demo: boolean };
+type Name = 'prefs' | 'pay' | 'face' | 'notify' | 'delete' | null;
+
+const SORT_LABEL: Record<string, string> = { recommended: 'Recommended', nearest: 'Nearest', price_asc: 'Lowest price', price_desc: 'Highest price', rating: 'Top rated' };
 
 export function AccountClient({ user, passkeys }: { user: U; passkeys: number }) {
   const router = useRouter();
+  const { refresh, unread } = useSession();
+  const { toast } = useFeedback();
+  const [sheet, setSheet] = useState<Name>(null);
   const [city, setCity] = useState(user.home_city ?? '');
   const [sort, setSort] = useState(user.default_sort);
   const [maxPrice, setMaxPrice] = useState(user.max_price_cents != null ? String(user.max_price_cents / 100) : '');
   const [card, setCard] = useState(user.saved_card);
-  const [saved, setSaved] = useState('');
-  const [faceId, setFaceId] = useState(passkeys > 0 ? 'on' : 'off');
+  const [faceOn, setFaceOn] = useState(passkeys > 0);
   const [faceMsg, setFaceMsg] = useState('');
+  const [reminders, setReminders] = useState(true);
   const [confirmText, setConfirmText] = useState('');
   const [deleteError, setDeleteError] = useState('');
-  const [deleted, setDeleted] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const patch = (body: unknown) => fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
 
   const savePrefs = async (e: React.FormEvent) => {
     e.preventDefault();
-    setSaved('');
-    const res = await fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ home_city: city, default_sort: sort, max_price_cents: maxPrice ? Math.round(Number(maxPrice) * 100) : null }) });
-    setSaved(res.ok ? 'Preferences saved. Search uses them from now on.' : 'Preferences were not saved. Try again.');
-    router.refresh();
+    setBusy(true);
+    try {
+      const res = await patch({ home_city: city, default_sort: sort, max_price_cents: maxPrice ? Math.round(Number(maxPrice) * 100) : null });
+      if (!res.ok) throw new Error();
+      toast('Preferences saved');
+      setSheet(null);
+      refresh();
+      router.refresh();
+    } catch {
+      toast('Preferences did not save. Try again.', 'error');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const removeCard = async () => {
-    const res = await fetch('/api/account', { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ remove_card: true }) });
-    if (res.ok) setCard(null);
+    try {
+      const res = await patch({ remove_card: true });
+      if (!res.ok) throw new Error();
+      setCard(null);
+      setSheet(null);
+      toast('Saved payment removed');
+      refresh();
+    } catch {
+      toast('That did not save. Try again.', 'error');
+    }
   };
 
   const addFace = async () => {
     setFaceMsg('');
+    setBusy(true);
     try {
+      const { startRegistration } = await import('@simplewebauthn/browser');
       const start = await fetch('/api/passkey/register-options', { method: 'POST' });
       const data = await start.json();
       if (!start.ok) throw new Error(data.error);
@@ -42,81 +72,140 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
       const done = await fetch('/api/passkey/register-verify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id: data.id, response: attestation }) });
       const result = await done.json();
       if (!done.ok) throw new Error(result.error);
-      setFaceId('on');
-      setFaceMsg('Face ID is on. Use it next time you log in.');
+      try {
+        localStorage.setItem('daypass-passkey', '1');
+      } catch {}
+      setFaceOn(true);
+      setFaceMsg('Face ID is on for this device. Use it next time you log in.');
     } catch (e) {
       const name = e instanceof Error ? e.name : '';
-      setFaceMsg(name === 'NotAllowedError' ? 'Face ID setup was cancelled.' : e instanceof Error ? e.message : 'This device could not set up Face ID.');
+      setFaceMsg(name === 'NotAllowedError' ? 'Face ID setup was cancelled.' : 'This device could not set up Face ID. On the login screen, Face ID signs in to a demo account instead.');
+    } finally {
+      setBusy(false);
     }
   };
 
   const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' });
-    window.location.assign('/');
+    setBusy(true);
+    try {
+      await fetch('/api/auth/logout', { method: 'POST' });
+      try {
+        sessionStorage.removeItem('daypass-session');
+      } catch {}
+      window.location.assign('/home');
+    } catch {
+      toast('Log out did not finish. Try again.', 'error');
+      setBusy(false);
+    }
   };
 
   const removeAccount = async () => {
     setDeleteError('');
-    const res = await fetch('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: confirmText }) });
-    const data = await res.json();
-    if (!res.ok) {
-      setDeleteError(data.error);
-      return;
+    setBusy(true);
+    try {
+      const res = await fetch('/api/account', { method: 'DELETE', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ confirm: confirmText }) });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
+      try {
+        sessionStorage.removeItem('daypass-session');
+      } catch {}
+      toast('Deletion requested. Your account will be erased within 30 days.');
+      setTimeout(() => window.location.assign('/home'), 1400);
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : 'That did not work. Try again.');
+      setBusy(false);
     }
-    setDeleted(true);
-    setTimeout(() => window.location.assign('/'), 2500);
   };
 
-  if (deleted) return <div className="banner" role="status"><strong>Deletion requested</strong><span>Your account will be erased within 30 days. You have been logged out.</span></div>;
-
   return (
-    <div className="account">
-      <section className="panel" aria-labelledby="a-details">
-        <h2 id="a-details" className="section-title">Your details</h2>
-        <p><strong>{user.name}</strong><br />{user.email}</p>
-        <div className="panel-links">
-          <Link href="/bookings" className="btn btn-white">My bookings</Link>
-          <button type="button" className="btn btn-ghost" onClick={logout}>Log out</button>
+    <>
+      <section className="settings-group" aria-labelledby="s-you">
+        <h2 id="s-you">Your Daypass</h2>
+        <ul className="rows">
+          <li><Link href="/bookings"><span>Passes</span><IconChevron /></Link></li>
+          <li><Link href="/wallet"><span>Wallet</span><IconChevron /></Link></li>
+          <li><Link href="/inbox"><span>Inbox</span>{unread ? <span className="row-value">{unread} new</span> : null}<IconChevron /></Link></li>
+        </ul>
+      </section>
+
+      <section className="settings-group" aria-labelledby="s-set">
+        <h2 id="s-set">Settings</h2>
+        <ul className="rows">
+          <li><button type="button" onClick={() => setSheet('prefs')}><span>Search preferences</span><span className="row-value">{user.home_city ?? SORT_LABEL[user.default_sort] ?? ''}</span><IconChevron /></button></li>
+          <li><button type="button" onClick={() => setSheet('pay')}><span>Saved payment</span><span className="row-value">{card ? `${card.brand}${card.last4 ? ` •••• ${card.last4}` : ''}` : 'None'}</span><IconChevron /></button></li>
+          <li><button type="button" onClick={() => setSheet('face')}><span>Face ID</span><span className="row-value">{faceOn ? 'On' : 'Off'}</span><IconChevron /></button></li>
+          <li><button type="button" onClick={() => setSheet('notify')}><span>Reminders</span><span className="row-value">{reminders ? 'On' : 'Off'}</span><IconChevron /></button></li>
+        </ul>
+      </section>
+
+      <section className="settings-group" aria-labelledby="s-gym">
+        <h2 id="s-gym">For gyms</h2>
+        <ul className="rows">
+          <li><Link href="/partners"><span>List your gym</span><IconChevron /></Link></li>
+          <li><Link href="/staff"><span>Door scanner for staff</span><IconChevron /></Link></li>
+        </ul>
+      </section>
+
+      <section className="settings-group" aria-labelledby="s-more">
+        <h2 id="s-more">More</h2>
+        <ul className="rows">
+          <li><Link href="/privacy"><span>Privacy</span><IconChevron /></Link></li>
+          <li><button type="button" disabled={busy} onClick={logout}><span>Log out</span><IconChevron /></button></li>
+          <li><button type="button" onClick={() => setSheet('delete')}><span className="danger-text">Delete account</span><IconChevron /></button></li>
+        </ul>
+      </section>
+
+      <Sheet open={sheet === 'prefs'} onClose={() => setSheet(null)} title="Search preferences">
+        <form className="pref-form" onSubmit={savePrefs}>
+          <div className="field"><label htmlFor="pref-city">Home city</label><input id="pref-city" value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2" /></div>
+          <div className="field"><label htmlFor="pref-sort">Sort gyms by</label>
+            <select id="pref-sort" value={sort} onChange={(e) => setSort(e.target.value)}>
+              {Object.entries(SORT_LABEL).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+            </select>
+          </div>
+          <div className="field"><label htmlFor="pref-price">Highest day pass price in euros</label><input id="pref-price" type="number" min="1" max="200" inputMode="decimal" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} /></div>
+          <button type="submit" className="btn btn-volt btn-block" disabled={busy}>{busy ? 'Saving' : 'Save preferences'}</button>
+        </form>
+      </Sheet>
+
+      <Sheet open={sheet === 'pay'} onClose={() => setSheet(null)} title="Saved payment">
+        <div className="link-list">
+          {card ? (
+            <>
+              <p className="sheet-sub">{card.brand}{card.last4 ? ` •••• ${card.last4}` : ''} is selected first at checkout.</p>
+              <button type="button" className="btn btn-ghost btn-block" onClick={removeCard}>Remove</button>
+            </>
+          ) : <p className="sheet-sub">Nothing saved. Turn on Save for next time at checkout.</p>}
+          <p className="fine">Demo payment methods only. No card details are ever collected.</p>
         </div>
-      </section>
+      </Sheet>
 
-      <form className="panel" onSubmit={savePrefs} aria-labelledby="a-prefs">
-        <h2 id="a-prefs" className="section-title">Search preferences</h2>
-        <div className="field"><label htmlFor="pref-city">Home city</label><input id="pref-city" value={city} onChange={(e) => setCity(e.target.value)} autoComplete="address-level2" /></div>
-        <div className="field"><label htmlFor="pref-sort">Sort gyms by</label>
-          <select id="pref-sort" value={sort} onChange={(e) => setSort(e.target.value)}>
-            <option value="recommended">Recommended</option><option value="nearest">Nearest</option><option value="price_asc">Lowest price</option><option value="price_desc">Highest price</option><option value="rating">Top rated</option>
-          </select>
+      <Sheet open={sheet === 'face'} onClose={() => setSheet(null)} title="Face ID">
+        <div className="link-list">
+          <p className="sheet-sub">{faceOn ? 'Face ID is on for this account.' : 'Uses your device passkey: Face ID, Touch ID or Windows Hello.'}</p>
+          <button type="button" className="btn btn-white btn-block" disabled={busy} onClick={addFace}>{faceOn ? 'Add another device' : 'Turn on Face ID'}</button>
+          {faceMsg ? <p role="status">{faceMsg}</p> : null}
         </div>
-        <div className="field"><label htmlFor="pref-price">Highest day pass price in euros</label><input id="pref-price" type="number" min="1" max="200" inputMode="decimal" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} /></div>
-        <button type="submit" className="btn btn-volt">Save preferences</button>
-        {saved ? <p role="status">{saved}</p> : null}
-      </form>
+      </Sheet>
 
-      <section className="panel" aria-labelledby="a-pay">
-        <h2 id="a-pay" className="section-title">Saved payment</h2>
-        {card ? (
-          <>
-            <p>{card.brand}{card.last4 ? ` •••• ${card.last4}` : ''}. Selected first at checkout.</p>
-            <button type="button" className="btn btn-ghost" onClick={removeCard}>Remove</button>
-          </>
-        ) : <p className="note">Nothing saved. Tick "Save this for next time" at checkout.</p>}
-      </section>
+      <Sheet open={sheet === 'notify'} onClose={() => setSheet(null)} title="Reminders">
+        <div className="link-list">
+          <button type="button" className="switch-row" role="switch" aria-checked={reminders} onClick={() => setReminders(!reminders)}>
+            <span><strong>Day-before reminder</strong><small>Appears in your Inbox</small></span>
+            <i className="switch" aria-hidden="true" />
+          </button>
+          <p className="fine">Demo setting for this visit. Real push or email would need a messaging service.</p>
+        </div>
+      </Sheet>
 
-      <section className="panel" aria-labelledby="a-face">
-        <h2 id="a-face" className="section-title">Log in with Face ID</h2>
-        <p>{faceId === 'on' ? 'On for this account.' : 'Uses your device passkey: Face ID, Touch ID or Windows Hello.'}</p>
-        <button type="button" className="btn btn-white" onClick={addFace}>{faceId === 'on' ? 'Add another device' : 'Turn on Face ID'}</button>
-        {faceMsg ? <p role="status">{faceMsg}</p> : null}
-      </section>
-
-      <section className="panel" aria-labelledby="a-delete">
-        <h2 id="a-delete" className="section-title">Delete account</h2>
-        <p>We erase your account and bookings within 30 days of your request. <Link href="/privacy" className="link">Read the privacy notice</Link>.</p>
-        <div className="field"><label htmlFor="del-confirm">Type DELETE to confirm</label><input id="del-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" /></div>
-        {deleteError ? <p className="form-error" role="alert">{deleteError}</p> : null}
-        <button type="button" className="btn btn-danger" onClick={removeAccount}>Request deletion</button>
-      </section>
-    </div>
+      <Sheet open={sheet === 'delete'} onClose={() => setSheet(null)} title="Delete account">
+        <div className="link-list">
+          <p className="sheet-sub">We erase your account and bookings within 30 days of your request, and you are logged out now. <Link href="/privacy" className="link">Read the privacy notice</Link>.</p>
+          <div className="field"><label htmlFor="del-confirm">Type DELETE to confirm</label><input id="del-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" /></div>
+          {deleteError ? <p className="form-error" role="alert">{deleteError}</p> : null}
+          <button type="button" className="btn btn-danger btn-block" disabled={busy} onClick={removeAccount}>Request deletion</button>
+        </div>
+      </Sheet>
+    </>
   );
 }

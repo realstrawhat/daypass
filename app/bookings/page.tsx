@@ -2,25 +2,38 @@ import Link from 'next/link';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { GymPhoto } from '@/components/GymPhoto';
-import { IconArrow } from '@/components/Icons';
+import { IconChevron, IconWallet } from '@/components/Icons';
+import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
 import { listBookings, type BookingView } from '@/lib/bookings';
 import { dateLabel, money, timeLabel } from '@/lib/format';
 
-export const metadata: Metadata = { title: 'My bookings' };
+export const metadata: Metadata = { title: 'Passes' };
 
-function Ticket({ b, past }: { b: BookingView; past?: boolean }) {
+const untilLabel = (iso: string) => {
+  const hours = (new Date(iso).getTime() - Date.now()) / 3600000;
+  if (hours < 0) return 'Happening now';
+  if (hours < 24) return `In ${Math.max(1, Math.round(hours))} ${Math.round(hours) <= 1 ? 'hour' : 'hours'}`;
+  const days = Math.round(hours / 24);
+  return days === 1 ? 'Tomorrow' : `In ${days} days`;
+};
+
+function Ticket({ b, next, past }: { b: BookingView; next?: boolean; past?: boolean }) {
   const cancelled = b.status === 'cancelled';
   return (
-    <li>
-      <Link href={`/bookings/${b.id}`} className={`ticket${cancelled ? ' is-cancelled' : ''}${past ? ' is-past' : ''}`}>
-        <div className="ticket-photo"><GymPhoto src={b.gym_photos[0]} name={b.gym_name} sizes="160px" /></div>
+    <li className="reveal-in">
+      <Link href={`/bookings/${b.id}`} transitionTypes={['nav-forward']} className={`ticket${cancelled ? ' is-cancelled' : ''}${next ? ' is-next' : ''}`}>
+        {next ? <i className="foil-sweep" aria-hidden="true" /> : null}
+        <div className="ticket-photo"><GymPhoto src={b.gym_photos[0]} name={b.gym_name} sizes="120px" /></div>
         <div className="ticket-body">
+          {next ? <span className="ticket-tag">{untilLabel(b.starts_at)}</span> : null}
           <h3>{b.gym_name}</h3>
           <p>{dateLabel(b.starts_at, b.gym_timezone)}, {timeLabel(b.starts_at, b.gym_timezone)}</p>
-          <p className="ticket-sub">{b.gym_city}{cancelled ? `. Cancelled, ${money(b.refund_cents)} refunded` : `. ${money(b.price_cents)}`}{b.is_sample ? '. Sample visit' : ''}</p>
+          <p className="ticket-sub">
+            {cancelled ? `Refunded ${money(b.refund_cents)}` : past ? (b.review_stars ? `${b.gym_city}, rated ${b.review_stars} of 5` : `${b.gym_city}, not rated yet`) : `${b.gym_city}, ${money(b.price_cents)}`}
+          </p>
         </div>
-        <i className="ticket-go" aria-hidden="true"><IconArrow /></i>
+        <i className="ticket-go" aria-hidden="true"><IconChevron width={18} height={18} /></i>
       </Link>
     </li>
   );
@@ -31,47 +44,39 @@ export default async function BookingsPage() {
   if (!user) redirect('/login?next=/bookings');
   const all = await listBookings(user.id);
   const now = Date.now();
-  const upcoming = all.filter((b) => b.status === 'confirmed' && new Date(b.starts_at).getTime() > now).reverse();
-  const past = all.filter((b) => b.status === 'cancelled' || new Date(b.starts_at).getTime() <= now);
-  const soon = upcoming.find((b) => new Date(b.starts_at).getTime() - now < 48 * 3600 * 1000);
-  const unrated = past.find((b) => b.status === 'confirmed' && b.review_stars == null);
+  const isCurrent = (b: BookingView) => b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > now;
+  const upcoming = all.filter(isCurrent).reverse();
+  const past = all.filter((b) => !isCurrent(b));
+  const hasWallet = all.some((b) => b.wallet_added_at && b.status === 'confirmed');
 
   return (
-    <main className="simple-page">
-      <h1 className="page-title">My bookings</h1>
+    <Page>
+      <main className="simple-page">
+        <div className="title-row">
+          <h1 className="page-title">Passes</h1>
+          <Link href="/wallet" className="title-link"><IconWallet width={18} height={18} /> Wallet{hasWallet ? <b className="title-dot" aria-label="has passes" /> : null}</Link>
+        </div>
 
-      {soon ? (
-        <Link href={`/bookings/${soon.id}`} className="banner banner-volt">
-          <strong>Coming up: {soon.gym_name}</strong>
-          <span>{dateLabel(soon.starts_at, soon.gym_timezone)} at {timeLabel(soon.starts_at, soon.gym_timezone)}. Your pass is ready.</span>
-        </Link>
-      ) : null}
-      {unrated ? (
-        <Link href={`/bookings/${unrated.id}#rate`} className="banner">
-          <strong>How was {unrated.gym_name}?</strong>
-          <span>Rate your visit out of 5 to help the next person choose.</span>
-        </Link>
-      ) : null}
-
-      <section className="ticket-section" aria-labelledby="up">
-        <h2 id="up" className="section-title">Upcoming</h2>
-        {upcoming.length ? (
-          <ul className="tickets">{upcoming.map((b) => <Ticket key={b.id} b={b} />)}</ul>
-        ) : (
-          <div className="empty">
-            <h2>Nothing booked</h2>
-            <p>Find a gym and book one session. It takes a couple of minutes.</p>
-            <Link href="/gyms" className="btn btn-volt">Find a gym</Link>
-          </div>
-        )}
-      </section>
-
-      {past.length ? (
-        <section className="ticket-section" aria-labelledby="pa">
-          <h2 id="pa" className="section-title">Past and cancelled</h2>
-          <ul className="tickets">{past.map((b) => <Ticket key={b.id} b={b} past />)}</ul>
+        <section className="ticket-section" aria-labelledby="up">
+          <h2 id="up" className="section-title">Upcoming</h2>
+          {upcoming.length ? (
+            <ul className="tickets">{upcoming.map((b, i) => <Ticket key={b.id} b={b} next={i === 0} />)}</ul>
+          ) : (
+            <div className="empty">
+              <h2>Nothing booked</h2>
+              <p>Find a gym and book one session. It takes a couple of minutes.</p>
+              <Link href="/gyms" className="btn btn-volt">Find a gym</Link>
+            </div>
+          )}
         </section>
-      ) : null}
-    </main>
+
+        {past.length ? (
+          <section className="ticket-section" aria-labelledby="pa">
+            <h2 id="pa" className="section-title">Past and cancelled</h2>
+            <ul className="tickets">{past.map((b) => <Ticket key={b.id} b={b} past />)}</ul>
+          </section>
+        ) : null}
+      </main>
+    </Page>
   );
 }

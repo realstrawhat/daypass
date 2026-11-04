@@ -1,5 +1,18 @@
 import { db } from './db';
+import { heldByGym, isWeekend, localParts, localToUtc } from './hours';
 import { seedCity } from '../scripts/seed-data.mjs';
+
+export type GymFacts = {
+  stay?: string;
+  entry?: string;
+  towel?: string;
+  lock?: string;
+  shower?: string;
+  water?: string;
+  age?: string;
+  access?: string;
+  staffedUntil?: number;
+};
 
 export type Gym = {
   id: string;
@@ -15,6 +28,7 @@ export type Gym = {
   photos: string[];
   equipment: string[];
   description: string;
+  facts: GymFacts;
   open_hour: number;
   close_hour: number;
   weekend_open_hour: number;
@@ -24,7 +38,7 @@ export type Gym = {
   confirmed_at: string;
   commission_bps: number;
   owner_user_id: string | null;
-  rating: number;
+  rating: number | null;
   rating_count: number;
   distance_km?: number | null;
 };
@@ -40,16 +54,20 @@ export type SearchInput = {
   sort?: Sort;
   minRating?: number | null;
   maxPriceCents?: number | null;
+  openNow?: boolean;
+  equipment?: string[];
   page?: number;
 };
 
 export async function searchGyms(input: SearchInput) {
-  const { lat, lng, sort = 'recommended', minRating = null, maxPriceCents = null, page = 1 } = input;
+  const { lat, lng, sort = 'recommended', minRating = null, maxPriceCents = null, openNow = false, equipment = [], page = 1 } = input;
   const radius = input.radiusKm ?? 25;
   const dLat = radius / 111;
   const dLng = radius / (111 * Math.max(0.2, Math.cos((lat * Math.PI) / 180)));
   const [south, west, north, east] = input.bbox ?? [lat - dLat, lng - dLng, lat + dLat, lng + dLng];
-  const offset = (Math.max(1, page) - 1) * PAGE_SIZE;
+  const safePage = Math.min(500, Math.max(1, Math.floor(page) || 1));
+  const offset = (safePage - 1) * PAGE_SIZE;
+  const wanted = equipment.length ? equipment : null;
 
   const rows = await db()`
     WITH nearby AS (
@@ -60,19 +78,29 @@ export async function searchGyms(input: SearchInput) {
       WHERE g.lat BETWEEN ${south}::float8 AND ${north}::float8
         AND g.lng BETWEEN ${west}::float8 AND ${east}::float8
     ),
+    real_reviews AS (
+      SELECT r.gym_id, sum(r.stars)::float8 AS stars, count(*)::int AS n
+      FROM reviews r WHERE r.is_public AND r.gym_id IN (SELECT id FROM nearby) GROUP BY r.gym_id
+    ),
     rated AS (
       SELECT n.*,
-        (SELECT round(((n.seed_rating * n.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(n.seed_rating_count + count(r.id), 0))::numeric, 1)
-           FROM reviews r WHERE r.gym_id = n.id) AS rating,
-        (SELECT n.seed_rating_count + count(r.id) FROM reviews r WHERE r.gym_id = n.id)::int AS rating_count
-      FROM nearby n
+        round(((n.seed_rating * n.seed_rating_count + coalesce(rr.stars, 0)) / nullif(n.seed_rating_count + coalesce(rr.n, 0), 0))::numeric, 1) AS rating,
+        (n.seed_rating_count + coalesce(rr.n, 0))::int AS rating_count,
+        extract(hour FROM now() AT TIME ZONE n.timezone)::int AS local_hour,
+        extract(isodow FROM now() AT TIME ZONE n.timezone)::int AS local_dow
+      FROM nearby n LEFT JOIN real_reviews rr ON rr.gym_id = n.id
     ),
     filtered AS (
       SELECT * FROM rated
       WHERE (${minRating}::numeric IS NULL OR rating >= ${minRating}::numeric)
         AND (${maxPriceCents}::int IS NULL OR price_cents <= ${maxPriceCents}::int)
+        AND (${wanted}::text[] IS NULL OR equipment @> ${wanted}::text[])
+        AND (NOT ${openNow}::boolean OR (
+          CASE WHEN local_dow >= 6
+            THEN local_hour >= weekend_open_hour AND local_hour < weekend_close_hour
+            ELSE local_hour >= open_hour AND local_hour < close_hour END))
     )
-    SELECT id, slug, name, city, country, timezone, address, lat, lng, price_cents, photos, equipment, description,
+    SELECT id, slug, name, city, country, timezone, address, lat, lng, price_cents, photos, equipment, description, facts,
       open_hour, close_hour, weekend_open_hour, weekend_close_hour, capacity, is_demo, confirmed_at, commission_bps, owner_user_id,
       rating::float8 AS rating, rating_count, distance_km, count(*) OVER()::int AS total
     FROM filtered
@@ -83,16 +111,16 @@ export async function searchGyms(input: SearchInput) {
       CASE WHEN ${sort}::text = 'rating' THEN rating END DESC NULLS LAST,
       CASE WHEN ${sort}::text = 'recommended' THEN
         (coalesce(rating, 4.0) / 5.0) * 0.5 + (1 - least(distance_km / 10.0, 1)) * 0.3 + (1 - least(price_cents / 2500.0, 1)) * 0.2 END DESC NULLS LAST,
-      distance_km ASC
+      distance_km ASC, id ASC
     LIMIT ${PAGE_SIZE} OFFSET ${offset}`;
 
   const total = rows[0] ? (rows[0].total as number) : 0;
-  return { gyms: rows as unknown as Gym[], total, page: Math.max(1, page), pageSize: PAGE_SIZE };
+  return { gyms: rows as unknown as Gym[], total, page: safePage, pageSize: PAGE_SIZE };
 }
 
 const GYM_SELECT_RATING = `
-  (SELECT round(((g.seed_rating * g.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(g.seed_rating_count + count(r.id), 0))::numeric, 1)::float8 FROM reviews r WHERE r.gym_id = g.id) AS rating,
-  (SELECT g.seed_rating_count + count(r.id) FROM reviews r WHERE r.gym_id = g.id)::int AS rating_count`;
+  (SELECT round(((g.seed_rating * g.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(g.seed_rating_count + count(r.id), 0))::numeric, 1)::float8 FROM reviews r WHERE r.is_public AND r.gym_id = g.id) AS rating,
+  (SELECT g.seed_rating_count + count(r.id) FROM reviews r WHERE r.is_public AND r.gym_id = g.id)::int AS rating_count`;
 
 export async function getGymBySlug(slug: string): Promise<Gym | null> {
   const rows = await db().query(`SELECT g.*, ${GYM_SELECT_RATING} FROM gyms g WHERE g.slug = $1`, [slug]);
@@ -109,41 +137,11 @@ export async function getReviews(gymId: string) {
   const rows = await db()`
     SELECT author, stars, body, created_at FROM (
       SELECT u.name AS author, r.stars, r.body, r.created_at
-      FROM reviews r JOIN users u ON u.id = r.user_id WHERE r.gym_id = ${gymId}::uuid
+      FROM reviews r JOIN users u ON u.id = r.user_id WHERE r.is_public AND r.gym_id = ${gymId}::uuid
       UNION ALL
       SELECT s.author, s.stars, s.body, now() - make_interval(days => s.days_ago) FROM seed_reviews s WHERE s.gym_id = ${gymId}::uuid
     ) x ORDER BY created_at DESC LIMIT 12`;
   return rows as { author: string; stars: number; body: string | null; created_at: string }[];
-}
-
-// Time zones ---------------------------------------------------------------
-
-function tzOffsetMs(utcMs: number, tz: string) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', second: 'numeric' }).formatToParts(new Date(utcMs));
-  const v = (t: string) => Number(parts.find((p) => p.type === t)?.value);
-  return Date.UTC(v('year'), v('month') - 1, v('day'), v('hour'), v('minute'), v('second')) - utcMs;
-}
-
-export function localToUtc(y: number, m: number, d: number, h: number, tz: string) {
-  const guess = Date.UTC(y, m - 1, d, h);
-  const first = guess - tzOffsetMs(guess, tz);
-  return new Date(guess - tzOffsetMs(first, tz));
-}
-
-function localParts(date: Date, tz: string) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: 'numeric', day: 'numeric', hour: 'numeric', minute: 'numeric', weekday: 'short' }).formatToParts(date);
-  const v = (t: string) => parts.find((p) => p.type === t)?.value ?? '';
-  return { y: Number(v('year')), m: Number(v('month')), d: Number(v('day')), h: Number(v('hour')), min: Number(v('minute')), weekday: v('weekday') };
-}
-
-const isWeekend = (weekday: string) => weekday === 'Sat' || weekday === 'Sun';
-
-// Some slots are held back by the gym (classes, maintenance). Stable per gym and hour.
-function heldByGym(gymId: string, utcIso: string) {
-  let h = 7;
-  const s = gymId + utcIso;
-  for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0;
-  return h % 7 === 0;
 }
 
 export const BOOKING_DAYS = 21;
@@ -153,6 +151,7 @@ export function isValidSlot(gym: Gym, startsAt: Date) {
   const now = Date.now();
   if (startsAt.getTime() <= now) return false;
   if (startsAt.getTime() > now + (BOOKING_DAYS + 1) * 86400000) return false;
+  if (startsAt.getUTCSeconds() !== 0 || startsAt.getUTCMilliseconds() !== 0) return false;
   const p = localParts(startsAt, gym.timezone);
   if (p.min !== 0) return false;
   const open = isWeekend(p.weekday) ? gym.weekend_open_hour : gym.open_hour;
@@ -227,24 +226,33 @@ export async function getAvailability(gym: Gym): Promise<SlotDay[]> {
 
 // Typed city search -----------------------------------------------------------
 
-export type Place = { name: string; country: string; lat: number; lng: number; timezone: string };
+export type Place = { name: string; country: string; admin?: string; lat: number; lng: number; timezone: string };
+
+export async function suggestPlaces(query: string, count = 5): Promise<Place[]> {
+  const q = query.trim().slice(0, 80);
+  if (q.length < 2) return [];
+  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=${count}&language=en&format=json`, {
+    next: { revalidate: 86400 },
+    signal: AbortSignal.timeout(5000),
+  });
+  if (!res.ok) throw new Error('geocoder unavailable');
+  const data = (await res.json()) as { results?: { name: string; country?: string; admin1?: string; latitude: number; longitude: number; timezone?: string }[] };
+  return (data.results ?? []).map((hit) => ({ name: hit.name, country: hit.country ?? '', admin: hit.admin1, lat: hit.latitude, lng: hit.longitude, timezone: hit.timezone ?? 'UTC' }));
+}
 
 export async function geocodeCity(query: string): Promise<Place | null> {
-  const q = query.trim().slice(0, 80);
-  if (q.length < 2) return null;
-  const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(q)}&count=1&language=en&format=json`, { next: { revalidate: 86400 } });
-  if (!res.ok) return null;
-  const data = (await res.json()) as { results?: { name: string; country?: string; latitude: number; longitude: number; timezone?: string }[] };
-  const hit = data.results?.[0];
-  if (!hit) return null;
-  return { name: hit.name, country: hit.country ?? '', lat: hit.latitude, lng: hit.longitude, timezone: hit.timezone ?? 'UTC' };
+  return (await suggestPlaces(query, 1))[0] ?? null;
 }
 
 // Sample listings let a tester search any city. They are flagged as demo data.
 export async function ensureCityHasGyms(place: Place) {
   const [{ n }] = (await db()`
     SELECT count(*)::int AS n FROM gyms
-    WHERE lat BETWEEN ${place.lat - 0.25}::float8 AND ${place.lat + 0.25}::float8
-      AND lng BETWEEN ${place.lng - 0.35}::float8 AND ${place.lng + 0.35}::float8`) as { n: number }[];
-  if (n === 0) await seedCity(db(), place);
+    WHERE lat BETWEEN ${place.lat - 0.22}::float8 AND ${place.lat + 0.22}::float8
+      AND lng BETWEEN ${place.lng - 0.3}::float8 AND ${place.lng + 0.3}::float8`) as { n: number }[];
+  if (n < 10) await seedCity(db(), place);
+}
+
+export async function listGymSlugsForCity(city: string) {
+  return (await db()`SELECT slug FROM gyms WHERE city = ${city}`) as { slug: string }[];
 }

@@ -1,4 +1,4 @@
-import { handle, HttpError, requireUser } from '@/lib/auth';
+﻿import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
 import { cancelBooking, changeBooking } from '@/lib/bookings';
 import { PAY_METHODS, type PayMethod } from '@/lib/payments';
 
@@ -6,7 +6,7 @@ import { PAY_METHODS, type PayMethod } from '@/lib/payments';
 export const PATCH = handle(async (req, ctx) => {
   const user = await requireUser();
   const { id } = await ctx.params;
-  const body = await req.json();
+  const body = await readJson(req);
   const method = body.method as PayMethod | undefined;
   if (method && !PAY_METHODS.includes(method)) throw new HttpError(400, 'Choose a way to pay.');
   const { booking, difference, refund } = await changeBooking(user.id, id, { startsAt: String(body.startsAt), gymId: body.gymId ? String(body.gymId) : undefined, method });

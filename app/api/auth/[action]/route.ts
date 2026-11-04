@@ -1,5 +1,5 @@
-import { createSession, destroySession, getCurrentUser, handle, hashPassword, HttpError, verifyPassword } from '@/lib/auth';
-import { addSamplePastVisit } from '@/lib/bookings';
+import { createSession, destroySession, getCurrentUser, handle, hashPassword, HttpError, readJson, refreshSessionCookie, verifyPassword } from '@/lib/auth';
+import { addMessage, addSamplePastVisit, createDemoUser } from '@/lib/bookings';
 import { db } from '@/lib/db';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -12,7 +12,13 @@ export const POST = handle(async (req, ctx) => {
     return Response.json({ ok: true });
   }
 
-  const body = await req.json().catch(() => ({}));
+  if (action === 'demo') {
+    const userId = await createDemoUser();
+    await createSession(userId);
+    return Response.json({ ok: true });
+  }
+
+  const body = await readJson(req);
   const email = String(body.email ?? '').trim().toLowerCase();
   const password = String(body.password ?? '');
 
@@ -24,8 +30,10 @@ export const POST = handle(async (req, ctx) => {
     const hash = await hashPassword(password);
     const rows = await db()`INSERT INTO users (email, name, password_hash) VALUES (${email}, ${name.slice(0, 80)}, ${hash}) ON CONFLICT (email) DO NOTHING RETURNING id`;
     if (!rows[0]) throw new HttpError(409, 'That email already has an account. Log in instead.', 'email');
-    await addSamplePastVisit(rows[0].id as string);
-    await createSession(rows[0].id as string);
+    const userId = rows[0].id as string;
+    await addSamplePastVisit(userId).catch(() => {});
+    await addMessage(userId, 'welcome', `Welcome, ${name.split(' ')[0]}`, 'Your account is ready. Book a session and your pass will appear in Passes.');
+    await createSession(userId);
     return Response.json({ ok: true });
   }
 
@@ -41,9 +49,50 @@ export const POST = handle(async (req, ctx) => {
   throw new HttpError(404, 'Not found.');
 });
 
+// One call that gives the app everything personal it needs when it opens.
 export const GET = handle(async (_req, ctx) => {
   const { action } = await ctx.params;
   if (action !== 'me') throw new HttpError(404, 'Not found.');
+  const noStore = { headers: { 'Cache-Control': 'private, no-store' } };
   const user = await getCurrentUser();
-  return Response.json({ user: user ? { name: user.name, email: user.email, saved_card: user.saved_card } : null }, { headers: { 'Cache-Control': 'no-store' } });
+  if (!user) return Response.json({ user: null }, noStore);
+  await refreshSessionCookie();
+
+  const [nextRows, rateRows, unread, saved] = await Promise.all([
+    db()`
+      SELECT b.id, b.code, b.starts_at, g.name AS gym_name, g.slug AS gym_slug, g.city AS gym_city, g.timezone AS gym_timezone, g.photos AS gym_photos
+      FROM bookings b JOIN gyms g ON g.id = b.gym_id
+      WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND b.checked_in_at IS NULL AND b.starts_at > now() - interval '3 hours'
+      ORDER BY b.starts_at ASC LIMIT 1`,
+    db()`
+      SELECT b.id, g.name AS gym_name
+      FROM bookings b JOIN gyms g ON g.id = b.gym_id LEFT JOIN reviews r ON r.booking_id = b.id
+      WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND r.id IS NULL
+        AND (b.checked_in_at IS NOT NULL OR b.starts_at < now() - interval '3 hours')
+      ORDER BY b.starts_at DESC LIMIT 1`,
+    db()`SELECT count(*)::int AS n FROM messages WHERE user_id = ${user.id}::uuid AND read_at IS NULL`,
+    db()`SELECT gym_id FROM saved_gyms WHERE user_id = ${user.id}::uuid`,
+  ]);
+
+  // The day-before reminder lands in the inbox the next time the app opens.
+  const next = nextRows[0];
+  let unreadCount = unread[0].n as number;
+  if (next && new Date(next.starts_at as string).getTime() - Date.now() < 24 * 3600 * 1000 && new Date(next.starts_at as string).getTime() > Date.now()) {
+    const added = await db()`
+      INSERT INTO messages (user_id, booking_id, kind, title, body)
+      VALUES (${user.id}::uuid, ${next.id as string}::uuid, 'reminder', ${`Tomorrow: ${next.gym_name as string}`}, 'Your pass is ready in Passes. Check the gym page for what to bring.')
+      ON CONFLICT DO NOTHING RETURNING id`;
+    unreadCount += added.length;
+  }
+
+  return Response.json(
+    {
+      user: { name: user.name, email: user.email, saved_card: user.saved_card, home_city: user.home_city, default_sort: user.default_sort, max_price_cents: user.max_price_cents, is_demo: user.is_demo },
+      unread: unreadCount,
+      next: next ?? null,
+      toRate: rateRows[0] ?? null,
+      saved: saved.map((s) => s.gym_id as string),
+    },
+    noStore,
+  );
 });

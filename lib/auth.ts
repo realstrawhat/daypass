@@ -17,6 +17,8 @@ export type User = {
   max_price_cents: number | null;
   saved_card: { brand: string; last4: string } | null;
   deletion_requested_at: string | null;
+  is_demo: boolean;
+  created_at: string;
 };
 
 export async function hashPassword(password: string) {
@@ -35,11 +37,20 @@ export async function verifyPassword(password: string, stored: string) {
 
 const hashToken = (t: string) => createHash('sha256').update(t).digest('hex');
 
+const cookieOptions = () => ({ httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax' as const, path: '/', maxAge: THIRTY_DAYS });
+
 export async function createSession(userId: string) {
   const token = randomBytes(32).toString('base64url');
-  await db()`INSERT INTO sessions (token_hash, user_id) VALUES (${hashToken(token)}, ${userId})`;
+  await db()`INSERT INTO sessions (token_hash, user_id) VALUES (${hashToken(token)}, ${userId}::uuid)`;
   const store = await cookies();
-  store.set(COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production', sameSite: 'lax', path: '/', maxAge: THIRTY_DAYS });
+  store.set(COOKIE, token, cookieOptions());
+}
+
+// A session ends after 30 days unused, so each app open moves the cookie's window forward too.
+export async function refreshSessionCookie() {
+  const store = await cookies();
+  const token = store.get(COOKIE)?.value;
+  if (token) store.set(COOKIE, token, cookieOptions());
 }
 
 export async function destroySession() {
@@ -49,8 +60,7 @@ export async function destroySession() {
   store.delete(COOKIE);
 }
 
-// A session ends after 30 days unused. Each visit moves that window forward.
-// Cached per request so the layout and page share one database lookup.
+// Cached per request so a page and its children share one database lookup.
 export const getCurrentUser = cache(async (): Promise<User | null> => {
   const store = await cookies();
   const token = store.get(COOKIE)?.value;
@@ -61,14 +71,14 @@ export const getCurrentUser = cache(async (): Promise<User | null> => {
       WHERE token_hash = ${hashToken(token)} AND last_seen_at > now() - interval '30 days'
       RETURNING user_id
     )
-    SELECT u.id, u.email, u.name, u.home_city, u.default_sort, u.max_price_cents, u.saved_card, u.deletion_requested_at
+    SELECT u.id, u.email, u.name, u.home_city, u.default_sort, u.max_price_cents, u.saved_card, u.deletion_requested_at, u.is_demo, u.created_at
     FROM users u JOIN s ON s.user_id = u.id`;
   return (rows[0] as User) ?? null;
 });
 
 export async function requireUser() {
   const user = await getCurrentUser();
-  if (!user) throw new HttpError(401, 'Log in to continue.');
+  if (!user) throw new HttpError(401, 'Log in to continue.', 'login');
   return user;
 }
 
@@ -76,6 +86,18 @@ export class HttpError extends Error {
   constructor(public status: number, message: string, public code?: string) {
     super(message);
   }
+}
+
+// Bad requests get a clear 400 rather than a server error.
+export async function readJson(req: Request): Promise<Record<string, any>> {
+  let body: unknown;
+  try {
+    body = await req.json();
+  } catch {
+    throw new HttpError(400, 'That request could not be read. Try again.', 'bad_json');
+  }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw new HttpError(400, 'That request could not be read. Try again.', 'bad_json');
+  return body as Record<string, any>;
 }
 
 export function handle(fn: (req: Request, ctx: any) => Promise<Response>) {
