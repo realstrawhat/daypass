@@ -1,4 +1,5 @@
 'use client';
+import { ScrollArrows } from './ui/Rail';
 import { useEffect, useRef } from 'react';
 import type { SlotDay } from '@/lib/gyms';
 import { haptic } from './ui/feedback';
@@ -14,16 +15,27 @@ type Props = {
 
 export function SlotPicker({ days, dayIndex, onDay, selected, onSelect, exclude }: Props) {
   const strip = useRef<HTMLDivElement>(null);
+  const settled = useRef(false);
   const day = days[dayIndex];
 
   // Keep the chosen date in view as the strip scrolls.
   useEffect(() => {
-    const el = strip.current?.querySelector<HTMLElement>('[aria-checked="true"]');
-    el?.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+    const box = strip.current;
+    const el = box?.querySelector<HTMLElement>('[aria-checked="true"]');
+    if (!box || !el) return;
+    // Only the strip moves. The page itself must stay where the person left it.
+    const left = box.scrollLeft + el.getBoundingClientRect().left - box.getBoundingClientRect().left - (box.clientWidth - el.offsetWidth) / 2;
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    box.scrollTo({ left, behavior: calm || !settled.current ? 'auto' : 'smooth' });
+    settled.current = true;
   }, [dayIndex]);
 
   return (
     <div className="picker">
+      <div className="day-head">
+        <p>Choose a date</p>
+        <ScrollArrows target={strip} label="Scroll dates" />
+      </div>
       <div className="day-strip" role="radiogroup" aria-label="Choose a date" ref={strip}>
         {days.map((d, i) => (
           <button

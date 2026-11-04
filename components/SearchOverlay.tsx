@@ -97,7 +97,7 @@ export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose:
         <>
           <button type="button" className="overlay-near" onClick={nearMe} disabled={locating}>
             <i><IconLocate /></i>
-            <span><strong>{locating ? 'Finding you' : 'Near me'}</strong><small>Used for this search only, never saved</small></span>
+            <span><strong>{locating ? 'Finding you' : 'Near me'}</strong><small>Used while you search, never saved</small></span>
           </button>
           {recent.length ? (
             <section className="overlay-section" aria-labelledby="overlay-recent">

@@ -23,7 +23,7 @@ export function Welcome() {
   return (
     <main className="welcome">
       <div className="welcome-art">
-        <Image src="/img/g09.jpg" alt="" fill priority sizes="(max-width: 860px) 100vw, 55vw" />
+        <Image src="/cutouts/motion.webp" alt="" fill priority sizes="(max-width: 860px) 100vw, 55vw" />
         <div className="welcome-shade" aria-hidden="true" />
         <div className="welcome-top">
           <Link href="/home" className="round round-glass" aria-label="Back to Home"><IconBack /></Link>

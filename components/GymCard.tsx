@@ -106,7 +106,7 @@ export function PickCard({ gym, priority, morph = true }: { gym: CardGym; priori
 }
 
 // The big swipeable card at the top of Home.
-export function FeatureCard({ gym, priority, morph = true }: { gym: CardGym; priority?: boolean; morph?: boolean }) {
+export function FeatureCard({ gym, priority, morph = true, showCity }: { gym: CardGym; priority?: boolean; morph?: boolean; showCity?: boolean }) {
   const status = useGymStatus(gym);
   return (
     <Link href={`/gyms/${gym.slug}`} transitionTypes={['nav-forward']} className="feature-card">
@@ -118,6 +118,7 @@ export function FeatureCard({ gym, priority, morph = true }: { gym: CardGym; pri
         <h3>{gym.name}</h3>
         <p className="card-meta">
           <RatingLine rating={gym.rating} count={gym.rating_count} />
+          {showCity && gym.city ? <span>{gym.city}</span> : null}
           <span className={`status-dot${status?.open ? ' is-open' : ''}`}>{status?.line ?? ' '}</span>
         </p>
         <span className="feature-book">{status?.nextSlot ? `Book ${status.nextSlot.replace(/^(Today|Tomorrow)/, (w) => w.toLowerCase())}` : 'See times'} <i aria-hidden="true"><IconArrow /></i></span>

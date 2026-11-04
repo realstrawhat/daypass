@@ -8,6 +8,7 @@ import { IconBack } from './Icons';
 import type { MapGym } from './GymMap';
 import type { GymHours } from '@/lib/hours';
 import { SharedPhoto } from './ui/Page';
+import { ScrollArrows } from './ui/Rail';
 
 const GymMap = dynamic(() => import('./GymMap').then((m) => m.GymMap), { ssr: false, loading: () => <div className="map-wrap map-loading" /> });
 
@@ -41,6 +42,7 @@ export function GymGallery({ gym, title }: { gym: { id: string; name: string; ph
       </div>
       <div className="gallery-shade" aria-hidden="true" />
       <div className="gallery-title">{title}</div>
+      {gym.photos.length > 1 ? <ScrollArrows target={track} label="Browse photos" className="gallery-arrows" /> : null}
       {gym.photos.length > 1 ? (
         <div className="gallery-dots" aria-hidden="true">{gym.photos.map((p, i) => <i key={p} className={i === index ? 'on' : ''} />)}</div>
       ) : null}
@@ -68,5 +70,5 @@ export function GymTopBar({ gym }: { gym: { id: string; name: string; city: stri
 
 export function GymStatusLine({ gym }: { gym: GymHours }) {
   const status = useGymStatus(gym);
-  return <p className={`status-dot gym-status${status?.open ? ' is-open' : ''}`}>{status ? status.line : ' '}{status?.nextSlot ? <small>Next free: {status.nextSlot}</small> : null}</p>;
+  return <p className={`status-dot gym-status${status?.open ? ' is-open' : ''}`}>{status ? status.line : ' '}{status?.nextSlot ? <small>Next open time: {status.nextSlot}</small> : null}</p>;
 }

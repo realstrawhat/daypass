@@ -1,45 +1,109 @@
 'use client';
 import dynamic from 'next/dynamic';
+import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { dateLabel, timeLabel } from '@/lib/format';
 import { CityMark } from './CityMark';
 import { FeatureCard, PickCard, type CardGym } from './GymCard';
+import { GymPhoto } from './GymPhoto';
 import { IconArrow, IconBell, IconLocate, IconSearch, Spark } from './Icons';
-import { locate, locationAllowed, nearestCity, setResolvedCity } from './location';
+import { generalArea, locate, locationAllowed, nearestCity, setResolvedCity } from './location';
 import { useSession, type NextBooking } from './session';
 import { useFeedback } from './ui/feedback';
+import { ScrollArrows } from './ui/Rail';
 
 const SearchOverlay = dynamic(() => import('./SearchOverlay').then((m) => m.SearchOverlay), { ssr: false });
 
 const CITIES = ['Amsterdam', 'Berlin', 'Paris', 'Lisbon', 'Barcelona', 'Prague', 'Vienna', 'Rome'];
 
-function countdown(iso: string) {
+const MOVES = [
+  { title: 'Lift heavy', note: 'heavy days', kit: 'Squat racks', img: '/cutouts/lift.webp', tone: 'is-lime', tall: true },
+  { title: 'Core and mat', note: 'just breathe', kit: 'Yoga room', img: '/cutouts/core.webp', tone: 'is-pale', tall: false },
+  { title: 'Kettlebells', note: 'stronger everyday', kit: 'Kettlebells', img: '/cutouts/kettlebell.webp', tone: 'is-lime', tall: true },
+  { title: 'Sled and sprint', note: 'push it', kit: 'Sled track', img: '/cutouts/sled.webp', tone: 'is-dark', tall: false },
+];
+
+type Local = { label: string; gyms: CardGym[]; source: 'exact' | 'home' | 'area' };
+
+function untilSession(iso: string) {
   const hours = (new Date(iso).getTime() - Date.now()) / 3600000;
-  if (hours < 0) return 'Happening now';
-  if (hours < 1) return `In ${Math.max(1, Math.round(hours * 60))} minutes`;
-  if (hours < 24) return `In ${Math.round(hours)} ${Math.round(hours) === 1 ? 'hour' : 'hours'}`;
+  if (hours < 0) return { n: 'Now', unit: 'happening' };
+  if (hours < 1) return { n: String(Math.max(1, Math.round(hours * 60))), unit: 'minutes to go' };
+  if (hours < 24) return { n: String(Math.round(hours)), unit: Math.round(hours) === 1 ? 'hour to go' : 'hours to go' };
   const days = Math.round(hours / 24);
-  return days === 1 ? 'Tomorrow' : `In ${days} days`;
+  return { n: String(days), unit: days === 1 ? 'day to go' : 'days to go' };
+}
+
+function HeroVideo() {
+  const video = useRef<HTMLVideoElement>(null);
+  const [playing, setPlaying] = useState(false);
+
+  useEffect(() => {
+    const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    const saving = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
+    if (!calm && !saving) video.current?.play().catch(() => {});
+  }, []);
+
+  const toggle = () => {
+    const v = video.current;
+    if (!v) return;
+    if (v.paused) v.play().catch(() => {});
+    else v.pause();
+  };
+
+  return (
+    <>
+      <picture>
+        <source media="(orientation: portrait)" srcSet="/video/hero-portrait.jpg" />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img className="vhero-poster" src="/video/hero-wide.jpg" alt="" fetchPriority="high" />
+      </picture>
+      <video ref={video} className={`vhero-video${playing ? ' is-on' : ''}`} muted loop playsInline preload="none" aria-hidden="true" tabIndex={-1} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)}>
+        <source media="(orientation: portrait)" src="/video/hero-portrait.mp4" type="video/mp4" />
+        <source src="/video/hero-wide.mp4" type="video/mp4" />
+      </video>
+      <i className="vhero-shade" aria-hidden="true" />
+      <button type="button" className="round round-sm vhero-pause" aria-label={playing ? 'Pause background video' : 'Play background video'} onClick={toggle}>
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">{playing ? <path d="M3 1h3v12H3zM8 1h3v12H8z" /> : <path d="M3 1l9 6-9 6z" />}</svg>
+      </button>
+    </>
+  );
 }
 
 function NextCard({ next }: { next: NextBooking }) {
-  const [when, setWhen] = useState('');
-  useEffect(() => setWhen(countdown(next.starts_at)), [next.starts_at]);
+  const [when, setWhen] = useState<{ n: string; unit: string } | null>(null);
+  useEffect(() => setWhen(untilSession(next.starts_at)), [next.starts_at]);
   return (
-    <Link href={`/bookings/${next.id}`} transitionTypes={['nav-forward']} className="next-card">
-      <i className="foil-sweep" aria-hidden="true" />
-      <div className="next-main">
-        <p className="next-label">{when || ' '}</p>
-        <h2>{next.gym_name}</h2>
-        <p className="next-when">{dateLabel(next.starts_at, next.gym_timezone)} at {timeLabel(next.starts_at, next.gym_timezone)}, {next.gym_city}</p>
+    <Link href={`/bookings/${next.id}`} transitionTypes={['nav-forward']} className="next-photo">
+      <GymPhoto src={next.gym_photos[0]} name={next.gym_name} sizes="(max-width: 860px) 130vw, 900px" />
+      <i className="next-photo-shade" aria-hidden="true" />
+      <p className="next-number" aria-label={when ? `${when.n} ${when.unit}` : undefined}><strong>{when?.n ?? ' '}</strong><small>{when?.unit ?? ' '}</small></p>
+      <div className="next-photo-copy">
+        <div>
+          <h2>{next.gym_name}</h2>
+          <p>{dateLabel(next.starts_at, next.gym_timezone)} at {timeLabel(next.starts_at, next.gym_timezone)}, {next.gym_city}</p>
+        </div>
+        <span className="next-photo-open" aria-hidden="true"><IconArrow /></span>
       </div>
-      <span className="next-open"><i aria-hidden="true"><IconArrow /></i></span>
     </Link>
   );
 }
 
-function FeaturedRail({ gyms, morphAllowed }: { gyms: CardGym[]; morphAllowed: (id: string) => boolean }) {
+function RailSection({ id, title, action, children }: { id: string; title: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+  const track = useRef<HTMLUListElement>(null);
+  return (
+    <section className="rail-section" aria-labelledby={id}>
+      <div className="rail-head">
+        <h2 id={id}>{title}</h2>
+        <div className="rail-tools">{action}<ScrollArrows target={track} label="Scroll this row" /></div>
+      </div>
+      <ul className="h-rail" ref={track}>{children}</ul>
+    </section>
+  );
+}
+
+function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLocation }: { gyms: CardGym[]; heading: string; showCity: boolean; morphAllowed: (id: string) => boolean; onLocate: () => void; askLocation: string | null }) {
   const track = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
   const onScroll = () => {
@@ -49,9 +113,17 @@ function FeaturedRail({ gyms, morphAllowed }: { gyms: CardGym[]; morphAllowed: (
     setIndex(Math.round(el.scrollLeft / (first.offsetWidth + 12)));
   };
   return (
-    <section className="featured" aria-label="Featured gyms">
+    <section className="featured" aria-labelledby="featured-title">
+      <div className="rail-head">
+        <div>
+          <h2 id="featured-title" className="two-tone">Find your <em>next gym</em></h2>
+          <p className="featured-where">{heading}</p>
+        </div>
+        <ScrollArrows target={track} label="Scroll featured gyms" />
+      </div>
+      {askLocation ? <button type="button" className="where-note" onClick={onLocate}><IconLocate /> <span>{askLocation}</span></button> : null}
       <ul className="featured-track" ref={track} onScroll={onScroll} tabIndex={0}>
-        {gyms.map((g, i) => <li key={g.id} className="featured-item"><FeatureCard gym={g} priority={i < 1} morph={morphAllowed(g.id)} /></li>)}
+        {gyms.map((g, i) => <li key={g.id} className="featured-item"><FeatureCard gym={g} priority={i < 1} morph={morphAllowed(g.id)} showCity={showCity} /></li>)}
       </ul>
       <div className="featured-dots" aria-hidden="true">
         {gyms.map((g, i) => <i key={g.id} className={i === index ? 'on' : ''} />)}
@@ -60,51 +132,74 @@ function FeaturedRail({ gyms, morphAllowed }: { gyms: CardGym[]; morphAllowed: (
   );
 }
 
-export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) {
+function RailSkeleton() {
+  return (
+    <section className="featured" aria-busy="true" aria-label="Finding gyms near you">
+      <div className="rail-head"><h2 className="two-tone">Find your <em>next gym</em></h2></div>
+      <div className="featured-track"><div className="featured-item"><span className="sk feature-sk" /></div><div className="featured-item"><span className="sk feature-sk" /></div></div>
+    </section>
+  );
+}
+
+export function HomeClient({ picks }: { picks: CardGym[] }) {
   const { user, ready, next, toRate, unread, saved } = useSession();
   const [overlay, setOverlay] = useState(false);
   const [note, setNote] = useState('');
-  const [local, setLocal] = useState<{ label: string; gyms: CardGym[] } | null>(null);
+  const [local, setLocal] = useState<Local | null>(null);
+  const [finding, setFinding] = useState(true);
   const [savedGyms, setSavedGyms] = useState<CardGym[]>([]);
   const { toast } = useFeedback();
 
-  // Show gyms around the person: their position if allowed, otherwise their saved home city.
-  const loadNear = async (coords: { lat: number; lng: number }) => {
-    const res = await fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...coords, sort: 'recommended' }) });
+  const loadCity = async (name: string, source: Local['source']) => {
+    const res = await fetch(`/api/gyms?city=${encodeURIComponent(name)}`);
+    if (!res.ok) return false;
     const d = await res.json();
-    if (d.gyms?.length) {
-      setLocal({ label: 'you', gyms: d.gyms.slice(0, 12) });
-      return;
-    }
-    const found = await nearestCity(coords);
-    if (!found) return;
-    setResolvedCity(found);
-    const c = await (await fetch(`/api/gyms?city=${encodeURIComponent(found)}`)).json();
-    if (c.gyms?.length) setLocal({ label: c.place?.name ?? found, gyms: c.gyms.slice(0, 12) });
+    if (!d.gyms?.length) return false;
+    setLocal({ label: d.place?.name ?? name, gyms: d.gyms.slice(0, 12), source });
+    return true;
   };
 
+  const loadNear = async (coords: { lat: number; lng: number }) => {
+    const res = await fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...coords, sort: 'recommended' }) });
+    if (!res.ok) return false;
+    const d = await res.json();
+    if (d.gyms?.length) {
+      setLocal({ label: 'you', gyms: d.gyms.slice(0, 12), source: 'exact' });
+      return true;
+    }
+    const found = await nearestCity(coords);
+    if (!found) return false;
+    setResolvedCity(found);
+    return loadCity(found, 'exact');
+  };
+
+  // Exact location if it was allowed, then the saved home city, then the general area from the network.
+  // If none of those are known, the screen says so instead of guessing a city.
   useEffect(() => {
+    if (!ready) return;
     let live = true;
     (async () => {
       if (await locationAllowed()) {
         try {
           const c = await locate();
-          if (live) await loadNear(c);
-          return;
+          if (live && (await loadNear(c))) return;
         } catch {}
       }
-      const home = user?.home_city;
-      if (home && home.toLowerCase() !== city.toLowerCase()) {
-        const d = await (await fetch(`/api/gyms?city=${encodeURIComponent(home)}`)).json().catch(() => null);
-        if (live && d?.gyms) setLocal({ label: d.place?.name ?? home, gyms: d.gyms.slice(0, 12) });
-      }
-    })().catch(() => {});
+      if (!live) return;
+      if (user?.home_city && (await loadCity(user.home_city, 'home'))) return;
+      const area = await generalArea();
+      if (live && area) await loadCity(area, 'area');
+    })()
+      .catch(() => {})
+      .finally(() => {
+        if (live) setFinding(false);
+      });
     return () => {
       live = false;
     };
     // Re-run if the saved home city changes.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.home_city, city]);
+  }, [ready, user?.home_city]);
 
   useEffect(() => {
     if (!user || saved.length === 0) {
@@ -125,8 +220,8 @@ export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) 
   const nearMe = async () => {
     try {
       const c = await locate();
-      await loadNear(c);
-      toast('Showing gyms around you');
+      if (await loadNear(c)) toast('Showing gyms around you');
+      else toast('No gyms found around you. Try typing a city.', 'error');
     } catch (e) {
       const text = e instanceof Error ? e.message : 'Location is off. Type a city instead.';
       toast(text, 'error');
@@ -136,38 +231,49 @@ export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) 
   };
 
   const shown = local?.gyms ?? picks;
-  const place = local ? (local.label === 'you' ? 'near you' : `in ${local.label}`) : `in ${city}`;
+  const place = !local ? null : local.label === 'you' ? 'near you' : `in ${local.label}`;
+  const heading = place ? `Top picks ${place}` : 'Top rated across Europe';
+  const askLocation = !local ? 'We don’t know where you are yet. Use my location' : local.source === 'area' ? `${local.label} is your general area. Use my exact location` : null;
   const featured = shown.slice(0, 5);
   const rest = shown.slice(5);
+  const searchQuery = !local ? '' : local.label === 'you' ? 'near=1&' : `city=${encodeURIComponent(local.label)}&`;
   // A photo can only morph from one card on a screen, so a saved gym's copy here stays still.
   const canMorph = (id: string) => !savedGyms.some((s) => s.id === id);
 
   return (
     <main className="home">
-      <header className="home-top">
-        <p className="home-brand"><Spark /> {!ready ? <span className="sk sk-word" /> : user ? `Hi ${user.name.split(' ')[0]}` : 'Daypass'}</p>
-        <div className="home-actions">
-          {user ? (
-            <>
-              <Link href="/inbox" className="round round-solid" aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'}>
-                <IconBell />{unread ? <b className="count-badge">{unread}</b> : null}
-              </Link>
-              <Link href="/account" className="avatar" aria-label="Account">{user.name.charAt(0).toUpperCase()}</Link>
-            </>
-          ) : ready ? (
-            <Link href="/login?next=/home" className="home-login">Log in</Link>
-          ) : null}
+      <section className="vhero" aria-labelledby="home-title">
+        <HeroVideo />
+        <header className="home-top">
+          <p className="home-brand"><Spark /> {!ready ? <span className="sk sk-word" /> : user ? `Hi ${user.name.split(' ')[0]}` : 'Daypass'}</p>
+          <div className="home-actions">
+            {user ? (
+              <>
+                <Link href="/inbox" className="round round-frost" aria-label={unread ? `Inbox, ${unread} unread` : 'Inbox'}>
+                  <IconBell />{unread ? <b className="count-badge">{unread}</b> : null}
+                </Link>
+                <Link href="/account" className="avatar" aria-label="Account">{user.name.charAt(0).toUpperCase()}</Link>
+              </>
+            ) : ready ? (
+              <Link href="/login?next=/home" className="home-login">Log in</Link>
+            ) : null}
+          </div>
+        </header>
+
+        <div className="vhero-copy">
+          <p className="hand vhero-note">
+            no membership, no catch
+            <svg viewBox="0 0 180 14" aria-hidden="true"><path d="M2 9c30-6 58-7 84-4s58 5 92-2" /></svg>
+          </p>
+          <h1 id="home-title" className="home-title"><span>One gym.</span><span>One day.</span><em>No contract.</em></h1>
+          <div className="home-search">
+            <button type="button" className="search-pill is-large is-frost" onClick={() => { setNote(''); setOverlay(true); }}>
+              <IconSearch /> <span>Where are you training?</span>
+            </button>
+            <button type="button" className="round round-volt round-lg" aria-label="Gyms near me" onClick={nearMe}><IconLocate /></button>
+          </div>
         </div>
-      </header>
-
-      <h1 className="home-title">One gym. One day. No contract.</h1>
-
-      <div className="home-search">
-        <button type="button" className="search-pill is-large" onClick={() => { setNote(''); setOverlay(true); }}>
-          <IconSearch /> <span>Where are you training?</span>
-        </button>
-        <button type="button" className="round round-solid round-lg" aria-label="Gyms near me" onClick={nearMe}><IconLocate /></button>
-      </div>
+      </section>
 
       {ready && next ? <NextCard next={next} /> : null}
 
@@ -178,44 +284,58 @@ export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) 
         </Link>
       ) : null}
 
-      {featured.length ? <FeaturedRail gyms={featured} morphAllowed={canMorph} /> : null}
+      {finding ? <RailSkeleton /> : featured.length ? <FeaturedRail gyms={featured} heading={heading} showCity={!local} morphAllowed={canMorph} onLocate={nearMe} askLocation={askLocation} /> : null}
 
-      {savedGyms.length ? (
-        <section className="rail-section" aria-labelledby="saved">
-          <div className="rail-head"><h2 id="saved">Saved</h2></div>
-          <ul className="h-rail">{savedGyms.map((g) => <li key={g.id}><PickCard gym={g} /></li>)}</ul>
-        </section>
-      ) : null}
-
-      {rest.length ? (
-        <section className="rail-section" aria-labelledby="picks">
-          <div className="rail-head">
-            <h2 id="picks">More {place}</h2>
-            <Link href={local?.label === 'you' ? '/gyms' : `/gyms?city=${encodeURIComponent(local?.label ?? city)}`} transitionTypes={['nav-tab']}>See all</Link>
-          </div>
-          <ul className="h-rail">{rest.map((g) => <li key={g.id}><PickCard gym={g} morph={canMorph(g.id)} /></li>)}</ul>
-        </section>
-      ) : null}
-
-      <section className="rail-section" aria-labelledby="cities">
-        <div className="rail-head"><h2 id="cities">Train anywhere</h2></div>
-        <ul className="city-grid">
-          {CITIES.map((c) => (
-            <li key={c}>
-              <Link href={`/gyms?city=${c}`} transitionTypes={['nav-tab']} className="city-tile">
-                <CityMark city={c} />
-                <span>{c}</span>
+      <section className="moves-section" aria-labelledby="moves-title">
+        <h2 id="moves-title" className="two-tone">Train <em>your way</em></h2>
+        <ul className="moves">
+          {MOVES.map((m) => (
+            <li key={m.title} className={m.tall ? 'is-tall' : ''}>
+              <Link href={`/gyms?${searchQuery}equipment=${encodeURIComponent(m.kit)}`} transitionTypes={['nav-tab']} className={`move ${m.tone}`}>
+                <span className="hand move-note">{m.note}</span>
+                <Image className="move-img" src={m.img} alt="" fill sizes="(max-width: 860px) 60vw, 320px" />
+                <span className="move-foot"><strong>{m.title}</strong><i aria-hidden="true"><IconArrow /></i></span>
               </Link>
             </li>
           ))}
         </ul>
       </section>
 
+      {savedGyms.length ? (
+        <RailSection id="saved" title="Saved">
+          {savedGyms.map((g) => <li key={g.id}><PickCard gym={g} /></li>)}
+        </RailSection>
+      ) : null}
+
+      {!finding && rest.length ? (
+        <RailSection
+          id="picks"
+          title={place ? `More ${place}` : 'More top gyms'}
+          action={local ? <Link href={local.label === 'you' ? '/gyms?near=1' : `/gyms?city=${encodeURIComponent(local.label)}`} transitionTypes={['nav-tab']}>See all</Link> : null}
+        >
+          {rest.map((g) => <li key={g.id}><PickCard gym={g} morph={canMorph(g.id)} /></li>)}
+        </RailSection>
+      ) : null}
+
+      <RailSection id="cities" title={<span className="two-tone">Train <em>anywhere</em></span>}>
+        {CITIES.map((c) => (
+          <li key={c}>
+            <Link href={`/gyms?city=${c}`} transitionTypes={['nav-tab']} className="city-card">
+              <Image src={`/cities/${c.toLowerCase()}.jpg`} alt="" fill sizes="190px" />
+              <i className="city-card-shade" aria-hidden="true" />
+              <CityMark city={c} size={30} />
+              <span>{c}</span>
+            </Link>
+          </li>
+        ))}
+      </RailSection>
+
       <Link href="/partners" className="home-partner">
+        <i className="glow-blob" aria-hidden="true" />
         <strong>Own a gym?</strong>
         <span>List it for free and set your own price. You pay 15% only when someone books.</span>
       </Link>
-      <p className="fine home-fine">Student project demo. Gyms are sample data, and payments, Wallet and email are simulated.</p>
+      <p className="fine home-fine">Student project demo. Gyms are sample data, and payments, Wallet and email are simulated. <Link href="/credits" className="link">Photo and video credits</Link></p>
       <SearchOverlay open={overlay} onClose={() => { setOverlay(false); setNote(''); }} note={note} />
     </main>
   );

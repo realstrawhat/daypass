@@ -35,10 +35,18 @@ export default async function AccountPage() {
     listBookings(user.id),
     db()`SELECT count(*)::int AS n FROM passkeys WHERE user_id = ${user.id}::uuid`,
   ]);
-  const visited = all.filter((b) => b.status === 'confirmed' && (b.checked_in_at || new Date(b.starts_at).getTime() < Date.now()));
+  // A real account's one sample visit is for trying the rating screen, so it doesn't count as training.
+  const visited = all.filter((b) => b.status === 'confirmed' && (user.is_demo || !b.is_sample) && (b.checked_in_at || new Date(b.starts_at).getTime() < Date.now()));
   const cities = new Set(visited.map((b) => b.gym_city)).size;
   const spent = visited.reduce((sum, b) => sum + b.price_cents - b.refund_cents, 0);
   const months = buildMonths(visited.map((b) => localParts(new Date(b.starts_at), b.gym_timezone)));
+  const now = new Date();
+  const thisYear = visited.filter((b) => new Date(b.starts_at).getUTCFullYear() === now.getUTCFullYear());
+  const rings = [
+    { label: 'Visits this month', goal: 4, value: visited.filter((b) => { const d = new Date(b.starts_at); return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth(); }).length, color: '#d7ff3e', r: 66 },
+    { label: 'Gyms tried this year', goal: 10, value: new Set(thisYear.map((b) => b.gym_id)).size, color: '#a4c92a', r: 50 },
+    { label: 'Cities this year', goal: 5, value: new Set(thisYear.map((b) => b.gym_city)).size, color: '#f2ffc4', r: 34 },
+  ];
 
   return (
     <Page>
@@ -56,6 +64,29 @@ export default async function AccountPage() {
           <div className="stat"><dt>Cities</dt><dd>{cities}</dd></div>
           <div className="stat"><dt>Spent</dt><dd>{money(spent)}</dd></div>
         </dl>
+
+        <section className="rings" aria-labelledby="rings-title">
+          <h2 id="rings-title" className="section-title">Your rings</h2>
+          <dl className="rings-list">
+            {rings.map((ring) => (
+              <div key={ring.label}>
+                <dt style={{ '--c': ring.color } as React.CSSProperties}><i aria-hidden="true" />{ring.label}</dt>
+                <dd>{ring.value} <small>of {ring.goal}</small></dd>
+              </div>
+            ))}
+          </dl>
+          <svg className="rings-art" viewBox="0 0 160 160" aria-hidden="true">
+            {rings.map((ring) => {
+              const length = 2 * Math.PI * ring.r;
+              return (
+                <g key={ring.label}>
+                  <circle className="track" cx="80" cy="80" r={ring.r} />
+                  {ring.value > 0 ? <circle cx="80" cy="80" r={ring.r} stroke={ring.color} strokeDasharray={`${Math.min(1, ring.value / ring.goal) * length} ${length}`} /> : null}
+                </g>
+              );
+            })}
+          </svg>
+        </section>
 
         <section className="visits" aria-labelledby="visits-title">
           <h2 id="visits-title" className="section-title">Your visits</h2>

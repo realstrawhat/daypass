@@ -5,7 +5,7 @@ import { GymBooking } from '@/components/GymBooking';
 import { GymGallery, GymStatusLine, GymTopBar, LocationMap } from '@/components/GymParts';
 import { IconAccess, IconClock, IconDrop, IconIdCard, IconKey, IconScan, IconStar, IconTowel, IconUser } from '@/components/Icons';
 import { Page } from '@/components/ui/Page';
-import { hourLabel, ratingLabel } from '@/lib/format';
+import { hourLabel, money, ratingLabel } from '@/lib/format';
 import { getGymBySlug, getReviews, type GymFacts } from '@/lib/gyms';
 import { ratingShares } from '@/lib/hours';
 
@@ -57,6 +57,11 @@ export default async function GymPage({ params }: P) {
               <GymStatusLine gym={hours} />
             </div>
           </header>
+          <dl className="gym-stats">
+            <div><dt>One visit</dt><dd>{money(gym.price_cents)}</dd></div>
+            <div><dt>Rating</dt><dd>{gym.rating != null ? ratingLabel(gym.rating) : 'New'}</dd></div>
+            <div><dt>Reviews</dt><dd>{gym.rating_count}</dd></div>
+          </dl>
 
           <div className="gym-layout">
             <aside className="gym-book">
@@ -98,13 +103,14 @@ export default async function GymPage({ params }: P) {
                 {gym.rating != null ? (
                   <div className="rating-board">
                     <div className="rating-big"><strong>{ratingLabel(gym.rating)}</strong><small>{gym.rating_count} reviews</small></div>
-                    <ul className="rating-bars" aria-label="Share of reviews by stars">
+                    <ul className="rating-bars" aria-label="Estimated share of reviews by stars">
                       {shares.map((pct, i) => (
                         <li key={i}><span>{5 - i}</span><i><b style={{ width: `${pct}%` }} /></i><span className="sr">{pct} percent</span></li>
                       ))}
                     </ul>
                   </div>
                 ) : <p className="note">No reviews yet. Be the first after your visit.</p>}
+                {gym.rating != null ? <p className="rating-estimate">Bars are estimated from the average rating.</p> : null}
                 {reviews.length ? (
                   <ul className="reviews">
                     {reviews.map((r, i) => (

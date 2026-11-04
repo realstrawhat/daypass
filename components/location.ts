@@ -110,3 +110,13 @@ export function rememberCity(city: string) {
     localStorage.setItem(RECENT, JSON.stringify(next));
   } catch {}
 }
+
+// The general area from the person's network, for when exact location hasn't been shared. Asked once per visit.
+let areaLookup: Promise<string | null> | null = null;
+export function generalArea(): Promise<string | null> {
+  areaLookup ??= fetch('/api/where')
+    .then((r) => (r.ok ? r.json() : null))
+    .then((d) => (d?.city as string) ?? null)
+    .catch(() => null);
+  return areaLookup;
+}

@@ -7,11 +7,12 @@ import { distanceLabel, money } from '@/lib/format';
 import { gymStatus } from '@/lib/hours';
 import type { Gym, Sort } from '@/lib/gyms';
 import { CityMark } from './CityMark';
+import { ScrollArrows } from './ui/Rail';
 import { FilterSheet, filterCount, NO_FILTERS, type Filters } from './FilterSheet';
 import { GymCard, RatingLine } from './GymCard';
 import { GymPhoto } from './GymPhoto';
 import { IconClose, IconExpand, IconList, IconLocate, IconMap, IconSearch, IconSliders } from './Icons';
-import { getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, rememberCity, watchLocation } from './location';
+import { getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, rememberCity, watchLocation, generalArea } from './location';
 import { SearchOverlay } from './SearchOverlay';
 import { useSession } from './session';
 import { haptic, useFeedback } from './ui/feedback';
@@ -94,6 +95,8 @@ export function GymSearch() {
   const request = useRef(0);
   const sentinel = useRef<HTMLDivElement>(null);
   const topMark = useRef<HTMLDivElement>(null);
+  const sortRow = useRef<HTMLDivElement>(null);
+  const [roughCity, setRoughCity] = useState<string | null>(null);
   const moreLock = useRef(false);
 
   // Update the address bar rather than navigate, so Back returns to this exact search.
@@ -147,6 +150,11 @@ export function GymSearch() {
     };
     // Runs once when Find opens.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Without exact location, the network still gives a rough city to offer.
+  useEffect(() => {
+    generalArea().then(setRoughCity);
   }, []);
 
   useEffect(() => {
@@ -305,8 +313,9 @@ export function GymSearch() {
       <main className="ask">
         <span className="ask-glow" aria-hidden="true" />
         <h1>Where do you want to train?</h1>
-        <p>Share your location to see the closest gyms. It is used for this search only and never saved.</p>
+        <p>Share your location to see the closest gyms. It is used while you search and never saved.</p>
         <button type="button" className="btn btn-volt ask-btn" onClick={nearMe}><IconLocate /> Use my location</button>
+        {roughCity ? <button type="button" className="btn btn-white ask-btn" onClick={() => router.replace(`/gyms?city=${encodeURIComponent(roughCity)}`)}>Gyms in {roughCity}, my general area</button> : null}
         <button type="button" className="btn btn-ghost ask-btn" onClick={() => setOverlay(true)}><IconSearch /> Search a city</button>
         {overlays}
       </main>
@@ -355,10 +364,13 @@ export function GymSearch() {
               <IconSliders />{count ? <b className="count-badge">{count}</b> : null}
             </button>
           </div>
-          <div className="filter-sort" role="group" aria-label="Sort gyms">
-            {SORTS.map((s) => (
-              <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { setQuery({ sort: s.id }); haptic(4); }}>{s.label}</button>
-            ))}
+          <div className="chips-row">
+            <div className="filter-sort" role="group" aria-label="Sort gyms" ref={sortRow}>
+              {SORTS.map((s) => (
+                <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { setQuery({ sort: s.id }); haptic(4); }}>{s.label}</button>
+              ))}
+            </div>
+            <ScrollArrows target={sortRow} label="Scroll sort options" />
           </div>
           {count ? (
             <ul className="applied" aria-label="Active filters">

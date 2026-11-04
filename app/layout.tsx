@@ -1,13 +1,15 @@
 import type { Metadata, Viewport } from 'next';
-import { Anton, Manrope } from 'next/font/google';
+import { Anton, Caveat_Brush, Manrope } from 'next/font/google';
 import './globals.css';
 import './screens.css';
 import './pages.css';
+import './inspo.css';
 import { Nav } from '@/components/Nav';
 import { Providers } from '@/components/session';
 
 const display = Anton({ weight: '400', subsets: ['latin'], variable: '--font-display', display: 'swap' });
 const body = Manrope({ subsets: ['latin'], variable: '--font-body', display: 'swap' });
+const hand = Caveat_Brush({ weight: '400', subsets: ['latin'], variable: '--font-hand', display: 'swap', preload: false });
 
 export const metadata: Metadata = {
   title: { default: 'Daypass: book a gym for one day', template: '%s | Daypass' },
@@ -23,7 +25,7 @@ export const viewport: Viewport = { themeColor: '#000000', width: 'device-width'
 // No cookies are read here, so browsing screens stay static, prefetchable and instant.
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${display.variable} ${body.variable}`}>
+    <html lang="en" className={`${display.variable} ${body.variable} ${hand.variable}`}>
       <body>
         <a className="skip" href="#main">Skip to content</a>
         <Providers>

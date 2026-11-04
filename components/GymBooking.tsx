@@ -7,6 +7,7 @@ import type { PayMethod } from '@/lib/payments';
 import { useSession } from './session';
 import { SlotPicker } from './SlotPicker';
 import { haptic, useFeedback } from './ui/feedback';
+import { SwipeAction } from './ui/SwipeAction';
 import { WalletSheet } from './WalletSheet';
 
 type Props = { gym: { id: string; name: string; price_cents: number; timezone: string } };
@@ -106,7 +107,7 @@ export function GymBooking({ gym }: Props) {
     bookedId.current = data.booking.id;
   };
 
-  const scrollToPicker = () => section.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  const scrollToPicker = () => section.current?.scrollIntoView({ behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'center' });
 
   return (
     <>
@@ -126,11 +127,13 @@ export function GymBooking({ gym }: Props) {
           </div>
         )}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
-        <button type="button" className="book-cta" disabled={!selected || busy} onClick={book}>
-          <span key={selected ?? 'none'} className="book-cta-label">
-            {busy ? 'Holding your spot' : selected ? <>Book {selectedLabel} <em>{money(gym.price_cents)}</em></> : 'Pick a time'}
-          </span>
-        </button>
+        {selected && !busy ? (
+          <SwipeAction key={selected} label={<>Swipe to book <em>{money(gym.price_cents)}</em></>} ariaLabel={`Book ${selectedLabel} for ${money(gym.price_cents)}`} onConfirm={book} />
+        ) : (
+          <button type="button" className="book-cta" disabled>
+            <span key={selected ?? 'none'} className="book-cta-label">{busy ? 'Holding your spot' : 'Pick a time'}</span>
+          </button>
+        )}
         <p className="fine">Free to change or cancel until 24 hours before. Refunded if the gym can't let you in.</p>
       </section>
 
