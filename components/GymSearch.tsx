@@ -103,7 +103,8 @@ export function GymSearch() {
       if (v === null) next.delete(k);
       else next.set(k, v);
     }
-    window.history.replaceState(window.history.state, '', `/gyms?${next}`);
+    // Passing null is what makes the router see the new address. Passing the current state hides it.
+    window.history.replaceState(null, '', `/gyms?${next}`);
   }, []);
 
   const applyFilters = (f: Filters) => {

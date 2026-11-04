@@ -210,7 +210,7 @@ export function HomeClient({ picks, city }: { picks: CardGym[]; city: string }) 
         <header className="hero-top">
           <div className="hero-hello">
             <p><Spark /> {ready && user ? `${hello}, ${user.name.split(' ')[0]}` : hello || ' '}</p>
-            <small>{openCount === null ? ' ' : openCount === 0 ? `Closed for now. Book ahead for tomorrow` : `${openCount} ${openCount === 1 ? 'gym' : 'gyms'} open ${place}`}</small>
+            <small>{openCount === null ? ' ' : openCount === 0 ? 'Closed now. Book for tomorrow' : `${openCount} ${openCount === 1 ? 'gym' : 'gyms'} open ${place}`}</small>
           </div>
           <div className="home-actions">
             {user ? (
