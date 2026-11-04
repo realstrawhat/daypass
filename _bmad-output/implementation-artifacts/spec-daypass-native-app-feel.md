@@ -104,7 +104,7 @@ Owner chose a new direction from the reference images, after rejecting the full-
 - `[medium]` `defer` Demo login has no rate limit and holds real capacity.
 - `[medium]` `patch` Face ID can land in a demo account silently — the scan now says Demo Face ID and "Signed in to a demo account". `defer`: trying a real passkey first when the device flag is missing.
 - `[high]` `patch` Personal pages stayed on the device after logout — copies are now removed at logout and account deletion.
-- `[high]` `patch` Offline promise failed for passes opened by in-app links — an opened pass now asks to be saved. NOT yet verified: the offline worker only runs in production and that deploy is blocked.
+- `[high]` `patch` Offline promise failed for passes opened by in-app links — an opened pass now asks to be saved. Verified on a local production build with the server fully stopped: a pass opened by an in-app tap still opened with its QR code, and an unsaved screen showed the offline page. Not yet checked on the live link or a real phone.
 - `[low]` `defer` Static cache never expires, `/img` marked immutable.
 - `[medium]` `patch` Rating bars are generated but looked like real counts — labelled as estimated.
 - `[medium]` `defer` Partner gyms get default facts owners can't correct. Pass back no longer shows when empty.

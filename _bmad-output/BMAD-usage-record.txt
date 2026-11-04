@@ -1069,7 +1069,8 @@ Confirmed faults were fixed and 13 tests added, taking the suite to 33 passing t
 Deviations in step 4:
 - Fixes were made in place, not by re-deriving from the spec.
 - Some findings were graded by reading the code without a separate verification step.
-- The spec remains in-review. Offline saving can't be verified until the deploy goes through.
+- The spec remains in-review until the live deploy and real phone checks are done. Offline saving
+  was checked on a local production build with the server fully stopped.
 
-Failures and corrections for this round: process-log.md, rows 18 to 31.
+Failures and corrections for this round: process-log.md, rows 18 to 34.
 Peer test: still to do by the student. No feedback has been invented.
