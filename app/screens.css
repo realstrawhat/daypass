@@ -24,7 +24,11 @@
 .auth-scan p { color: #fff; font-weight: 700; }
 
 /* Home */
-.home { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: 0 var(--gutter) 28px; max-width: 1180px; margin: 0 auto; }
+.home { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; padding: calc(14px + var(--safe-t)) var(--gutter) 28px; max-width: 1180px; margin: 0 auto; }
+.home-top { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 44px; }
+.home-brand { display: inline-flex; align-items: center; gap: 8px; font-weight: 800; }
+.home-brand svg { flex: none; color: var(--volt); width: 22px; height: 22px; }
+.home-title { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(3rem, 12.800vw, 6.400rem); line-height: 1; max-width: 9em; animation: rise 620ms var(--ease) both; }
 .home-actions { flex: none; display: flex; align-items: center; gap: 8px; }
 .home-login { display: inline-flex; align-items: center; min-height: 44px; padding: 0 16px; border-radius: 99px; background: var(--s2); font-weight: 700; font-size: .92rem; }
 .avatar { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: var(--volt); color: #000; font-weight: 800; font-size: 1.100rem; transition: transform var(--t-2) var(--spring); }
@@ -46,57 +50,28 @@
 .next-open { position: relative; display: inline-flex; align-items: center; gap: 10px; font-weight: 800; }
 .next-open i { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #000; color: var(--volt); transition: transform var(--t-3) var(--bounce); }
 .next-card:hover .next-open i { transform: rotate(45deg); }
-/* The opening screen: a full-screen hero of real gyms */
-.hero { position: relative; height: min(80svh, 760px); min-height: 500px; margin: 0 calc(var(--gutter) * -1); overflow: hidden; background: var(--s1); border-radius: 0 0 36px 36px; isolation: isolate; }
-.hero-track { display: flex; height: 100%; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
-.hero-track::-webkit-scrollbar { display: none; }
-.hero-track:focus-visible { outline-offset: -4px; }
-.hero-slide { position: relative; flex: none; width: 100%; height: 100%; scroll-snap-align: start; scroll-snap-stop: always; overflow: hidden; display: block; contain: paint; }
-.hero-photo { position: absolute; inset: 0; z-index: -2; }
-.hero-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.62), rgba(0,0,0,0) 26%, rgba(0,0,0,0) 44%, rgba(0,0,0,.9) 88%); }
-.hero-copy { position: absolute; left: var(--gutter); right: var(--gutter); bottom: 48px; display: grid; gap: 6px; }
-.hero-copy h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(4rem, 19vw, 9.500rem); line-height: .98; overflow-wrap: anywhere; }
-.hero-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 3px 14px; font-size: .94rem; font-weight: 600; }
-.hero-actions { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
-.hero-price { flex: none; padding: 7px 14px; border-radius: 15px; background: var(--volt); color: #000; font-family: var(--display); font-size: 1.700rem; line-height: 1.100; transform: rotate(-4deg); }
-.hero-cta { flex: 1; min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 54px; padding: 4px 6px 4px 20px; border-radius: 99px; background: #fff; color: #000; font-weight: 800; white-space: nowrap; transition: transform var(--t-1) var(--spring); }
-.hero-cta i { flex: none; width: 44px; height: 44px; border-radius: 50%; display: grid; place-items: center; background: #000; color: var(--volt); }
-.hero-slide:active .hero-cta { transform: scale(.97); }
-.hero-bars { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(10px + var(--safe-t)); z-index: 3; display: flex; gap: 5px; pointer-events: none; }
-.hero-bars i { flex: 1; height: 3px; border-radius: 9px; background: rgba(255,255,255,.3); overflow: hidden; position: relative; }
-.hero-bars i::after { content: ''; position: absolute; inset: 0; border-radius: 9px; background: #fff; transform: scaleX(0); transform-origin: left; }
-.hero-bars i.is-done::after { transform: none; }
-.hero-bars i.is-running::after { animation: bar-fill var(--slide) linear both; }
-@keyframes bar-fill { to { transform: none; } }
-.hero-top { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(22px + var(--safe-t)); z-index: 3; display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; pointer-events: none; }
-.hero-top a, .hero-top button { pointer-events: auto; }
-.hero-hello { min-width: 0; }
-.hero-hello p { display: flex; align-items: center; gap: 6px; font-weight: 800; }
-.hero-hello svg { flex: none; width: 18px; height: 18px; color: var(--volt); }
-.hero-hello small { color: #e4e5e0; font-size: .86rem; }
-.hero > .save.is-photo { top: auto; bottom: 150px; right: var(--gutter); width: 48px; height: 48px; z-index: 3; }
+/* Swipeable featured gyms: each card eases to full size as it reaches the centre. */
+.featured { display: grid; gap: 10px; min-width: 0; }
+.featured-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); scroll-padding-inline: var(--gutter); overscroll-behavior-x: contain; }
+.featured-track::-webkit-scrollbar { display: none; }
+.featured-item { flex: none; width: min(86vw, 620px); scroll-snap-align: start; }
+.feature-card { width: 100%; height: clamp(380px, 58svh, 560px); border-radius: 34px; }
+.feature-card .card-copy { left: 18px; right: 18px; bottom: 18px; gap: 4px; font-size: .96rem; }
+.feature-card .card-copy h3 { font-size: clamp(3rem, 13.600vw, 5rem); line-height: 1; }
+.feature-card .price-sticker { left: 18px; top: 18px; }
+.feature-card .save.is-photo { top: 18px; right: 18px; width: 44px; height: 44px; }
+.feature-book { display: inline-flex; justify-self: start; align-items: center; gap: 10px; min-height: 48px; margin-top: 8px; padding: 4px 6px 4px 18px; border-radius: 99px; background: #fff; color: #000; font-weight: 800; }
+.feature-book i { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; background: #000; color: var(--volt); transition: transform var(--t-3) var(--bounce); }
+.feature-card:hover .feature-book i { transform: rotate(45deg); }
+.featured-dots { display: flex; justify-content: center; gap: 6px; }
+.featured-dots i { width: 7px; height: 7px; border-radius: 50%; background: var(--s3); transition: background var(--t-2), transform var(--t-3) var(--bounce); }
+.featured-dots i.on { background: var(--volt); transform: scale(1.300); }
 @supports (animation-timeline: view()) {
   @media (prefers-reduced-motion: no-preference) {
-    /* Each photo slides at its own pace behind its card as you swipe. */
-    .hero-photo img { animation: hero-parallax linear both; animation-timeline: view(inline); scale: 1.160; }
-    @keyframes hero-parallax { from { translate: 7% 0; } to { translate: -7% 0; } }
-    .hero-copy h2 { animation: hero-name linear both; animation-timeline: view(inline); }
-    @keyframes hero-name { 0% { translate: 28% 0; opacity: 0; } 40%, 60% { translate: 0 0; opacity: 1; } 100% { translate: -28% 0; opacity: 0; } }
+    .featured-item .feature-card { animation: feature-focus linear both; animation-timeline: view(inline); }
+    @keyframes feature-focus { 0% { transform: scale(.9); opacity: .6; } 36%, 64% { transform: none; opacity: 1; } 100% { transform: scale(.9); opacity: .6; } }
   }
 }
-.round-volt { background: var(--volt); color: #000; }
-.round-volt:hover:not(:disabled) { background: #e2ff6d; }
-.home-search { position: relative; z-index: 4; margin-top: -28px; box-shadow: none; }
-.home-search .search-pill { box-shadow: 0 14px 34px rgba(0,0,0,.5); }
-.home-body { display: grid; grid-template-columns: minmax(0, 1fr); gap: 14px; margin-top: 4px; }
-
-.next-ticket { position: relative; overflow: hidden; display: flex; align-items: center; gap: 12px; padding: 8px 16px 8px 8px; border-radius: 26px; background: var(--volt); color: #000; transition: transform var(--t-2) var(--spring); }
-.next-ticket-photo { position: relative; flex: none; width: 76px; height: 76px; border-radius: 19px; overflow: hidden; background: #000; }
-.next-ticket-copy { flex: 1; min-width: 0; display: grid; line-height: 1.250; }
-.next-ticket-copy small { font-weight: 800; font-size: .8rem; }
-.next-ticket-copy strong { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 1.600rem; line-height: 1.100; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.next-ticket-copy span { font-weight: 700; font-size: .9rem; }
-.next-ticket-open { flex: none; display: inline-flex; align-items: center; gap: 4px; font-weight: 800; }
 
 /* City marks */
 .city-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }

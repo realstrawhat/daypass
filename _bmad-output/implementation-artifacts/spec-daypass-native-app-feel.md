@@ -2,7 +2,7 @@
 title: 'Daypass: make it behave and feel like a real app'
 type: 'feature'
 created: '2026-11-04'
-status: 'in-progress'
+status: 'in-review'
 baseline_revision: '2744e1d1422d316dbfefa439e65d57d160b61d57'
 review_loop_iteration: 0
 followup_review_recommended: false

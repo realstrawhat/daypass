@@ -110,7 +110,7 @@ export function FeatureCard({ gym, priority, morph = true }: { gym: CardGym; pri
   const status = useGymStatus(gym);
   return (
     <Link href={`/gyms/${gym.slug}`} transitionTypes={['nav-forward']} className="feature-card">
-      <CardPhoto gym={gym} morph={morph} priority={priority} sizes="(max-width: 860px) 86vw, 620px" />
+      <CardPhoto gym={gym} morph={morph} priority={priority} sizes="(max-width: 860px) 130vw, 620px" />
       <i className="card-shade" aria-hidden="true" />
       <span className="price-sticker is-large">{money(gym.price_cents)}<small>one visit</small></span>
       <SaveButton gymId={gym.id} name={gym.name} />
@@ -120,7 +120,7 @@ export function FeatureCard({ gym, priority, morph = true }: { gym: CardGym; pri
           <RatingLine rating={gym.rating} count={gym.rating_count} />
           <span className={`status-dot${status?.open ? ' is-open' : ''}`}>{status?.line ?? ' '}</span>
         </p>
-        <span className="feature-book">{status?.nextSlot ? `Book ${status.nextSlot}` : 'See times'} <i aria-hidden="true"><IconArrow /></i></span>
+        <span className="feature-book">{status?.nextSlot ? `Book ${status.nextSlot.replace(/^(Today|Tomorrow)/, (w) => w.toLowerCase())}` : 'See times'} <i aria-hidden="true"><IconArrow /></i></span>
       </div>
     </Link>
   );
