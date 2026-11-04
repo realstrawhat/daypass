@@ -53,6 +53,14 @@ export function GymGallery({ gym, title }: { gym: { id: string; name: string; ph
 // A native-style bar: floating buttons over the photo, then the name settles into a solid bar on scroll.
 export function GymTopBar({ gym }: { gym: { id: string; name: string; city: string } }) {
   const [solid, setSolid] = useState(false);
+  const [back, setBack] = useState(`/gyms?city=${encodeURIComponent(gym.city)}`);
+  useEffect(() => {
+    try {
+      const last = sessionStorage.getItem('daypass-last-search');
+      const params = new URLSearchParams(last ?? '');
+      if (last && (params.get('near') || params.get('area') || params.get('city')?.toLowerCase() === gym.city.toLowerCase())) setBack(`/gyms${last}`);
+    } catch {}
+  }, [gym.city]);
   useEffect(() => {
     const onScroll = () => setSolid(window.scrollY > window.innerHeight * 0.42);
     onScroll();
@@ -61,7 +69,7 @@ export function GymTopBar({ gym }: { gym: { id: string; name: string; city: stri
   }, []);
   return (
     <header className={`gym-bar${solid ? ' is-solid' : ''}`}>
-      <Link href={`/gyms?city=${encodeURIComponent(gym.city)}`} transitionTypes={['nav-back']} className="round round-glass" aria-label={`Back to gyms in ${gym.city}`}><IconBack /></Link>
+      <Link href={back} transitionTypes={['nav-back']} className="round round-glass" aria-label={`Back to gyms in ${gym.city}`}><IconBack /></Link>
       <p className="gym-bar-title" aria-hidden={!solid}>{gym.name}</p>
       <SaveButton gymId={gym.id} name={gym.name} tone="plain" />
     </header>

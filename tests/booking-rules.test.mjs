@@ -319,3 +319,152 @@ test('moving to a pricier gym charges the difference, a cheaper gym refunds it',
   assert.equal(down.status, 200);
   assert.equal(down.data.refund, dear.price_cents - cheap.price_cents);
 });
+
+// Door, refund and privacy rules for real accounts. These move a booking's time in the database,
+// because the rules depend on how close the session is.
+const sql = process.env.DATABASE_URL ? (await import('@neondatabase/serverless')).neon(process.env.DATABASE_URL) : null;
+const needsDb = { skip: sql ? false : 'needs DATABASE_URL (npm test loads it from .env.local)' };
+
+async function booked(call) {
+  const { gym, slots } = await freeSlots();
+  const slot = pick(later(slots));
+  const hold = await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: slot.startsAt, key: key() } });
+  assert.equal(hold.status, 200);
+  const id = hold.data.booking.id;
+  assert.equal((await call(`/api/checkout/${id}/pay`, { method: 'POST', body: { method: 'demo-card' } })).status, 200);
+  const [row] = await sql`SELECT code, price_cents FROM bookings WHERE id = ${id}::uuid`;
+  return { id, code: row.code, price: row.price_cents, gym, slot };
+}
+const moveTo = (id, hours) => sql`UPDATE bookings SET starts_at = now() + make_interval(mins => ${Math.round(hours * 60)}::int) WHERE id = ${id}::uuid`;
+
+test('the door: valid once, then used, with the QR prefix, and expired or cancelled passes refused', needsDb, async () => {
+  const call = await client();
+  const a = await booked(call);
+  await moveTo(a.id, 0.5);
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: `DAYPASS:${a.code}` } })).data.result, 'valid');
+  const [row] = await sql`SELECT checked_in_at FROM bookings WHERE id = ${a.id}::uuid`;
+  assert.ok(row.checked_in_at, 'a valid scan checks the pass in');
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'used');
+  assert.equal((await call(`/api/bookings/${a.id}`, { method: 'PATCH', body: { startsAt: pick(later((await freeSlots()).slots)).startsAt } })).data.code, 'checked_in');
+
+  const old = await booked(call);
+  await moveTo(old.id, -4);
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: old.code } })).data.result, 'expired');
+
+  const gone = await booked(call);
+  assert.equal((await call(`/api/bookings/${gone.id}`, { method: 'DELETE' })).status, 200);
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: gone.code } })).data.result, 'cancelled');
+});
+
+test('another account cannot read, use or change a real person\'s pass', needsDb, async () => {
+  const owner = await client();
+  const stranger = await client();
+  const demo = await demoClient();
+  const a = await booked(owner);
+  await moveTo(a.id, 0.5);
+  for (const other of [stranger, demo]) {
+    const seen = await other('/api/staff', { method: 'POST', body: { code: a.code } });
+    assert.equal(seen.data.result, 'unknown');
+    assert.equal(seen.data.holder, undefined, 'the holder name stays private');
+  }
+  const [row] = await sql`SELECT checked_in_at FROM bookings WHERE id = ${a.id}::uuid`;
+  assert.equal(row.checked_in_at, null, 'the pass is still unused');
+  for (const action of ['wallet', 'checkin', 'refused']) {
+    assert.equal((await stranger(`/api/bookings/${a.id}/${action}`, { method: 'POST', body: {} })).status, 404, action);
+  }
+});
+
+test('a real account can only check in and claim refused entry around its session', needsDb, async () => {
+  const call = await client();
+  const a = await booked(call);
+  assert.equal((await call(`/api/bookings/${a.id}/checkin`, { method: 'POST', body: {} })).data.code, 'too_early');
+  assert.equal((await call(`/api/bookings/${a.id}/refused`, { method: 'POST', body: { reason: 'closed' } })).data.code, 'too_early');
+  await moveTo(a.id, 2);
+  const refund = await call(`/api/bookings/${a.id}/refused`, { method: 'POST', body: { reason: 'closed' } });
+  assert.equal(refund.status, 200);
+  assert.equal(refund.data.refund_cents, a.price, 'the full price comes back');
+  const b = await booked(call);
+  await moveTo(b.id, 0.5);
+  assert.ok((await call(`/api/bookings/${b.id}/checkin`, { method: 'POST', body: {} })).data.checked_in_at);
+});
+
+test('demo ratings stay private and a real visit counts', needsDb, async () => {
+  const slug = 'iron-gym-amsterdam';
+  const score = async () => {
+    const [g] = await sql`SELECT id FROM gyms WHERE slug = ${slug}`;
+    const [r] = await sql`SELECT count(*)::int AS n FROM reviews WHERE gym_id = ${g.id}::uuid AND is_public`;
+    return r.n;
+  };
+  const before = await score();
+  const demo = await demoClient();
+  const { data } = await demo('/api/auth/me');
+  assert.equal((await demo('/api/reviews', { method: 'POST', body: { bookingId: data.toRate.id, stars: 5 } })).status, 200);
+  assert.equal(await score(), before, 'a demo rating changes nothing');
+  const call = await client();
+  const a = await booked(call);
+  await sql`UPDATE bookings SET gym_id = (SELECT id FROM gyms WHERE slug = ${slug}) WHERE id = ${a.id}::uuid`;
+  await moveTo(a.id, -5);
+  assert.equal((await call('/api/reviews', { method: 'POST', body: { bookingId: a.id, stars: 4 } })).status, 200);
+  assert.equal(await score(), before + 1, 'a real rating counts');
+});
+
+test('filters really narrow the results', async () => {
+  const all = await (await fetch(`${BASE}/api/gyms?city=Berlin`)).json();
+  const rated = await (await fetch(`${BASE}/api/gyms?city=Berlin&minRating=4.5`)).json();
+  assert.ok(rated.total > 0 && rated.total < all.total);
+  assert.ok(rated.gyms.every((g) => g.rating >= 4.5));
+  const cheap = await (await fetch(`${BASE}/api/gyms?city=Berlin&maxPrice=1200`)).json();
+  assert.ok(cheap.total > 0 && cheap.total < all.total);
+  const kit = await (await fetch(`${BASE}/api/gyms?city=Berlin&equipment=Sauna`)).json();
+  assert.ok(kit.total > 0 && kit.total < all.total);
+  const nearest = await (await fetch(`${BASE}/api/gyms`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: 52.52, lng: 13.405, sort: 'nearest' }) })).json();
+  const distances = nearest.gyms.map((g) => Number(g.distance_km));
+  assert.deepEqual(distances, [...distances].sort((x, y) => x - y), 'nearest is in distance order');
+});
+
+test('open now matches each gym\'s own hours', async () => {
+  const { gymStatus } = await import('../lib/hours.ts');
+  const open = await (await fetch(`${BASE}/api/gyms?city=Berlin&openNow=1`)).json();
+  assert.ok(open.gyms.every((g) => gymStatus(g).open));
+  const all = await (await fetch(`${BASE}/api/gyms?city=Berlin`)).json();
+  assert.ok(open.total <= all.total);
+  if (all.total === all.gyms.length) assert.equal(open.total, all.gyms.filter((g) => gymStatus(g).open).length);
+});
+
+test('private screens send guests to login, and bad booking input is refused', async () => {
+  for (const path of ['/wallet', '/inbox', '/staff']) {
+    const res = await fetch(BASE + path, { redirect: 'manual' });
+    assert.equal(res.status, 307, path);
+    assert.ok(res.headers.get('location').includes('/login'), path);
+  }
+  const call = await client();
+  const { gym, slots } = await freeSlots();
+  const slot = later(slots)[0];
+  const at = new Date(new Date(slot.startsAt).getTime() + 30000).toISOString();
+  assert.equal((await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: at, key: key() } })).data.code, 'slot_invalid');
+  assert.equal((await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: slot.startsAt } })).status, 400);
+});
+
+test('a reminder arrives once, and opening the inbox clears the count', needsDb, async () => {
+  const call = await client();
+  const a = await booked(call);
+  await moveTo(a.id, 2);
+  const first = (await call('/api/auth/me')).data.unread;
+  const second = (await call('/api/auth/me')).data.unread;
+  assert.equal(second, first, 'no duplicate reminder');
+  const [msg] = await sql`SELECT title FROM messages WHERE booking_id = ${a.id}::uuid AND kind = 'reminder'`;
+  assert.ok(msg, 'the reminder was written');
+  assert.equal((await call('/api/messages', { method: 'POST' })).status, 200);
+  assert.equal((await call('/api/auth/me')).data.unread, 0);
+});
+
+test('saved gyms use the same rating as everywhere else', needsDb, async () => {
+  const call = await client();
+  const search = await (await fetch(`${BASE}/api/gyms?city=Amsterdam`)).json();
+  const gym = search.gyms[0];
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: gym.id, saved: true } })).status, 200);
+  const saved = (await call('/api/saved')).data.gyms.find((g) => g.id === gym.id);
+  assert.equal(saved.rating, gym.rating);
+  assert.equal(saved.rating_count, gym.rating_count);
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: crypto.randomUUID(), saved: true } })).status, 200, 'a gym that no longer exists is ignored');
+});

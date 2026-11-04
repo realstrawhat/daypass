@@ -157,6 +157,8 @@ const statements = [
 ];
 
 for (const s of statements) await sql.query(s);
+// Reviews written before the public flag existed: samples and demo accounts must not count.
+await sql`UPDATE reviews r SET is_public = false FROM bookings b JOIN users u ON u.id = b.user_id WHERE b.id = r.booking_id AND r.is_public AND (b.is_sample OR u.is_demo)`;
 console.log('schema ready');
 
 const { seedCity, CITIES } = await import('./seed-data.mjs');

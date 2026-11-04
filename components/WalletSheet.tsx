@@ -43,7 +43,7 @@ export function WalletSheet({ open, merchant, amountCents, lines, savedCard, all
       setError('');
       busy.current = false;
     }
-  }, [open, savedCard]);
+  }, [open, savedCard?.brand]);
 
   const pay = async () => {
     if (busy.current) return;

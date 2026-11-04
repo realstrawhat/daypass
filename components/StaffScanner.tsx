@@ -3,18 +3,19 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconScan } from './Icons';
 import { haptic } from './ui/feedback';
 
-type Result = { result: 'valid' | 'used' | 'expired' | 'wrong_date' | 'cancelled' | 'unknown'; gym?: string; holder?: string; when?: string; code?: string; usedAt?: string };
+type Result = { result: 'valid' | 'used' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown'; gym?: string; holder?: string; when?: string; code?: string; usedAt?: string };
 
 const COPY: Record<Result['result'], { title: string; tone: string; line: (r: Result) => string }> = {
   valid: { title: 'Let them in', tone: 'is-valid', line: (r) => `${r.holder}, checked in for ${r.gym}.` },
   used: { title: 'Already used', tone: 'is-bad', line: (r) => `This pass was checked in at ${r.usedAt}.` },
   expired: { title: 'Expired', tone: 'is-bad', line: (r) => `This pass was for ${r.when}.` },
+  too_early: { title: 'Too early', tone: 'is-warn', line: (r) => `This pass opens one hour before ${r.when}.` },
   wrong_date: { title: 'Wrong date', tone: 'is-warn', line: (r) => `This pass is for ${r.when}.` },
   cancelled: { title: 'Cancelled', tone: 'is-bad', line: () => 'This booking was cancelled and refunded.' },
   unknown: { title: 'Not found', tone: 'is-bad', line: () => 'Check the code, or ask for the pass on their phone.' },
 };
 
-// What reception uses: any phone, no software to install, and a typed code when scanning fails.
+// What reception uses: no software to install, and a typed code when a browser can't scan.
 export function StaffScanner() {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<Result | null>(null);
@@ -30,6 +31,7 @@ export function StaffScanner() {
     if (!value.trim()) return;
     setBusy(true);
     setError('');
+    setResult(null);
     try {
       const res = await fetch('/api/staff', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ code: value }) });
       const data = await res.json();
@@ -39,6 +41,7 @@ export function StaffScanner() {
       haptic(data.result === 'valid' ? 20 : 40);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That check did not finish. Try again.');
+      lastScan.current = '';
     } finally {
       setBusy(false);
     }
@@ -60,6 +63,7 @@ export function StaffScanner() {
     }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      stop();
       stream.current = s;
       setCamera('on');
       requestAnimationFrame(() => {
@@ -73,6 +77,7 @@ export function StaffScanner() {
         if (!video.current || video.current.readyState < 2) return;
         const found = await detector.detect(video.current).catch(() => []);
         const value = found[0]?.rawValue;
+        if (value && !value.startsWith('DAYPASS:')) return;
         if (value && value !== lastScan.current) {
           lastScan.current = value;
           check(value);
@@ -107,7 +112,7 @@ export function StaffScanner() {
       {error ? <p className="form-error" role="alert">{error}</p> : null}
 
       {result && copy ? (
-        <div key={`${result.code}-${result.result}`} className={`staff-result ${copy.tone}`} role="status">
+        <div onAnimationEnd={() => { lastScan.current = ''; }} key={`${result.code}-${result.result}`} className={`staff-result ${copy.tone}`} role="status">
           <h2>{copy.title}</h2>
           <p>{copy.line(result)}</p>
           {result.result !== 'unknown' && result.code ? <p><strong>{result.code}</strong></p> : null}

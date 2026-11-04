@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IconChevron } from './Icons';
-import { useSession } from './session';
+import { useSession, clearSavedPages } from './session';
 import { useFeedback } from './ui/feedback';
 import { feel, setSound, soundOn } from './ui/sensory';
 import { Sheet } from './ui/Sheet';
@@ -91,10 +91,12 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
   const logout = async () => {
     setBusy(true);
     try {
-      await fetch('/api/auth/logout', { method: 'POST' });
+      const res = await fetch('/api/auth/logout', { method: 'POST' });
+      if (!res.ok) throw new Error();
       try {
         sessionStorage.removeItem('daypass-session');
       } catch {}
+      await clearSavedPages();
       window.location.assign('/home');
     } catch {
       toast('Log out did not finish. Try again.', 'error');
@@ -112,6 +114,7 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
       try {
         sessionStorage.removeItem('daypass-session');
       } catch {}
+      await clearSavedPages();
       toast('Deletion requested. Your account will be erased within 30 days.');
       setTimeout(() => window.location.assign('/home'), 1400);
     } catch (e) {

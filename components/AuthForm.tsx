@@ -20,6 +20,7 @@ export function AuthForm({ onDone, initialMode = 'login' }: Props) {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [scan, setScan] = useState<'scanning' | 'done' | null>(null);
+  const [scanDemo, setScanDemo] = useState(false);
 
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,6 +67,7 @@ export function AuthForm({ onDone, initialMode = 'login' }: Props) {
         const assertion = await startAuthentication({ optionsJSON: start.options });
         await post('/api/passkey/login-verify', { id: start.id, response: assertion });
       } else {
+        setScanDemo(true);
         await Promise.all([post('/api/auth/demo'), new Promise((r) => setTimeout(r, 1300))]);
       }
       setScan('done');
@@ -85,7 +87,7 @@ export function AuthForm({ onDone, initialMode = 'login' }: Props) {
       {scan ? (
         <div className="auth-scan" role="status">
           <FaceScan state={scan} />
-          <p>{scan === 'done' ? 'Done' : 'Face ID'}</p>
+          <p>{scan === 'done' ? (scanDemo ? 'Signed in to a demo account' : 'Done') : scanDemo ? 'Demo Face ID' : 'Face ID'}</p>
         </div>
       ) : null}
       <div className="segmented" role="group" aria-label="Log in or create an account" data-index={mode === 'login' ? 0 : 1}>

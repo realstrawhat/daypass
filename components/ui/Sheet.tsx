@@ -19,6 +19,25 @@ type Props = {
 
 const EXIT_MS = 300;
 
+// Sheets can open on top of each other, such as paying a price difference inside Change booking.
+// Only the top one answers the Back gesture, and closing it must not close the one beneath.
+const openSheets: object[] = [];
+let ownBack = false;
+
+// Closing a sheet steps back through history, which would undo a navigation made at the same moment.
+// So anything that changes the address waits for that step.
+export function afterSheetClosed(run: () => void) {
+  let done = false;
+  const go = () => {
+    if (done) return;
+    done = true;
+    window.removeEventListener('popstate', go);
+    setTimeout(run, 0);
+  };
+  window.addEventListener('popstate', go);
+  setTimeout(go, 250);
+}
+
 // A native dialog gives focus handling and Escape. On top of that: drag to dismiss with
 // velocity, and the phone's Back gesture closes the sheet instead of leaving the page.
 export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, className = '', full, children }: Props) {
@@ -33,6 +52,7 @@ export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, cl
   const keepHistoryRef = useRef(keepHistory);
   keepHistoryRef.current = keepHistory;
   const drag = useRef<{ y: number; t: number; lastY: number; lastT: number; id: number } | null>(null);
+  const token = useRef({}).current;
 
   useEffect(() => {
     if (open) setRendered(true);
@@ -43,6 +63,7 @@ export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, cl
     if (!d || !rendered) return;
     if (open) {
       if (!d.open) d.showModal();
+      if (!openSheets.includes(token)) openSheets.push(token);
       document.documentElement.classList.add('sheet-open');
       const f = requestAnimationFrame(() => requestAnimationFrame(() => setState('open')));
       if (!pushedHistory.current) {
@@ -50,6 +71,11 @@ export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, cl
         pushedHistory.current = true;
       }
       const onPop = () => {
+        if (ownBack) {
+          ownBack = false;
+          return;
+        }
+        if (openSheets[openSheets.length - 1] !== token) return;
         pushedHistory.current = false;
         if (lockedRef.current) {
           window.history.pushState({ ...window.history.state, daypassSheet: true }, '');
@@ -64,22 +90,31 @@ export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, cl
         window.removeEventListener('popstate', onPop);
       };
     }
+    const at = openSheets.indexOf(token);
+    if (at >= 0) openSheets.splice(at, 1);
     setState('exit');
     d.style.removeProperty('--drag');
     const t = setTimeout(() => {
       if (d.open) d.close();
-      document.documentElement.classList.remove('sheet-open');
+      if (openSheets.length === 0) document.documentElement.classList.remove('sheet-open');
       setRendered(false);
       setState('enter');
     }, EXIT_MS);
     if (pushedHistory.current) {
       pushedHistory.current = false;
-      if (!keepHistoryRef.current && window.history.state?.daypassSheet) window.history.back();
+      if (!keepHistoryRef.current && window.history.state?.daypassSheet) {
+        if (openSheets.length > 0) ownBack = true;
+        window.history.back();
+      }
     }
     return () => clearTimeout(t);
   }, [open, rendered]);
 
-  useEffect(() => () => document.documentElement.classList.remove('sheet-open'), []);
+  useEffect(() => () => {
+    const at = openSheets.indexOf(token);
+    if (at >= 0) openSheets.splice(at, 1);
+    if (openSheets.length === 0) document.documentElement.classList.remove('sheet-open');
+  }, [token]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {
     if (lockedRef.current || (e.target as HTMLElement).closest('button, a, input, select, textarea')) return;

@@ -12,7 +12,7 @@ export type PassData = {
   holder?: string;
   qrSvg: string;
   facts?: string[];
-  state?: 'active' | 'used' | 'void';
+  state?: 'active' | 'used' | 'void' | 'expired';
 };
 
 // The day pass. Pointer and device tilt drive the foil through CSS variables, so React never re-renders on move.
@@ -78,13 +78,13 @@ export function HoloPass({ pass, stamp = false }: { pass: PassData; stamp?: bool
   };
 
   return (
-    <div className={`holo-stage${stamp ? ' is-new' : ''}${pass.state === 'used' ? ' is-used' : ''}${pass.state === 'void' ? ' is-void' : ''}`}>
+    <div className={`holo-stage${stamp ? ' is-new' : ''}${pass.state === 'used' ? ' is-used' : ''}${pass.state === 'void' || pass.state === 'expired' ? ' is-void' : ''}`}>
       <div className={`holo${flipped ? ' is-flipped' : ''}`} ref={ref}>
         <div className="holo-face holo-front" role="group" aria-hidden={flipped} aria-label={`Day pass for ${pass.gym} on ${pass.dateLabel} at ${pass.timeLabel}, code ${pass.code}`}>
           <div className="holo-foil" aria-hidden="true" />
           <div className="holo-top">
             <span className="holo-brand">Daypass</span>
-            <span className="holo-kind">{pass.state === 'used' ? 'Checked in' : pass.state === 'void' ? 'Cancelled' : 'One visit'}</span>
+            <span className="holo-kind">{pass.state === 'used' ? 'Checked in' : pass.state === 'void' ? 'Cancelled' : pass.state === 'expired' ? 'Expired' : 'One visit'}</span>
           </div>
           <p className="holo-gym">{pass.gym}</p>
           <p className="holo-city">{pass.city}</p>
@@ -95,7 +95,7 @@ export function HoloPass({ pass, stamp = false }: { pass: PassData; stamp?: bool
           </dl>
           <div className="holo-foot">
             <div className="holo-qr" aria-hidden="true"><span dangerouslySetInnerHTML={{ __html: pass.qrSvg }} /></div>
-            <div className="holo-code"><span>{pass.state === 'void' ? 'No longer valid' : pass.state === 'used' ? 'Already used' : 'Show at the desk'}</span><strong>{pass.code}</strong></div>
+            <div className="holo-code"><span>{pass.state === 'void' || pass.state === 'expired' ? 'No longer valid' : pass.state === 'used' ? 'Already used' : 'Show at the desk'}</span><strong>{pass.code}</strong></div>
           </div>
           <div className="sticker" aria-hidden="true">
             <svg viewBox="0 0 120 120">
@@ -122,9 +122,11 @@ export function HoloPass({ pass, stamp = false }: { pass: PassData; stamp?: bool
           {Array.from({ length: 12 }, (_, i) => <i key={i} style={{ '--a': `${i * 30}deg`, '--d': `${70 + (i % 3) * 34}px` } as React.CSSProperties} />)}
         </div>
       ) : null}
-      <button type="button" className="holo-flip" onClick={flip} aria-pressed={flipped}>
-        <IconFlip width={16} height={16} /> {flipped ? 'Show pass' : 'What your pass includes'}
-      </button>
+      {pass.facts?.length ? (
+        <button type="button" className="holo-flip" onClick={flip} aria-pressed={flipped}>
+          <IconFlip width={16} height={16} /> {flipped ? 'Show pass' : 'What your pass includes'}
+        </button>
+      ) : null}
     </div>
   );
 }

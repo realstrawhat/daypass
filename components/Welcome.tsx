@@ -17,7 +17,10 @@ export function Welcome() {
   const next = safeNext(params.get('next'));
 
   useEffect(() => {
-    if (user) router.replace(next);
+    if (user) {
+      router.refresh();
+      router.replace(next);
+    }
   }, [user, next, router]);
 
   return (

@@ -10,7 +10,7 @@ export const POST = handle(async (req, ctx) => {
     return Response.json({ ok: true });
   }
   if (action === 'checkin') {
-    const b = await simulateCheckIn(user.id, id);
+    const b = await simulateCheckIn(user, id);
     return Response.json({ checked_in_at: b.checked_in_at });
   }
   if (action === 'refused') {

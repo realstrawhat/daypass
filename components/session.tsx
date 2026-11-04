@@ -51,6 +51,20 @@ const SessionContext = createContext<Ctx>({
 
 export const useSession = () => useContext(SessionContext);
 
+// Removes saved copies of personal pages from this device, so the next person can't read them offline.
+export async function clearSavedPages() {
+  try {
+    if (!('caches' in window)) return;
+    for (const name of await caches.keys()) {
+      if (!name.endsWith('-pages')) continue;
+      const cache = await caches.open(name);
+      for (const req of await cache.keys()) {
+        if (!new URL(req.url).pathname.endsWith('/offline.html')) await cache.delete(req);
+      }
+    }
+  } catch {}
+}
+
 const useIsoLayout = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
 function SessionProvider({ children }: { children: React.ReactNode }) {
@@ -76,6 +90,8 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
   const refresh = useCallback(async () => {
     try {
       const res = await fetch('/api/auth/me');
+      // A server hiccup says nothing about the session, so keep the one we have.
+      if (!res.ok) return null;
       const body = await res.json();
       const next: SessionData = body.user ? { ...EMPTY, ...body } : EMPTY;
       setData(next);

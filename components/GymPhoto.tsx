@@ -8,7 +8,8 @@ type Props = { src?: string; name: string; sizes: string; priority?: boolean; to
 // Photos fade in as they arrive. A gym without photos still gets a deliberate placeholder.
 export function GymPhoto({ src, name, sizes, priority, tone = 'color' }: Props) {
   const [loaded, setLoaded] = useState(false);
-  if (!src) {
+  const [failed, setFailed] = useState(false);
+  if (!src || failed) {
     return (
       <div className="photo-empty" role="img" aria-label={`${name} has no photos yet`}>
         <Spark width="34%" height="34%" />
@@ -25,6 +26,7 @@ export function GymPhoto({ src, name, sizes, priority, tone = 'color' }: Props) 
       sizes={sizes}
       priority={priority}
       onLoad={() => setLoaded(true)}
+      onError={() => setFailed(true)}
     />
   );
 }

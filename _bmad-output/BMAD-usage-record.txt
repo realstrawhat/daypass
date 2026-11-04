@@ -1048,3 +1048,27 @@ corrections
 - _bmad-output/implementation-artifacts/peer-feedback-template.md: to fill in
 with the peer tester
 - tests/booking-rules.test.mjs: the automated tests
+
+
+================================================================================
+ROUND 2: NATIVE APP FEEL (added 2026-11-05)
+================================================================================
+Workflow: bmad-build-auto, second run.
+Spec: _bmad-output/implementation-artifacts/spec-daypass-native-app-feel.md
+Written before the code this time, which improves on round 1.
+
+Step 3, implement: Claude Code wrote the code in the main session, not through a fresh
+subagent, so the owner's feedback could be applied as it came. This is a deviation.
+
+Step 4, review: all four reviewers ran as separate agents against a diff of everything since
+the baseline revision: Blind Hunter, Edge Case Hunter, Verification Gap and Intent Alignment.
+They reported about 124 findings. The triage is logged in the spec under Review Triage Log.
+Confirmed faults were fixed and 13 tests added, taking the suite to 33 passing tests.
+
+Deviations in step 4:
+- Fixes were made in place, not by re-deriving from the spec.
+- Some findings were graded by reading the code without a separate verification step.
+- The spec remains in-review. Offline saving can't be verified until the deploy goes through.
+
+Failures and corrections for this round: process-log.md, rows 18 to 31.
+Peer test: still to do by the student. No feedback has been invented.

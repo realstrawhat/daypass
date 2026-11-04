@@ -32,12 +32,19 @@ const SORTS: { id: Sort; label: string }[] = [
 // Results stay in memory for the visit, so going back to a search is instant and keeps its place.
 const cache = new Map<string, { result: Result; gyms: Gym[]; page: number }>();
 
+const validNumber = (v: string | null) => {
+  const n = v ? Number(v) : NaN;
+  return Number.isFinite(n) ? n : null;
+};
+
 async function fetchPage(params: URLSearchParams, coords: { lat: number; lng: number } | null): Promise<Result> {
-  const res = coords
-    ? await fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...Object.fromEntries(params), ...coords }) })
-    : await fetch(`/api/gyms?${params}`);
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Search did not finish. Try again.');
+  const res = await (coords
+    ? fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...Object.fromEntries(params), ...coords }) })
+    : fetch(`/api/gyms?${params}`)).catch(() => {
+    throw new Error('No connection. Check your signal and try again.');
+  });
+  const data = await res.json().catch(() => null);
+  if (!res.ok || !data) throw new Error(data?.error || 'Search did not finish. Try again.');
   return data;
 }
 
@@ -66,8 +73,9 @@ export function GymSearch() {
   const sort = (params.get('sort') as Sort) || (user?.default_sort as Sort) || 'recommended';
   const paramEquipment = params.get('equipment');
   const filters = useMemo<Filters>(() => ({
-    maxPrice: params.get('maxPrice') ? Number(params.get('maxPrice')) : user?.max_price_cents ?? null,
-    minRating: params.get('minRating') ? Number(params.get('minRating')) : null,
+    // "any" means the person cleared their saved price limit for this search.
+    maxPrice: params.get('maxPrice') === 'any' ? null : validNumber(params.get('maxPrice')) ?? user?.max_price_cents ?? null,
+    minRating: validNumber(params.get('minRating')),
     openNow: params.get('openNow') === '1',
     equipment: paramEquipment ? paramEquipment.split('|') : [],
   }), [params, paramEquipment, user?.max_price_cents]);
@@ -93,6 +101,8 @@ export function GymSearch() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showPill, setShowPill] = useState(false);
   const request = useRef(0);
+  const keyRef = useRef(key);
+  keyRef.current = key;
   const sentinel = useRef<HTMLDivElement>(null);
   const topMark = useRef<HTMLDivElement>(null);
   const sortRow = useRef<HTMLDivElement>(null);
@@ -112,7 +122,7 @@ export function GymSearch() {
 
   const applyFilters = (f: Filters) => {
     setQuery({
-      maxPrice: f.maxPrice != null ? String(f.maxPrice) : null,
+      maxPrice: f.maxPrice != null ? String(f.maxPrice) : user?.max_price_cents != null ? 'any' : null,
       minRating: f.minRating != null ? String(f.minRating) : null,
       openNow: f.openNow ? '1' : null,
       equipment: f.equipment.length ? f.equipment.join('|') : null,
@@ -120,14 +130,27 @@ export function GymSearch() {
   };
 
   // Once location is allowed the app never asks again: it finds you, then keeps up as you move.
+  // Before that it opens the person's general area from their network, and offers exact location after.
   const [autoChecked, setAutoChecked] = useState(false);
+  const [locFailed, setLocFailed] = useState(false);
+  const [fromArea, setFromArea] = useState(false);
   useEffect(() => {
+    if (!ready) return;
     let live = true;
     let stop = () => {};
     locationAllowed().then(async (ok) => {
       if (!live) return;
-      setAutoChecked(true);
-      if (!ok) return;
+      if (!ok) {
+        const rough = !urlCity && !near && !area && !user?.home_city ? await generalArea() : null;
+        if (!live) return;
+        const current = new URLSearchParams(window.location.search);
+        if (rough && !current.get('city') && !current.get('near') && !current.get('area')) {
+          setFromArea(true);
+          router.replace(`/gyms?city=${encodeURIComponent(rough)}`);
+        }
+        setAutoChecked(true);
+        return;
+      }
       try {
         const c = await locate();
         if (!live) return;
@@ -137,20 +160,26 @@ export function GymSearch() {
           // In near-me mode, refresh the gyms after moving a real distance.
           setCoords((cur) => (cur && kmBetween(cur, moved) > 0.8 ? moved : cur));
         });
-        if (!urlCity && !near && !area) {
+        // Check the address again: the person may have picked a city while we were locating them.
+        const current = new URLSearchParams(window.location.search);
+        if (!current.get('city') && !current.get('near') && !current.get('area')) {
           const known = getResolvedCity();
           setCoords(c);
           router.replace(known ? `/gyms?city=${encodeURIComponent(known)}` : '/gyms?near=1');
         }
-      } catch {}
+      } catch {
+        if (live) setLocFailed(true);
+      } finally {
+        if (live) setAutoChecked(true);
+      }
     });
     return () => {
       live = false;
       stop();
     };
-    // Runs once when Find opens.
+    // Runs once when Find opens and the session is known.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [ready]);
 
   // Without exact location, the network still gives a rough city to offer.
   useEffect(() => {
@@ -167,6 +196,7 @@ export function GymSearch() {
     }).catch((e: Error) => {
       if (!live) return;
       setLocError(e.message);
+      setLocFailed(true);
       setOverlay(true);
     });
     return () => {
@@ -178,6 +208,8 @@ export function GymSearch() {
     if (!hasSearch) return;
     const hit = cache.get(key);
     if (hit) {
+      // A slower, older search must not replace this one when it lands.
+      request.current += 1;
       setResult(hit.result);
       setGyms(hit.gyms);
       setPage(hit.page);
@@ -192,7 +224,7 @@ export function GymSearch() {
       .then(async (data) => {
         if (id !== request.current) return;
         // Nothing listed near you yet: open your city, which fills in sample gyms.
-        if (near && coords && data.total === 0 && filterCount(filters) === 0) {
+        if (near && coords && !area && data.total === 0 && filterCount(filters) === 0) {
           const found = await nearestCity(coords);
           if (id !== request.current) return;
           if (found) {
@@ -219,6 +251,13 @@ export function GymSearch() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, hasSearch]);
 
+  useEffect(() => {
+    if (!hasSearch) return;
+    try {
+      sessionStorage.setItem('daypass-last-search', window.location.search);
+    } catch {}
+  }, [key, hasSearch]);
+
   const total = result?.total ?? 0;
   const hasMore = gyms.length < total;
 
@@ -226,9 +265,15 @@ export function GymSearch() {
     if (moreLock.current || !hasMore || loading) return;
     moreLock.current = true;
     setLoadingMore(true);
+    const startedFor = key;
     try {
       const nextPage = page + 1;
       const data = await fetchPage(apiParams({ city, sort, filters, area }, nextPage), near ? coords : null);
+      if (keyRef.current !== startedFor) return;
+      if (!data.gyms.length) {
+        setResult((r) => (r ? { ...r, total: gyms.length } : r));
+        return;
+      }
       setGyms((prev) => {
         const seen = new Set(prev.map((g) => g.id));
         const merged = [...prev, ...data.gyms.filter((g) => !seen.has(g.id))];
@@ -278,6 +323,8 @@ export function GymSearch() {
     setLocating(true);
     try {
       const c = await locate();
+      setLocFailed(false);
+      setFromArea(false);
       setCoords(c);
       setMe(c);
       haptic(8);
@@ -308,7 +355,7 @@ export function GymSearch() {
     </>
   );
 
-  if (!hasSearch && ready && !near && autoChecked && !me) {
+  if (!hasSearch && ready && autoChecked && (locFailed || (!near && !me))) {
     return (
       <main className="ask">
         <span className="ask-glow" aria-hidden="true" />
@@ -381,6 +428,7 @@ export function GymSearch() {
             </ul>
           ) : null}
         </div>
+        {fromArea && urlCity ? <button type="button" className="where-note" onClick={nearMe}><IconLocate /> <span>{urlCity} is your general area. Use my exact location</span></button> : null}
         <h1 className="search-title" aria-live="polite">
           {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{error ? heading : `${total} ${total === 1 ? 'gym' : 'gyms'} ${near && !result?.place ? 'near you' : area ? 'in this area' : `in ${heading}`}`}</span></>}
         </h1>

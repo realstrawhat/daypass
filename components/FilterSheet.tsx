@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react';
 import { money } from '@/lib/format';
 import { haptic } from './ui/feedback';
-import { Sheet } from './ui/Sheet';
+import { afterSheetClosed, Sheet } from './ui/Sheet';
 
 export type Filters = { maxPrice: number | null; minRating: number | null; openNow: boolean; equipment: string[] };
 export const NO_FILTERS: Filters = { maxPrice: null, minRating: null, openNow: false, equipment: [] };
@@ -29,19 +29,9 @@ export function FilterSheet({ open, onClose, value, onApply, countFor }: Props) 
   const [draft, setDraft] = useState<Filters>(value);
   const [count, setCount] = useState<number | null>(null);
 
-  // Closing a sheet steps back past its own history entry, which would undo a change to the
-  // address made while it was open. So the filters are written once that step has finished.
   const apply = () => {
     const chosen = draft;
-    let done = false;
-    const run = () => {
-      if (done) return;
-      done = true;
-      window.removeEventListener('popstate', run);
-      setTimeout(() => onApply(chosen), 0);
-    };
-    window.addEventListener('popstate', run);
-    setTimeout(run, 250);
+    afterSheetClosed(() => onApply(chosen));
     onClose();
   };
 

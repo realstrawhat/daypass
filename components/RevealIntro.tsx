@@ -13,7 +13,7 @@ export function RevealIntro({ gym }: { gym: string }) {
     // Lands with the sticker slamming onto the pass.
     const s = setTimeout(() => feel('stamp'), 2520);
     const b = setTimeout(() => banner({ title: 'Daypass', body: `Your pass for ${gym} is ready. A copy is in your inbox.`, href: '/inbox' }), 3400);
-    window.history.replaceState(window.history.state, '', window.location.pathname);
+    window.history.replaceState(null, '', window.location.pathname);
     return () => {
       clearTimeout(t);
       clearTimeout(s);

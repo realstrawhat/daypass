@@ -93,6 +93,7 @@ export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaS
         m.on('load', () => {
           if (cancelled) return;
           tuneStyle(m);
+          setFailed(false);
           setReady(true);
         });
         m.on('error', (e: { error?: { status?: number } }) => {

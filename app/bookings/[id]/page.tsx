@@ -3,7 +3,7 @@ import QRCode from 'qrcode';
 import type { Metadata } from 'next';
 import { notFound, redirect } from 'next/navigation';
 import { IconBack } from '@/components/Icons';
-import { PassView } from '@/components/PassView';
+import { PassView, SaveForOffline } from '@/components/PassView';
 import { RateVisit } from '@/components/RateVisit';
 import { RevealIntro } from '@/components/RevealIntro';
 import { HoloPass } from '@/components/HoloPass';
@@ -45,6 +45,7 @@ export default async function BookingPage({ params, searchParams }: P) {
     <Page>
       <main className="pass-page">
         {isNew && !cancelled ? <RevealIntro gym={b.gym_name} /> : null}
+        <SaveForOffline id={b.id} version={`${b.status}-${b.checked_in_at ?? ''}-${b.starts_at}`} />
         <Link href="/bookings" transitionTypes={['nav-back']} className="round round-solid pass-back" aria-label="Back to Passes"><IconBack /></Link>
 
         <div className="pass-layout">
@@ -80,7 +81,7 @@ export default async function BookingPage({ params, searchParams }: P) {
             {cancelled ? (
               <div className="banner" role="status">
                 <strong>{b.refund_reason && b.refund_reason !== 'cancelled' ? 'Refund sent' : 'Booking cancelled'}</strong>
-                <span>{money(b.refund_cents)} refunded to your demo card. The spot is free again.</span>
+                <span>{money(b.refund_cents)} refunded to your demo card.{start.getTime() > Date.now() ? ' The spot is free again.' : ''}</span>
               </div>
             ) : null}
 

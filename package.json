@@ -11,7 +11,7 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
-    "test": "node --test tests/booking-rules.test.mjs"
+    "test": "node --env-file-if-exists=.env.local --test tests/booking-rules.test.mjs tests/hours.test.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",

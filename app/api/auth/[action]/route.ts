@@ -13,7 +13,12 @@ export const POST = handle(async (req, ctx) => {
   }
 
   if (action === 'demo') {
-    const userId = await createDemoUser();
+    const raw = req.headers.get('x-vercel-ip-city');
+    let area: string | null = null;
+    try {
+      area = raw ? decodeURIComponent(raw) : null;
+    } catch {}
+    const userId = await createDemoUser(area);
     await createSession(userId);
     return Response.json({ ok: true });
   }
@@ -78,9 +83,12 @@ export const GET = handle(async (_req, ctx) => {
   const next = nextRows[0];
   let unreadCount = unread[0].n as number;
   if (next && new Date(next.starts_at as string).getTime() - Date.now() < 24 * 3600 * 1000 && new Date(next.starts_at as string).getTime() > Date.now()) {
+    // Compared on the gym's own calendar, so a session later today doesn't say "tomorrow".
+    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: next.gym_timezone as string }).format(d);
+    const when = day(new Date(next.starts_at as string)) === day(new Date()) ? 'Today' : 'Tomorrow';
     const added = await db()`
       INSERT INTO messages (user_id, booking_id, kind, title, body)
-      VALUES (${user.id}::uuid, ${next.id as string}::uuid, 'reminder', ${`Tomorrow: ${next.gym_name as string}`}, 'Your pass is ready in Passes. Check the gym page for what to bring.')
+      VALUES (${user.id}::uuid, ${next.id as string}::uuid, 'reminder', ${`${when}: ${next.gym_name as string}`}, 'Your pass is ready in Passes. Check the gym page for what to bring.')
       ON CONFLICT DO NOTHING RETURNING id`;
     unreadCount += added.length;
   }

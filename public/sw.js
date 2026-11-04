@@ -1,5 +1,5 @@
 // Keeps passes and the app shell available with no signal, such as in a gym basement.
-const VERSION = 'daypass-v1';
+const VERSION = 'daypass-v2';
 const STATIC = `${VERSION}-static`;
 const PAGES = `${VERSION}-pages`;
 const OFFLINE = '/offline.html';
@@ -12,6 +12,12 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
   );
+});
+
+// In-app links aren't full page loads, so an opened pass asks to be saved directly.
+self.addEventListener('message', (event) => {
+  if (event.data?.type !== 'save-pages') return;
+  event.waitUntil(caches.open(PAGES).then((c) => Promise.all(event.data.urls.map((u) => c.add(u).catch(() => {})))));
 });
 
 self.addEventListener('fetch', (event) => {
@@ -45,7 +51,16 @@ self.addEventListener('fetch', (event) => {
           }
           return res;
         })
-        .catch(async () => (await caches.match(request)) || (await caches.match('/bookings')) || (await caches.match(OFFLINE))),
+        .catch(async () => {
+          const saved = await caches.match(request, { ignoreSearch: true });
+          if (saved) return saved;
+          // An unsaved pass falls back to the saved Passes list. Other pages say they aren't saved.
+          if (url.pathname.startsWith('/bookings')) {
+            const list = await caches.match('/bookings');
+            if (list) return list;
+          }
+          return caches.match(OFFLINE);
+        }),
     );
   }
 });

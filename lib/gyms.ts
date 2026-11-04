@@ -118,7 +118,7 @@ export async function searchGyms(input: SearchInput) {
   return { gyms: rows as unknown as Gym[], total, page: safePage, pageSize: PAGE_SIZE };
 }
 
-const GYM_SELECT_RATING = `
+export const GYM_SELECT_RATING = `
   (SELECT round(((g.seed_rating * g.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(g.seed_rating_count + count(r.id), 0))::numeric, 1)::float8 FROM reviews r WHERE r.is_public AND r.gym_id = g.id) AS rating,
   (SELECT g.seed_rating_count + count(r.id) FROM reviews r WHERE r.is_public AND r.gym_id = g.id)::int AS rating_count`;
 

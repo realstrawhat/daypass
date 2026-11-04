@@ -107,8 +107,9 @@ async function getOwned(userId: string, id: string) {
   return rows[0] as Booking;
 }
 
+// Called after money or a check-in has already gone through, so a failed lookup must not fail the action.
 const gymLabel = async (gymId: string) => {
-  const gym = await getGymById(gymId);
+  const gym = await getGymById(gymId).catch(() => null);
   return { name: gym?.name ?? 'your gym', tz: gym?.timezone ?? 'UTC' };
 };
 
@@ -295,28 +296,38 @@ export async function refuseEntryRefund(user: User, id: string, detail: string) 
   const done = await refundBooking(user.id, id, detail.slice(0, 120) || 'entry refused', null);
   if (!done) throw new HttpError(409, 'This booking is not active, so there is nothing to refund.', 'not_confirmed');
   const { name } = await gymLabel(done.gym_id);
-  await addMessage(user.id, 'refund', `Refund sent: ${name}`, `Sorry you couldn't get in. We refunded ${money(done.price_cents)} to your demo card and let the gym know.`, id);
+  await addMessage(user.id, 'refund', `Refund sent: ${name}`, `Sorry you couldn't get in. We refunded ${money(done.price_cents)} to your demo card.`, id);
   return done;
 }
 
-export type DeskResult = 'valid' | 'used' | 'expired' | 'wrong_date' | 'cancelled' | 'unknown';
+export type DeskResult = 'valid' | 'used' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown';
 
 // What reception sees. Valid only from an hour before the session until three hours after it starts.
-export async function deskCheck(code: string, apply: boolean) {
+// This is a demo with no staff accounts, so a real person's pass can only be scanned from their own account.
+// Demo passes can be scanned from any account, so two phones can act out the door.
+export async function deskCheck(scanner: User, code: string, apply: boolean) {
   const clean = code.trim().toUpperCase().replace(/^DAYPASS:/, '');
   const rows = await db()`
-    SELECT b.*, g.name AS gym_name, g.timezone AS gym_timezone, u.name AS holder
+    SELECT b.*, g.name AS gym_name, g.timezone AS gym_timezone, u.name AS holder, u.is_demo AS holder_is_demo
     FROM bookings b JOIN gyms g ON g.id = b.gym_id JOIN users u ON u.id = b.user_id
     WHERE b.code = ${clean} AND b.status IN ('confirmed','cancelled')`;
-  const b = rows[0] as (Booking & { gym_name: string; gym_timezone: string; holder: string }) | undefined;
-  if (!b) return { result: 'unknown' as DeskResult };
+  const b = rows[0] as (Booking & { gym_name: string; gym_timezone: string; holder: string; holder_is_demo: boolean }) | undefined;
+  if (!b || (b.user_id !== scanner.id && !b.holder_is_demo)) return { result: 'unknown' as DeskResult };
   const detail = { gym: b.gym_name, holder: b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
   if (b.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
   if (b.checked_in_at) return { result: 'used' as DeskResult, ...detail, usedAt: timeLabel(b.checked_in_at, b.gym_timezone) };
   const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
-  if (hours > 1) return { result: 'wrong_date' as DeskResult, ...detail };
+  if (hours > 1) {
+    const sameDay = dateLabel(b.starts_at, b.gym_timezone) === dateLabel(new Date().toISOString(), b.gym_timezone);
+    return { result: (sameDay ? 'too_early' : 'wrong_date') as DeskResult, ...detail };
+  }
   if (hours < -3) return { result: 'expired' as DeskResult, ...detail };
-  if (apply) await markCheckedIn(b.id, b.user_id);
+  // Two scans at once, or a cancel in between: only one can win, and the other is told what happened.
+  if (apply && !(await markCheckedIn(b.id, b.user_id))) {
+    const [now] = await db()`SELECT status, checked_in_at FROM bookings WHERE id = ${b.id}::uuid`;
+    if (now?.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
+    return { result: 'used' as DeskResult, ...detail, usedAt: timeLabel(now?.checked_in_at as string, b.gym_timezone) };
+  }
   return { result: 'valid' as DeskResult, ...detail };
 }
 
@@ -326,14 +337,18 @@ async function markCheckedIn(id: string, userId: string) {
     const { name } = await gymLabel(rows[0].gym_id as string);
     await addMessage(userId, 'checkin', `Checked in at ${name}`, 'Enjoy your session. We will ask how it went afterwards.', id);
   }
+  return !!rows[0];
 }
 
-// The owner's own simulated desk scan, so a demo works whatever the session time.
-export async function simulateCheckIn(userId: string, id: string) {
-  const b = await getOwned(userId, id);
+// The owner's own simulated desk scan. Demo accounts can try it any time. A real account can use it only
+// around its session, so nobody can use up a pass weeks ahead or post a rating without visiting.
+export async function simulateCheckIn(user: User, id: string) {
+  const b = await getOwned(user.id, id);
   if (b.status !== 'confirmed') throw new HttpError(409, 'This pass is not active.', 'not_confirmed');
-  if (!b.checked_in_at) await markCheckedIn(id, userId);
-  return getOwned(userId, id);
+  const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
+  if (!user.is_demo && !b.checked_in_at && (hours > 1 || hours < -3)) throw new HttpError(409, 'Check-in opens one hour before your session.', 'too_early');
+  if (!b.checked_in_at) await markCheckedIn(id, user.id);
+  return getOwned(user.id, id);
 }
 
 export async function addToWallet(userId: string, id: string) {
@@ -401,7 +416,7 @@ export async function addReview(user: User, bookingId: string, stars: number, bo
 
 // The subtle demo login. Every tap makes a new throwaway account with a lived-in history,
 // so it can never reach anyone's real account.
-export async function createDemoUser() {
+export async function createDemoUser(area: string | null = null) {
   await db()`
     WITH old AS (SELECT id FROM users WHERE is_demo AND created_at < now() - interval '14 days'),
     live AS (
@@ -440,7 +455,8 @@ export async function createDemoUser() {
 
   // One upcoming pass, booked through the real rules.
   try {
-    const gym = await getGymBySlug('iron-gym-amsterdam');
+    const [local] = area ? await db()`SELECT slug FROM gyms WHERE lower(city) = lower(${area}) AND is_demo ORDER BY name = 'Iron Gym' DESC LIMIT 1` : [];
+    const gym = await getGymBySlug((local?.slug as string) ?? 'iron-gym-amsterdam');
     if (gym) {
       const days = await getAvailability(gym);
       const later = days.slice(3).flatMap((d) => d.slots).find((s) => Number(s.label.slice(0, 2)) >= 9);

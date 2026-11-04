@@ -57,7 +57,7 @@ async function run(p: Params) {
 export const GET = handle(async (req) => {
   const params = Object.fromEntries(new URL(req.url).searchParams);
   const body = await run(params);
-  const isCity = typeof params.city === 'string' && !params.bbox;
+  const isCity = !!params.city && !params.bbox;
   return Response.json(body, { headers: { 'Cache-Control': isCity ? 'public, s-maxage=30, stale-while-revalidate=300' : 'private, no-store' } });
 });
 

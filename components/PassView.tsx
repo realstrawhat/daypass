@@ -12,7 +12,7 @@ import { SlotPicker } from './SlotPicker';
 import { FaceScan } from './ui/FaceScan';
 import { haptic, useFeedback } from './ui/feedback';
 import { feel } from './ui/sensory';
-import { Sheet } from './ui/Sheet';
+import { afterSheetClosed, Sheet } from './ui/Sheet';
 import { WalletSheet } from './WalletSheet';
 
 export type PassBooking = {
@@ -54,15 +54,23 @@ const postAction = async (id: string, action: string, body?: unknown) => {
 
 export function PassView({ booking: b, pass, directions, googleCal, changeable, isOver, isNew }: Props) {
   const router = useRouter();
-  const { refresh } = useSession();
+  const { refresh, user } = useSession();
   const { toast, banner } = useFeedback();
   const [sheet, setSheet] = useState<SheetName>(null);
   const [lateNotice, setLateNotice] = useState(false);
+  const [earlyHelp, setEarlyHelp] = useState(false);
   const [inWallet, setInWallet] = useState(b.in_wallet);
   const [checkedIn, setCheckedIn] = useState(!!b.checked_in_at);
   const close = () => setSheet(null);
   const used = checkedIn;
   const canManage = !isOver && !used;
+  useEffect(() => setCheckedIn(!!b.checked_in_at), [b.checked_in_at]);
+  // Around the session, a real account can use the same door steps. Demo accounts can try them any time.
+  const [nearSession, setNearSession] = useState({ help: false, scan: false });
+  useEffect(() => {
+    const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
+    setNearSession({ help: hours <= 3, scan: hours <= 1 });
+  }, [b.starts_at]);
 
   const afterChange = () => {
     refresh();
@@ -71,7 +79,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
 
   return (
     <>
-      <HoloPass pass={{ ...pass, state: used ? 'used' : 'active' }} stamp={isNew} />
+      <HoloPass pass={{ ...pass, state: used ? 'used' : isOver ? 'expired' : 'active' }} stamp={isNew} />
 
       <div className="pass-actions">
         {!used && !isOver ? (
@@ -91,9 +99,10 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
           <ul className="rows">
             <li><button type="button" onClick={() => (changeable ? setSheet('change') : setLateNotice(true))}><span>Change date or gym</span><IconChevron /></button></li>
             <li><button type="button" onClick={() => (changeable ? setSheet('cancel') : setLateNotice(true))}><span>Cancel booking</span><IconChevron /></button></li>
-            <li><button type="button" onClick={() => setSheet('help')}><span className="row-help"><IconHelp /> I can't get in</span><IconChevron /></button></li>
+            <li><button type="button" onClick={() => (user?.is_demo || nearSession.help ? setSheet('help') : setEarlyHelp(true))}><span className="row-help"><IconHelp /> I can't get in</span><IconChevron /></button></li>
           </ul>
         ) : null}
+        {earlyHelp ? <p className="fine" role="status">This is for problems at the door, so it opens 3 hours before your session.</p> : null}
         {lateNotice ? <p className="form-error" role="alert">This visit is less than 24 hours away, so changes are no longer possible.</p> : canManage ? <p className="fine">You can change or cancel until 24 hours before your session.</p> : null}
       </div>
 
@@ -123,6 +132,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
           <DeskMode
             b={b}
             qrSvg={pass.qrSvg}
+            canSimulate={!!user?.is_demo || nearSession.scan}
             onCheckedIn={() => {
               setCheckedIn(true);
               afterChange();
@@ -141,8 +151,10 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
               close();
               toast('Booking updated');
               refresh();
-              router.replace(`/bookings/${b.id}?updated=1`);
-              router.refresh();
+              afterSheetClosed(() => {
+                router.replace(`/bookings/${b.id}?updated=1`);
+                router.refresh();
+              });
             }}
           />
         ) : null}
@@ -160,7 +172,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
 }
 
 // Full-screen pass for reception: bright, large and kept awake.
-function DeskMode({ b, qrSvg, onCheckedIn, onClose }: { b: PassBooking; qrSvg: string; onCheckedIn: () => void; onClose: () => void }) {
+function DeskMode({ b, qrSvg, canSimulate, onCheckedIn, onClose }: { b: PassBooking; qrSvg: string; canSimulate: boolean; onCheckedIn: () => void; onClose: () => void }) {
   const [time, setTime] = useState('');
   const [state, setState] = useState<'show' | 'scanning' | 'done'>('show');
   const [error, setError] = useState('');
@@ -213,12 +225,13 @@ function DeskMode({ b, qrSvg, onCheckedIn, onClose }: { b: PassBooking; qrSvg: s
       <p className="desk-code" aria-label={`Pass code ${b.code.split('').join(' ')}`}>{b.code}</p>
       <p className="desk-clock">{time}</p>
       {error ? <p className="form-error" role="alert">{error}</p> : null}
-      <button type="button" className="desk-sim" disabled={state === 'scanning'} onClick={simulate}>{state === 'scanning' ? 'Scanning' : 'Demo: simulate the desk scan'}</button>
+      {canSimulate ? <button type="button" className="desk-sim" disabled={state === 'scanning'} onClick={simulate}>{state === 'scanning' ? 'Scanning' : 'Demo: simulate the desk scan'}</button> : <p className="fine">Check-in opens one hour before your session.</p>}
     </div>
   );
 }
 
 function AddToWallet({ b, onAdded, onClose }: { b: PassBooking; onAdded: () => void; onClose: () => void }) {
+  const router = useRouter();
   const [state, setState] = useState<'idle' | 'adding' | 'added'>('idle');
   const [error, setError] = useState('');
   const add = async () => {
@@ -250,7 +263,7 @@ function AddToWallet({ b, onAdded, onClose }: { b: PassBooking; onAdded: () => v
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {state === 'added' ? (
         <div className="link-list">
-          <Link href="/wallet" className="btn btn-volt btn-block" onClick={onClose}>View in Wallet</Link>
+          <Link href="/wallet" className="btn btn-volt btn-block" onClick={(e) => { e.preventDefault(); onClose(); afterSheetClosed(() => router.push('/wallet')); }}>View in Wallet</Link>
           <button type="button" className="btn btn-ghost btn-block" onClick={onClose}>Done</button>
         </div>
       ) : (
@@ -280,7 +293,7 @@ function RefusedFlow({ b, onClose, onDone }: { b: PassBooking; onClose: () => vo
   };
   return (
     <div className="link-list">
-      <p className="sheet-sub">First, show staff your code: <strong>{b.code}</strong>. If you still can't get in, you get your {money(b.price_cents)} back. We let the gym know.</p>
+      <p className="sheet-sub">First, show staff your code: <strong>{b.code}</strong>. If you still can't get in, you get your {money(b.price_cents)} back.</p>
       <div className="reasons" role="radiogroup" aria-label="What happened">
         {REASONS.map((r) => (
           <button key={r} type="button" role="radio" aria-checked={reason === r} onClick={() => { setReason(r); haptic(4); }}><i aria-hidden="true" />{r}</button>
@@ -335,6 +348,7 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
     let live = true;
     setDays(null);
     setSelected(null);
+    setError('');
     fetch(`/api/gyms/${gym.id}/slots`)
       .then((r) => r.json())
       .then((d) => {
@@ -357,9 +371,11 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
     try {
       const r = await fetch('/api/gyms', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ lat: b.lat, lng: b.lng, sort: 'nearest' }) });
       const d = await r.json();
-      setOthers(r.ok ? d.gyms : []);
+      if (!r.ok) throw new Error();
+      setOthers(d.gyms);
     } catch {
-      setOthers([]);
+      setStep('time');
+      setError('Nearby gyms did not load. Try again.');
     }
   };
 
@@ -448,4 +464,13 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
       <button type="button" className="btn btn-ghost btn-block" onClick={openGyms}>Move to another gym</button>
     </div>
   );
+}
+
+// In-app links aren't full page loads, so a pass is saved for offline use whenever it is on screen.
+export function SaveForOffline({ id, version }: { id: string; version: string }) {
+  useEffect(() => {
+    if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
+    navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: 'save-pages', urls: [`/bookings/${id}`, '/bookings'] })).catch(() => {});
+  }, [id, version]);
+  return null;
 }

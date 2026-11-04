@@ -163,6 +163,7 @@ export function GymBooking({ gym }: Props) {
           onDone={() => {
             setWalletOpen(false);
             refresh().catch(() => {});
+            router.refresh();
             if (bookedId.current) router.push(`/bookings/${bookedId.current}?new=1`, { transitionTypes: ['nav-forward'] });
             else toast('Your booking is in Passes.');
           }}
