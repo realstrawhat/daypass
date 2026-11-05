@@ -956,3 +956,43 @@ test('other phones get no covers, and the sideways rows reach the screen edge', 
   assert.equal(m.right, m.width, 'and off the right edge');
   await done();
 });
+
+test('the floating navigation sits in the exact middle, with four equal circles, on phones of every size', needsChrome, async () => {
+  for (const width of [320, 390, 440]) {
+    const { page, done } = await visitor({ width, height: 900 });
+    // A tab can be current or, on a page like Privacy, none of them.
+    for (const path of ['/home', '/gyms?city=Berlin', '/privacy']) {
+      await open(page, path);
+      await page.waitForSelector('.tabbar a');
+      await sleep(500);
+      const m = await page.evaluate(() => {
+        const items = [...document.querySelectorAll('.tabbar a')].map((a) => a.getBoundingClientRect());
+        return { offCentre: (Math.min(...items.map((r) => r.left)) + Math.max(...items.map((r) => r.right))) / 2 - innerWidth / 2, sizes: items.map((r) => r.width), heights: items.map((r) => r.height) };
+      });
+      assert.ok(Math.abs(m.offCentre) <= 0.5, `${width}px ${path}: ${m.offCentre}px off centre`);
+      assert.equal(new Set(m.sizes).size, 1, `${width}px ${path}: equal widths, got ${m.sizes}`);
+      assert.deepEqual(m.sizes, m.heights, 'and round');
+      assert.ok(m.sizes[0] >= 48, 'big enough to tap');
+    }
+    await done();
+  }
+});
+
+test('the upcoming reminder stays calm: a small chip and a card that does not take over Home', needsDb, async () => {
+  const { page, done } = await visitor({ width: 440, height: 956 });
+  await demoSession(page);
+  await open(page, '/home');
+  await page.waitForSelector('.next-photo');
+  await page.waitForSelector('.vhero-next');
+  await sleep(600);
+  const m = await page.evaluate(() => {
+    const words = document.querySelector('.next-number small');
+    const number = document.querySelector('.next-number strong');
+    const shade = getComputedStyle(document.querySelector('.next-photo-shade')).backgroundImage;
+    return { height: document.querySelector('.next-photo').getBoundingClientRect().height, number: parseFloat(getComputedStyle(number).fontSize), words: words.innerText, shade };
+  });
+  assert.ok(m.height <= 190, `the card is ${m.height}px tall`);
+  assert.ok(m.number <= 70, `the number is ${m.number}px`);
+  assert.match(m.words, /to go/);
+  await done();
+});

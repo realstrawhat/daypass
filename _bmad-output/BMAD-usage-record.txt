@@ -1242,6 +1242,12 @@ After the deploy
 [2026-11-05 11:50] Asked for big-company design rules, with the internet allowed at any time
     "USE BIG COMPANY DESIGN RULE U CAN USE INTERNET ANYTIME"
 
+[2026-11-05 13:05] Named the phones, asked what a question meant, and gave feedback on the reminder and navigation
+    "IPHNOE 16 PRO MAX BUT ALMOST ALL USE IPHONE AND ANDRIOD IN MU CLASS WDYM
+    BY QUESTION 2 AND HOME DOESNT FEEL BAD BUT UPCOMING REMINDER IT WAY MORE
+    ATTENTIVE NGL AND FLOATING NAV BAR IN PHONE ISNT GOOD LIKE NOT CENTRALIZED
+    NGL"
+
 
 ==============================================================================
 12. WHERE THE BMAD PROCESS WAS NOT FOLLOWED IN ROUND 2
@@ -1280,6 +1286,9 @@ halted the whole run on one design pick.
 - The changes after the deploy (section 17) did not go through the four step 4
 reviewers. Claude Code's own tests found faults in them, listed in that
 section, but no independent review has read them.
+- Apple's guidance asks for labels on tab bars. The round navigation has none,
+because the student chose it from the references and asked for it to stay
+centred.
 - The peer test has not happened yet. No peer feedback exists in this record.
 - No human other than the student has used the app, and sounds and haptics
 have not been checked by Claude Code on a real phone.
@@ -1352,6 +1361,8 @@ like real counts. Bars are now labelled as estimated.
 2026-11-05 12:19  Browser tests as an iPhone: 31 passed, 0 failed
 2026-11-05 12:28  API tests + Browser tests: 43 passed, 0 failed / 31 passed, 0 failed
 2026-11-05 12:35  Browser tests + API tests: 31 passed, 0 failed / 43 passed, 0 failed
+2026-11-05 13:42  API tests + Browser tests: 43 passed, 0 failed / 33 passed, 0 failed
+2026-11-05 13:47  Browser tests as an iPhone: 33 passed, 0 failed
 
 Failed runs above were investigated, not ignored. The process log's failures
 table explains them, including a stale local server, an invalid first offline
@@ -3132,20 +3143,34 @@ Home, against published rules
     optional. Google's Android haptics guidance: a key click lasts 10 to 20
     ms, and avoid long buzzes. What changed: one solid search bar with the
     location button inside it, glass on 6 elements of Home instead of 25, one
-    top row of controls, a quiet location line, the current tab named while
-    other tabs stay as the round icons the student chose, and content fading
-    under the navigation. Claude Code also found its own bug: a speed setting
-    clipped sideways rows 16 px before the screen edge.
+    top row of controls, a quiet location line, the current tab named
+    (reversed later, see below), and content fading under the navigation.
+    Claude Code also found its own bug: a speed setting clipped sideways rows
+    16 px before the screen edge.
 
 Corrections to what Claude Code had said
     It had recorded that tests clean up after themselves, but browser tests
     that logged out left demo accounts behind: 110 demo accounts, holding 80
     spots in 16 upcoming slots at Iron Gym, which show as full. The leak is
     fixed. The existing accounts were not deleted without asking, and the app
-    removes demo accounts after 14 days. It also told the student the full
-    slots were all at Iron Gym after seeing only 5 of them, and a full count
-    then confirmed it. Its first plan to lengthen Android's buzz was dropped
-    after reading Google's guidance.
+    removes demo accounts after 14 days. The student then chose to clear them,
+    after asking what the question meant: 110 demo accounts were removed, full
+    upcoming slots went from 16 to 0, and the 1 other account was not touched.
+    Claude Code also told the student the full slots were all at Iron Gym
+    after seeing only 5 of them, and a full count then confirmed it. Its first
+    plan to lengthen Android's buzz was dropped after reading Google's
+    guidance.
+
+Navigation and reminder
+    The student said the floating navigation was not centred and the upcoming
+    reminder took too much attention. Measured at the width of an iPhone 16
+    Pro Max, the navigation was 11 px off centre, a bug Claude Code had just
+    introduced by making the current tab wider. It is now four equal round
+    tabs in a row that fills the screen, with both sides equal at 320, 390 and
+    440 px. "Way more attentive" could mean too loud or too quiet, so Claude
+    Code asked, and the student chose calmer: the reminder card went from 280
+    to 150 px tall and its number from 150 to 62 px, with a darker photo and
+    readable words.
 
 Not done
     Nothing here has been felt or seen on a real phone. The student has not
