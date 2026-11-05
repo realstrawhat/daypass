@@ -11,26 +11,26 @@
 .hand { font-family: var(--hand); font-weight: 400; color: var(--volt); line-height: 1; }
 .two-tone { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(2.500rem, 10.500vw, 4.400rem); line-height: 1; }
 .two-tone em { font-style: normal; color: var(--volt); }
-.round-frost, .round-volt { backdrop-filter: blur(14px); }
+.round-frost { backdrop-filter: blur(14px); }
 .round-frost { background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); }
 .round-frost:hover:not(:disabled) { background: rgba(255,255,255,.24); }
 .round-volt { background: var(--volt); color: #000; }
 .round-volt:hover:not(:disabled) { background: #e2ff6d; }
 
 /* Opening screen */
-.home { padding-top: 0; gap: 22px; }
+.home { padding-top: 0; gap: 40px; }
 .vhero { position: relative; height: 100svh; min-height: 560px; margin: 0 calc(var(--gutter) * -1); display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; background: #050505; isolation: isolate; padding: calc(14px + var(--safe-t)) var(--gutter) calc(var(--tabbar) + var(--safe-b) + 18px); border-radius: 0 0 38px 38px; }
 .vhero picture { display: contents; }
 .vhero-poster, .vhero-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; z-index: -2; }
 .vhero-video { opacity: 0; transition: opacity 700ms var(--ease); }
 .vhero-video.is-on { opacity: 1; }
 .vhero-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.05) 26%, rgba(0,0,0,.12) 44%, rgba(0,0,0,.86) 86%); }
-.vhero-pause { position: absolute; left: var(--gutter); top: calc(72px + var(--safe-t)); background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); }
+.vhero-pause { background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); }
 .home-top { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(14px + var(--safe-t)); z-index: 2; flex-direction: row-reverse; }
 .home-top .home-login { background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); }
 /* The lifter stands on the left of the video, so the words sit on the right, with the search in the middle. */
 .vhero-copy { display: grid; gap: 14px; min-width: 0; width: 100%; justify-items: end; text-align: right; }
-.vhero-copy .home-search { width: 100%; max-width: 620px; justify-self: center; margin-top: clamp(22px, 3.600svh, 40px); }
+.vhero-copy .home-search { position: relative; width: 100%; max-width: 620px; justify-self: center; margin-top: clamp(22px, 3.600svh, 40px); }
 .vhero-next { display: inline-flex; align-items: center; gap: 8px; max-width: 100%; min-height: 40px; padding: 4px 6px 4px 14px; border-radius: 99px; background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); font-size: .88rem; font-weight: 600; text-align: left; transition: transform var(--t-2) var(--spring); }
 .vhero-next span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vhero-next i { flex: none; width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; background: var(--volt); color: #000; transition: transform var(--t-3) var(--bounce); }
@@ -43,9 +43,11 @@
 .home-title span, .home-title em { display: block; font-style: normal; animation: rise 760ms var(--ease) both; }
 .home-title span:nth-child(2) { animation-delay: 80ms; }
 .home-title em { color: var(--volt); animation-delay: 160ms; }
-.search-pill.is-frost { background: var(--frost); color: #fff; box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(18px) saturate(1.300); }
-.search-pill.is-frost span { color: #fff; font-weight: 500; }
-.search-pill.is-frost:hover { background: rgba(255,255,255,.22); }
+/* The one prominent action here. The location button lives inside it, so they read as one control. */
+.vhero-copy .search-pill { padding-right: 62px; box-shadow: 0 10px 30px rgba(0,0,0,.35); }
+.home-locate { position: absolute; right: 4px; top: 4px; z-index: 2; width: 48px; height: 48px; background: #000; color: var(--volt); }
+.home-locate:hover:not(:disabled) { background: #1b1c1d; }
+.home-locate:active svg { transform: scale(1.180); }
 
 /* Giant number on your next booking */
 .next-photo { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 18px; min-height: 280px; padding: 18px; border-radius: 34px; overflow: hidden; isolation: isolate; background: var(--s2); transition: transform var(--t-2) var(--spring); }
@@ -71,10 +73,11 @@
 .rail-arrow svg { width: 18px; height: 18px; }
 .book .rail-arrow { background: #e3e5dd; color: #000; box-shadow: none; }
 .featured-where { color: var(--mute); font-weight: 400; margin-top: 4px; }
-.where-note { display: inline-flex; align-items: center; justify-self: start; gap: 8px; min-height: 40px; padding: 4px 14px 4px 10px; border-radius: 99px; background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-edge); text-align: left; font-size: .9rem; font-weight: 500; line-height: 1.250; }
+.where-note { display: inline-flex; align-items: center; justify-self: start; gap: 8px; min-height: 44px; padding: 2px 0; border-radius: 12px; color: var(--text-2); text-align: left; font-size: .9rem; font-weight: 400; line-height: 1.300; }
+.where-note b { font-weight: 600; color: var(--volt); white-space: nowrap; }
 .where-note svg { flex: none; width: 18px; height: 18px; color: var(--volt); }
 .feature-sk { display: block; height: clamp(380px, 58svh, 560px); border-radius: 34px; }
-.feature-book { background: var(--frost); color: #fff; box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(16px); font-weight: 600; }
+.feature-book { background: rgba(0,0,0,.46); color: #fff; box-shadow: inset 0 0 0 1px var(--frost-edge); font-weight: 600; }
 .feature-book i { background: var(--volt); color: #000; }
 .chips-row { display: flex; align-items: center; gap: 8px; min-width: 0; }
 .chips-row .filter-sort { flex: 1; min-width: 0; }
@@ -84,7 +87,7 @@
 
 /* Train your way: cut-out athletes on lime */
 .moves-section { display: grid; gap: 14px; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 640px; }
-.moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 150px; grid-auto-flow: dense; gap: 10px; }
+.moves { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); grid-auto-rows: 168px; grid-auto-flow: dense; gap: 10px; }
 .moves li { grid-row: span 1; min-width: 0; }
 .moves li.is-tall { grid-row: span 2; }
 .move { position: relative; display: block; height: 100%; padding: 12px; border-radius: 26px; overflow: hidden; color: #000; transition: transform var(--t-2) var(--spring); }
@@ -95,6 +98,8 @@
 .move-note { position: relative; z-index: 1; display: block; max-width: 7.500em; font-size: 1.300rem; color: #000; transform: rotate(-4deg); }
 .move.is-dark .move-note { color: var(--volt); }
 .moves .move-img { object-fit: contain; object-position: center 58%; padding: 12px 6px 48px; transition: transform var(--t-3) var(--spring); }
+/* In the short tiles the athlete sits below the handwritten note, not behind it. */
+.moves li:not(.is-tall) .move-img { padding-top: 40px; }
 .move:hover .move-img { transform: scale(1.040); }
 .move-foot { position: absolute; left: 12px; right: 10px; bottom: 10px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 6px; }
 .move-foot strong { font-weight: 800; font-size: .96rem; line-height: 1.150; }
@@ -128,11 +133,14 @@
 
 /* Floating round navigation on phones */
 @media (max-width: 860px) {
-  .tabbar { left: 50%; right: auto; transform: translateX(-50%); display: flex; gap: 10px; padding: 0; border-radius: 0; background: none; box-shadow: none; }
+  .tabbar { left: 50%; right: auto; transform: translateX(-50%); display: flex; gap: 8px; padding: 0; border-radius: 0; background: none; box-shadow: none; }
   .tabbar .nav-thumb { display: none; }
-  .tabbar a { width: 60px; height: 60px; min-height: 0; border-radius: 50%; color: #fff; background: rgba(38,40,42,.62); box-shadow: 0 10px 28px rgba(0,0,0,.42), inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(20px) saturate(1.400); transition: background var(--t-2), color var(--t-2), transform var(--t-2) var(--spring); }
+  .tabbar a { display: flex; align-items: center; justify-content: center; gap: 6px; flex: none; width: 52px; height: 52px; min-height: 0; border-radius: 26px; color: #fff; background: rgba(38,40,42,.72); box-shadow: 0 8px 22px rgba(0,0,0,.4), inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(20px) saturate(1.400); transition: background var(--t-2), color var(--t-2), transform var(--t-2) var(--spring); }
   .tabbar a span { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-  .tabbar a[aria-current='page'] { background: var(--volt); color: #000; box-shadow: 0 10px 28px rgba(0,0,0,.42); }
+  .tabbar a[aria-current='page'] { width: auto; padding: 0 18px 0 14px; background: var(--volt); color: #000; box-shadow: 0 8px 22px rgba(0,0,0,.4); }
+  .tabbar a[aria-current='page'] span { position: static; width: auto; height: auto; overflow: visible; clip-path: none; font-size: .86rem; font-weight: 800; }
+  /* Content fades out under the navigation, so words on a card never clash with it. */
+  .tabbar-fade { position: fixed; left: 0; right: 0; bottom: 0; z-index: 42; height: calc(92px + var(--safe-b)); pointer-events: none; background: linear-gradient(180deg, rgba(0,0,0,0), rgba(0,0,0,.8)); }
   .tabbar .nav-badge { top: -2px; right: -2px; }
 }
 
@@ -178,7 +186,6 @@
   .home { --home-pad: max(var(--gutter), calc((100vw - 88px - 1180px) / 2)); max-width: none; padding-inline: var(--home-pad); }
   .vhero { margin-inline: calc(var(--home-pad) * -1); padding-inline: var(--home-pad); padding-bottom: 44px; height: min(100svh, 900px); }
   .home-top { left: var(--home-pad); right: var(--home-pad); }
-  .vhero-pause { left: var(--home-pad); }
   .home-title { font-size: clamp(5rem, min(9.400vw, 15svh), 10.500rem); }
   .moves { grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-rows: 170px; }
   .moves li, .moves li.is-tall { grid-row: span 2; }
@@ -237,7 +244,7 @@
 }
 
 /* The heart */
-.save { position: relative; background: rgba(0,0,0,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); backdrop-filter: blur(12px); transition: transform var(--t-3) var(--bounce), color var(--t-2), background var(--t-2), box-shadow var(--t-2); }
+.save { position: relative; background: rgba(0,0,0,.42); box-shadow: inset 0 0 0 1px rgba(255,255,255,.16); transition: transform var(--t-3) var(--bounce), color var(--t-2), background var(--t-2), box-shadow var(--t-2); }
 .save.is-photo, .save.is-plain { background: rgba(0,0,0,.42); }
 .save:active { transform: scale(.74); transition-duration: 70ms; }
 .save.is-on { color: #000; background: var(--volt); box-shadow: 0 6px 20px rgba(215,255,62,.32); }
@@ -252,6 +259,16 @@
 .save-burst b { position: absolute; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%; background: var(--volt); animation: save-spark 620ms var(--ease) both; }
 .save-burst b:nth-child(even) { width: 4px; height: 4px; margin: -2px; background: #fff; }
 @keyframes save-spark { 0% { transform: rotate(var(--a)) translateY(-8px) scale(1); opacity: 1; } 100% { transform: rotate(var(--a)) translateY(-34px) scale(.2); opacity: 0; } }
+
+/* Apple asks for a 44 point target and Google for 48, so the smaller round buttons reach further than they look. */
+.rail-arrow::after, .round-sm::after, .save::after { content: ''; position: absolute; inset: -4px; border-radius: 50%; }
+.chips-row .rail-arrow::after { inset: -5px; }
+
+/* iPhones: the see-through label over a control that lets a real tap play the system tick. See sensory.ts. */
+[data-tick] { position: absolute; inset: 0; z-index: 1; border-radius: inherit; touch-action: manipulation; -webkit-user-select: none; user-select: none; }
+[data-tick] input { position: absolute; width: 1px; height: 1px; margin: 0; visibility: hidden; }
+.rail-arrow > [data-tick], .round-sm > [data-tick], .save > [data-tick] { inset: -4px; }
+.no-haptics [data-tick], [disabled] > [data-tick], [aria-disabled='true'] > [data-tick] { display: none; }
 
 /* Save message with a way through to the list */
 .toast { pointer-events: none; }

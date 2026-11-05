@@ -42,7 +42,7 @@
 
 @keyframes card-up { from { transform: translateY(16px); opacity: 0; } }
 /* Swipeable featured gyms: each card eases to full size as it reaches the centre. */
-.featured { display: grid; gap: 10px; min-width: 0; }
+.featured { display: grid; gap: 12px; min-width: 0; }
 .featured-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); scroll-padding-inline: var(--gutter); overscroll-behavior-x: contain; }
 .featured-track::-webkit-scrollbar { display: none; }
 .featured-item { flex: none; width: min(86vw, 620px); scroll-snap-align: start; }
@@ -75,10 +75,11 @@
 .rate-nudge strong { font-weight: 800; }
 .rate-nudge svg { flex: none; color: var(--volt); }
 
-.rail-section { display: grid; gap: 10px; margin-top: 10px; min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 340px; }
+/* content-visibility clips to this box, so the box reaches the screen edge and rows can run off it. */
+.rail-section { display: grid; gap: 12px; margin-inline: calc(var(--gutter) * -1); padding-inline: var(--gutter); min-width: 0; content-visibility: auto; contain-intrinsic-size: auto 340px; }
 .rail-head { display: flex; justify-content: space-between; align-items: baseline; gap: 16px; }
 .rail-head h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(1.700rem, 3vw, 2.400rem); line-height: 1.100; }
-.rail-head a { font-weight: 700; text-decoration: underline; text-underline-offset: 3px; flex: none; min-height: 24px; }
+.rail-head a { display: inline-flex; align-items: center; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; flex: none; min-height: 44px; }
 .h-rail { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x proximity; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); overscroll-behavior-x: contain; }
 .h-rail::-webkit-scrollbar { display: none; }
 .h-rail li { flex: none; scroll-snap-align: start; scroll-margin-left: var(--gutter); }
@@ -98,7 +99,7 @@
 .price-sticker.is-small { font-size: 1.160rem; padding: 4px 11px; }
 .price-sticker.is-large { font-size: 2rem; padding: 8px 15px; border-radius: 16px; }
 .pick-card:hover .price-sticker, .gym-card:hover .price-sticker, .feature-card:hover .price-sticker { transform: rotate(-9deg) scale(1.060); }
-.home-partner { display: grid; gap: 2px; margin-top: 10px; padding: 16px 18px; border-radius: 24px; background: var(--s1); }
+.home-partner { display: grid; gap: 2px; padding: 16px 18px; border-radius: 24px; background: var(--s1); }
 .home-partner strong { font-weight: 800; }
 .home-partner span { color: var(--text-2); }
 .home-fine { padding: 2px 4px; }

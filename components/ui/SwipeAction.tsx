@@ -32,6 +32,7 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
         type="button"
         className="swipe-thumb"
         data-feel="none"
+        data-no-cover=""
         aria-label={ariaLabel}
         onPointerDown={(e) => {
           if (e.button !== 0) return;

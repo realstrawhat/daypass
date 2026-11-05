@@ -59,7 +59,7 @@
 .rows li + li { border-top: 1px solid var(--s3); }
 .rows button, .rows a { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 8px 16px; text-align: left; font-weight: 700; transition: background var(--t-1), transform var(--t-2) var(--spring); }
 .rows button:hover, .rows a:hover { background: var(--s2); }
-.rows svg:last-child { flex: none; width: 18px; height: 18px; color: var(--mute); }
+.rows svg:last-of-type { flex: none; width: 18px; height: 18px; color: var(--mute); }
 .row-help { display: inline-flex; align-items: center; gap: 10px; }
 .row-help svg { color: var(--volt) !important; width: 20px !important; height: 20px !important; }
 .row-value { color: var(--mute); font-weight: 500; font-size: .92rem; margin-left: auto; }

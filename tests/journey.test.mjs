@@ -1,7 +1,8 @@
 // Journeys through the real screens in Chrome, for what the API tests can't see: taps, sheets, history,
 // press states and offline. Run against a production build, because the offline worker only runs there:
 //   npm run build && npx next start -p 3000      then, in another window:   npm run test:ui
-// BASE_URL points these at another address, such as the live site.
+// BASE_URL points these at another address, such as the live site. IPHONE=1 runs every journey as an iPhone, with
+// the see-through tap covers in place.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -14,6 +15,7 @@ const sql = process.env.DATABASE_URL ? (await import('@neondatabase/serverless')
 const needsChrome = { skip: CHROME ? false : 'needs Chrome (set CHROME_PATH)' };
 const needsDb = { skip: CHROME && sql ? false : 'needs Chrome and DATABASE_URL' };
 const TIMEOUT = 25000;
+const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1';
 
 let browser;
 before(async () => {
@@ -26,13 +28,20 @@ after(async () => {
 });
 
 // A fresh visitor with their own cookies. `replace` answers chosen addresses with a fixed response.
-async function visitor({ width = 390, height = 844, mobile = true, replace = {}, intercept = LOCAL } = {}) {
+async function visitor({ width = 390, height = 844, mobile = true, replace = {}, intercept = LOCAL, iphone = !!process.env.IPHONE } = {}) {
   const context = await browser.createBrowserContext();
   const page = await context.newPage();
   page.setDefaultTimeout(TIMEOUT);
+  if (iphone) await page.setUserAgent(IPHONE_UA);
   await page.setViewport({ width, height, deviceScaleFactor: mobile ? 2 : 1, isMobile: mobile, hasTouch: mobile });
   const errors = [];
   page.on('pageerror', (e) => errors.push(e.message));
+  // Everyone this visitor was logged in as, including accounts it has logged out of by the end.
+  const accounts = new Set();
+  page.on('response', (r) => {
+    if (!r.url().endsWith('/api/auth/me')) return;
+    r.json().then((d) => { if (d.user?.email) accounts.add(d.user.email); }).catch(() => {});
+  });
   if (intercept || Object.keys(replace).length) {
     await page.setRequestInterception(true);
     page.on('request', (r) => {
@@ -48,7 +57,8 @@ async function visitor({ width = 390, height = 844, mobile = true, replace = {},
     done: async () => {
       if (sql) {
         const me = await page.evaluate(async () => (await (await fetch('/api/auth/me')).json()).user?.email ?? null).catch(() => null);
-        if (me) await sql`DELETE FROM users WHERE email = ${me} AND (is_demo OR email LIKE 'qa+%')`;
+        if (me) accounts.add(me);
+        if (accounts.size) await sql`DELETE FROM users WHERE email = ANY(${[...accounts]}) AND (is_demo OR email LIKE 'qa+%')`;
       }
       await context.close();
       assert.deepEqual(errors, [], 'the page threw no script errors');
@@ -507,7 +517,7 @@ test('the opening screen: words on the right, search in the middle, air between 
       const hero = box('.vhero');
       const title = box('.home-title');
       const search = box('.home-search');
-      return { heroCentre: (hero.left + hero.right) / 2, searchCentre: (search.left + search.right) / 2, gap: search.top - title.bottom, align: getComputedStyle(document.querySelector('.vhero-copy')).textAlign, frost: getComputedStyle(document.querySelector('.search-pill.is-frost')).backdropFilter };
+      return { heroCentre: (hero.left + hero.right) / 2, searchCentre: (search.left + search.right) / 2, gap: search.top - title.bottom, align: getComputedStyle(document.querySelector('.vhero-copy')).textAlign, frost: getComputedStyle(document.querySelector('.vhero-pause')).backdropFilter };
     });
     assert.equal(m.align, 'right');
     assert.match(m.frost, /blur/, 'the frosted glass really renders in Chrome');
@@ -830,5 +840,119 @@ test('deleting an account removes its saved pages too', needsChrome, async () =>
   await page.waitForFunction(() => location.pathname === '/home');
   const left = await page.evaluate(async () => (await (await caches.open('daypass-pages')).keys()).map((r) => new URL(r.url).pathname));
   assert.ok(!left.some((p) => /^\/(bookings|account)/.test(p)), `found ${left}`);
+  await done();
+});
+
+// What a finger lands on at the middle of an element, and where that middle is.
+const under = (page, selector) => page.$eval(selector, (e) => {
+  e.scrollIntoView({ block: 'center', behavior: 'instant' });
+  const r = e.getBoundingClientRect();
+  const x = (r.left + r.right) / 2;
+  const y = (r.top + r.bottom) / 2;
+  const hit = document.elementFromPoint(x, y);
+  return { x, y, cover: !!hit?.closest('[data-tick]'), parent: hit?.closest('[data-tick]')?.parentElement.className ?? '' };
+});
+
+test('iPhone: a tap reaches a hidden switch first, then the control, exactly once', needsChrome, async () => {
+  const { page, done } = await visitor({ iphone: true });
+  await page.evaluateOnNewDocument(() => {
+    window.trail = [];
+    window.addEventListener('click', (e) => window.trail.push(e.target.tagName), { capture: true });
+    window.buzzes = [];
+    Navigator.prototype.vibrate = function (p) {
+      window.buzzes.push(p);
+      return true;
+    };
+  });
+  await open(page, '/home');
+  await page.waitForSelector('.feature-card > [data-tick]');
+  await page.waitForSelector('.tabbar a[href="/gyms"] > [data-tick]');
+  assert.equal(await exists(page, 'a.skip > [data-tick]'), false, 'the skip link is left to the browser');
+  assert.equal(await exists(page, '.home-fine a > [data-tick]'), false, 'a link inside a sentence gets no cover');
+
+  // The card's own link: the tap goes label, switch, then link.
+  const card = await page.$eval('.feature-card', (e) => {
+    e.scrollIntoView({ block: 'center', behavior: 'instant' });
+    const r = e.getBoundingClientRect();
+    return { x: r.left + r.width / 2, y: r.top + r.height / 2 };
+  });
+  await sleep(300);
+  await page.evaluate(() => { window.trail = []; });
+  await page.mouse.click(card.x, card.y);
+  await page.waitForFunction(() => location.pathname.startsWith('/gyms/'));
+  assert.deepEqual((await page.evaluate(() => window.trail)).slice(0, 3), ['LABEL', 'INPUT', 'A']);
+
+  // The heart stays above its card's cover, and a tap on it never opens the gym.
+  await open(page, '/home');
+  await page.waitForSelector('.feature-card .save > [data-tick]');
+  await sleep(300);
+  const heart = await under(page, '.feature-card .save');
+  assert.ok(heart.parent.includes('save'), `the heart's own cover is on top, found ${heart.parent}`);
+  await page.mouse.click(heart.x, heart.y);
+  await page.waitForSelector('.auth-skip');
+  assert.equal(await address(page), '/home', 'still on Home');
+
+  // A sort of button that needs its form sent.
+  await open(page, '/login');
+  await page.waitForSelector('#auth-email');
+  await page.type('#auth-email', 'nobody@example.com');
+  await page.type('#auth-password', 'not-the-password');
+  await page.waitForSelector('button[type="submit"] > [data-tick]');
+  const asked = page.waitForResponse((r) => r.url().includes('/api/auth/'));
+  await tap(page, 'button[type="submit"]');
+  assert.equal((await asked).request().method(), 'POST', 'the login form was really sent');
+
+  // One tap, one buzz, and the switch really changed.
+  await open(page, '/gyms?city=Berlin');
+  await page.waitForSelector('.chip > [data-tick]');
+  await sleep(300);
+  await page.evaluate(() => { window.buzzes = []; });
+  await tap(page, '.chip');
+  await sleep(150);
+  assert.equal((await page.evaluate(() => window.buzzes)).length, 1, 'one tap, one buzz');
+  assert.equal(await page.$eval('.chip > [data-tick] input', (i) => i.checked), true, 'the tap reached the switch');
+  await done();
+});
+
+test('iPhone: a touch that starts on a cover still scrolls, and Haptics off removes the covers', needsChrome, async () => {
+  const { page, done } = await visitor({ iphone: true });
+  await open(page, '/home');
+  await page.waitForSelector('.move > [data-tick]');
+  await page.$eval('.move', (e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await sleep(400);
+  const before = await page.evaluate(() => scrollY);
+  const box = await (await page.$('.move')).boundingBox();
+  const cdp = await page.createCDPSession();
+  const x = box.x + box.width / 2;
+  const y = box.y + box.height / 2;
+  assert.ok((await under(page, '.move')).cover, 'the touch starts on the cover');
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  for (let i = 1; i <= 12; i += 1) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x, y: y - (240 * i) / 12 }] });
+    await sleep(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(700);
+  assert.ok((await page.evaluate(() => scrollY)) > before + 100, 'the page scrolled');
+  assert.equal(await address(page), '/home', 'and nothing opened');
+
+  await page.evaluate(() => localStorage.setItem('daypass-haptics', '0'));
+  await open(page, '/home');
+  await page.waitForSelector('.tabbar a[href="/gyms"] > [data-tick]');
+  assert.equal(await page.$eval('.tabbar a[href="/gyms"] > [data-tick]', (e) => getComputedStyle(e).display), 'none');
+  await tap(page, '.tabbar a[href="/gyms"]');
+  await page.waitForFunction(() => location.pathname === '/gyms');
+  await done();
+});
+
+test('other phones get no covers, and the sideways rows reach the screen edge', needsChrome, async () => {
+  const { page, done } = await visitor({ iphone: false });
+  await open(page, '/home');
+  await page.waitForSelector('.rail-section .h-rail');
+  await sleep(1200);
+  assert.equal(await exists(page, '[data-tick]'), false);
+  const m = await page.$eval('.rail-section', (s) => ({ left: s.getBoundingClientRect().left, right: s.getBoundingClientRect().right, width: innerWidth }));
+  assert.equal(m.left, 0, 'the row can run off the left edge');
+  assert.equal(m.right, m.width, 'and off the right edge');
   await done();
 });

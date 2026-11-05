@@ -36,6 +36,7 @@ export function Nav() {
         </div>
         <Link href="/partners" className="rail-foot"><IconStore /><span>Gyms</span></Link>
       </nav>
+      <i className="tabbar-fade" aria-hidden="true" />
       <nav className="tabbar" aria-label="Main" style={style}>
         {activeIndex >= 0 ? <i className="nav-thumb" aria-hidden="true" /> : null}
         {items.map((i, n) => (

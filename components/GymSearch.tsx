@@ -452,7 +452,7 @@ export function GymSearch() {
             </ul>
           ) : null}
         </div>
-        {areaCity && urlCity === areaCity ? <button type="button" className="where-note" onClick={nearMe}><IconLocate /> <span>{urlCity} is your general area. Use my exact location</span></button> : null}
+        {areaCity && urlCity === areaCity ? <button type="button" className="where-note" onClick={nearMe}><IconLocate /> <span>{urlCity} is your general area. <b>Use my exact location</b></span></button> : null}
         <h1 className="search-title" aria-live="polite">
           {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{error ? heading : `${total} ${total === 1 ? 'gym' : 'gyms'} ${near && !result?.place ? 'near you' : area ? 'in this area' : `in ${heading}`}`}</span></>}
         </h1>

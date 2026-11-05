@@ -171,13 +171,16 @@ export async function payHold(userId: string, id: string, method: PayMethod) {
 }
 
 const LATE_MESSAGE = 'This visit is less than 24 hours away, so changes are no longer possible.';
+const STALE_MESSAGE = 'This booking was just changed elsewhere. Reload to see the latest.';
 
 // Move a booking to a new time, optionally at another gym. One atomic statement:
 // take the new spot, update the booking, free the old spot and record any price difference.
-export async function changeBooking(userId: string, id: string, input: { startsAt: string; gymId?: string; method?: PayMethod }) {
+export async function changeBooking(userId: string, id: string, input: { startsAt: string; gymId?: string; method?: PayMethod; version?: number }) {
   const b = await getOwned(userId, id);
   if (b.status !== 'confirmed') throw new HttpError(409, 'Only confirmed bookings can be changed.', 'not_confirmed');
   if (b.checked_in_at) throw new HttpError(409, 'You have already checked in for this visit.', 'checked_in');
+  // The person chose this from an older screen, such as a second device, so it must not replace a newer change.
+  if (input.version != null && input.version !== b.confirmation_version) throw new HttpError(409, STALE_MESSAGE, 'stale');
   if (new Date(b.starts_at).getTime() - Date.now() <= 24 * 3600 * 1000) throw new HttpError(409, LATE_MESSAGE, 'too_late');
 
   const gym = await getGymById(input.gymId ?? b.gym_id);
@@ -245,7 +248,7 @@ export async function changeBooking(userId: string, id: string, input: { startsA
   }
 
   const now = await getOwned(userId, id);
-  if (now.confirmation_version !== b.confirmation_version) throw new HttpError(409, 'This booking was just changed elsewhere. Reload to see the latest.', 'stale');
+  if (now.confirmation_version !== b.confirmation_version) throw new HttpError(409, STALE_MESSAGE, 'stale');
   if (new Date(now.starts_at).getTime() - Date.now() <= 24 * 3600 * 1000) throw new HttpError(409, LATE_MESSAGE, 'too_late');
   throw new HttpError(409, 'Someone just took the last spot at that time. Pick another slot.', 'slot_full');
 }

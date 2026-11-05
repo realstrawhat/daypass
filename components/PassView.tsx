@@ -18,6 +18,7 @@ import { WalletSheet } from './WalletSheet';
 
 export type PassBooking = {
   id: string;
+  version: number;
   code: string;
   gym_id: string;
   gym_name: string;
@@ -349,6 +350,7 @@ function CancelFlow({ b, onClose, onDone }: { b: PassBooking; onClose: () => voi
 }
 
 function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
+  const router = useRouter();
   const [gym, setGym] = useState({ id: b.gym_id, name: b.gym_name, price_cents: b.price_cents, timezone: b.timezone });
   const [step, setStep] = useState<'time' | 'gym' | 'review'>('time');
   const [days, setDays] = useState<SlotDay[] | null>(null);
@@ -399,8 +401,10 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
   const difference = gym.price_cents - b.price_cents;
 
   const submit = async (method?: PayMethod) => {
-    const res = await fetch(`/api/bookings/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startsAt: selected, gymId: gym.id, method }) });
+    const res = await fetch(`/api/bookings/${b.id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ startsAt: selected, gymId: gym.id, method, version: b.version }) });
     const data = await res.json();
+    // Catch up with the newer booking, so the next try starts from the right place.
+    if (data.code === 'stale') router.refresh();
     if (!res.ok) throw new Error(data.error);
     paidOk.current = true;
   };

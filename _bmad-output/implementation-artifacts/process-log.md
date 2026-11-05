@@ -68,6 +68,13 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 | 42 | After paying inside Change booking, a step stayed in the Back history and a flag could go stale, so the next sheet might ignore Back | Sheets closing together now share one step back | Journey checks no step is left and the next sheet closes on Back |
 | 43 | New browser tests failed from Claude's own mistakes: reading the address too early, clicking covered cards, tapping during the 300 ms a sheet closes, and trying a second change after the first had moved the session inside 24 hours, where changes are correctly locked | Tests corrected. The product was right in these cases | Full run passes |
 | 44 | The Edge Case Hunter stopped on the 5-hour usage limit partway through its review | Resumed it. Verdicts waited until all four reviewers had reported, as step 4 requires | Its 52 findings each have a row |
+| 45 | Live test after the owner's deploy: `two changes at once: only one wins` failed on the live link, though it passed locally (39 passed, 1 failed, 2 skipped because they only work locally). The browser tests passed 28 of 28 | 20 more tries on the live link, reading the database after each. 16 had one winner and 4 had two, always one after the other, never the same version, and spot counts were right every time. So no double booking or double charge. The real gap: a change from an out-of-date screen silently replaced a newer one, although the app has a "changed elsewhere" message for that. The page now sends the version it was showing, and an older one is refused | A new API test covers it however late the second change arrives. Passes locally. Not yet on the live link |
+| 46 | Owner feedback: no haptic feedback on the phone. Claude had said haptics were fixed and stronger (row 40) without having felt them. Android's vibration was already in the code. The iPhone route was a script toggling a hidden switch, and two community sources report Apple closed that in iOS 26.5: only a real tap on a switch still ticks. Apple's own documents don't describe this, and the owner's phone model isn't known yet | Each control now gets a see-through label with a hidden switch inside, on iPhones and iPads only: the method of the open-source ios-haptics library. The buzz also runs before the sound, so a sound fault can't stop it. Reduced Motion no longer turns haptics off. A new Haptics switch in Account lets people turn them off, as Apple asks | A real WebKit engine with an iPhone profile: 14 of 14 checks. That build has no switch control and can't buzz, so it proves the tap reaches the switch, not that a phone ticks. Felt on a real phone: not yet |
+| 47 | Reading how that method works, Claude saw it would have failed silently on every link: the app's navigation cancels the click, and a cancelled click never reaches the switch. Claude's first plan for Android was also wrong: it would have lengthened the buzz, but Google's guidance says a key click lasts 10 to 20 ms and warns against long buzzes | Clicks on a cover are now held back from everything else. The tap reaches the switch first, then the control gets a click of its own. Android's tap is 20 ms | Label, switch, then link, read from the click order in WebKit and in Chrome |
+| 48 | Running every browser journey as an iPhone found a real fault in the new covers: covers on the filter chips rose above the sticky "Show gyms" bar and took its taps, so filters could not be applied on an iPhone | Each cover now stays inside its own control, so it can't rise over anything outside it. `IPHONE=1 npm run test:ui` is now a repeatable check | 31 of 31 journeys as an iPhone, and the filter flow added to the WebKit check |
+| 49 | Owner feedback: Home feels clunky, followed by "use big company design rule". Looking at it on a phone-sized screen found a real bug from Claude's own speed work: a performance setting clipped the sideways rows 16 px before the screen edge. The handwritten notes also overlapped the athletes, and specks remained around the cut-outs | Rows now reach the edge, and notes and athletes no longer overlap. Refinements from Apple's guidance, not a redesign: one prominent action (search with the location button inside it), glass only on navigation and floating controls (6 elements on Home, down from 25), one top row of controls, a quiet location line, the current tab named, navigation sized to the owner's reference, content fading under the navigation, and larger tap areas. Google's guidance is the source for haptic length. Its 48 point target figure comes from secondary sources, because the official page did not load here | Viewed at 390 and 1440 px. The owner has not seen it yet. Blur cost could not be judged: on this computer scrolling held about 60 frames a second with blur on or off, and a phone's graphics chip can't be simulated here |
+| 50 | Claude had recorded that tests clean up after themselves. Database totals showed otherwise: browser tests that logged out left demo accounts behind. The database held 110 demo accounts and 1,000 sample bookings. 80 spots in 16 upcoming slots, all at Iron Gym (15 Amsterdam, 1 Berlin), were held by demo accounts, so those times show as full. Claude also told the owner they were all at Iron Gym after looking at only 5 of them. A full count then confirmed it | Tests now remember every account they logged in as and remove it. Existing leftovers were not deleted, because they can't be told apart from real demo visitors. The app already removes demo accounts after 14 days, so these clear by about 18 November, or sooner if the owner agrees | Both test suites run back to back: users stayed at 111 and bookings at 1,004 |
+| 51 | Two more of Claude's checks gave wrong answers. A scroll test failed because its fake swipe scrolled nothing anywhere, even with no covers. A pixel comparison seemed to show the Map button missing on iPhones, but the screenshots had caught it at different moments | The scroll test now sends real touch movements: 300 px with covers against 311 px without, and sideways rows moved the same 222 px. The Map button was checked directly and tapped there and back as an iPhone | With and without covers, 5 of 7 screens match to the pixel. Home and Find differ only by that button and stray single pixels |
 | 28 | Owner feedback: the owner disliked the new full-screen Home (row 22) and said the previous and first versions were better | Restored the previous Home layout: headline, search, swipeable gym cards. Kept the separately requested changes: no ribbon, city marks, colour photos, location-aware gyms. The auto-sliding hero is gone | Checked in the test browser at 390 px, then on the live link |
 
 ## Second round: BMad process notes
@@ -77,18 +84,32 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 - The owner asked to push, deploy and then test, so the live check and the BMad review run after the first deploy of this round.
 - The four step 4 reviewers ran after the deploy and reported roughly 120 findings, many of them repeats. The triage log groups them instead of giving one row each. Fixes were applied directly in the main session, not through a re-engaged implementation subagent or a re-derive from the spec, because the owner was changing the design live. Some findings were graded by reading the code without a separate verification step, and are marked as such in the triage log. The spec stays at `in-review` until the deploy and offline check are done.
 - The follow-up pass ran all four reviewers again on the changes since the first pass. Every finding has its own row with a verdict and a route: 133 findings, counted by script. The spec is now `done`. See its Auto Run Result for the breakdown, the deferred list and the deviations.
+- After the owner deployed the follow-up pass, the live tests and the owner's feedback on the phone led to rows 45 to 51. These changes did not go through the four BMad reviewers. They were tested instead, and recorded in the spec's Change Log.
 - Home, haptics, location and city marks arrived as owner feedback during the round. They were built without amending the spec first, which is a deviation from the workflow.
 - Performance on Home, measured with a phone-speed simulation (4x slower processor, Fast 4G, empty cache): main content visible in 1.1 s, layout shift 0.045, but about 1.8 s of blocked processing during startup. Home had 446 page elements at that point. Most of the script is the framework itself, so no further cheap saving was found. This is a lab simulation, not a real device. That figure predates the video Home, and it is replaced by the next note.
 - Performance on the video Home, same simulation on the live link, as first measured: main content visible in 1.13 s, layout shift 0, about 1.1 s of blocked processing, framework script 390 of 585 KB, 566 page elements. Blur was not rendering yet when this was taken, see row 38.
 
 ## Checks run
 
-Latest, on a clean production build of the final code:
+Latest, on a local production build, after rows 45 to 51. Not yet deployed:
 
 - `npm run typecheck`: no errors.
-- `npm test`: 42 of 42 pass against the real database.
-- `npm run test:ui`: 28 of 28 journeys pass in headless Chrome.
-- Clean-up script afterwards: 0 test accounts and 0 test gyms left behind.
+- `npm test`: 43 of 43 pass against the real database.
+- `npm run test:ui`: 31 of 31 journeys pass in headless Chrome.
+- `IPHONE=1 npm run test:ui`: 31 of 31 journeys pass with the iPhone tap covers in place.
+- A real WebKit engine with an iPhone profile: 14 of 14 checks. This is a separate script outside the project, because it needs its own browser download.
+- Clean-up: both suites run back to back left users at 111 and bookings at 1,004.
+
+On the live link, on the owner's deploy of the follow-up pass:
+
+- `npm test`: 39 passed, 1 failed, 2 skipped because they only work locally. See row 45.
+- `npm run test:ui`: 28 of 28.
+
+Before that, on a clean production build of the follow-up pass:
+
+- `npm run typecheck`: no errors.
+- `npm test`: 42 of 42.
+- `npm run test:ui`: 28 of 28.
 
 Round 1, at the time:
 
@@ -107,6 +128,7 @@ Round 1, at the time:
 - Face ID uses passkeys. The setup step was reached, but a real Face ID login was not completed on a physical device.
 - NFR3 needs five real test users. NFR1 and NFR9 were not measured on a mid-range phone or under load. NFR10 can only be measured over time.
 - WCAG 2.2 AA was designed for but not formally audited.
+- Haptics have not been felt on any real phone by Claude. The iPhone route depends on community reports of how iOS 26.5 behaves, so it could stop working in a later iOS. A swipe can't tick on the newest iPhones, because only a tap counts, and nor can a moment with no finger on the glass, such as a payment finishing.
 
 ## Peer test
 

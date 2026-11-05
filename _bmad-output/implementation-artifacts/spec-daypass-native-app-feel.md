@@ -282,6 +282,10 @@ Owner chose a new direction from the reference images, after rejecting the full-
 
 Owner's request: finish the BMad steps and logs. The intent contract is unchanged. What the code now does for its rows: demo passes skip the time window at the door, so the desk row can be acted out on any day; refused entry opens on the day of the session and closes 6 hours after the start; a real pass still scans only from its own account. Verification gains `npm run test:ui`. Known-bad states avoided: a valid pass flipping to Already used while in view, and test data reaching public pages. KEEP: the owner's chosen look and location order.
 
+### 2026-11-05 (after the deploy)
+
+Owner's feedback from a phone: no haptics, and Home feels clunky, followed by "use big company design rule". The intent contract is unchanged. Changes: iPhones get a real-tap route to the system tick, because a script can reportedly no longer trigger it from iOS 26.5; haptics can be turned off; Home is refined against Apple's and Google's published guidance, without a redesign. A booking change now states the version it was made from, so a change from an out-of-date screen is refused. Verification gains `IPHONE=1 npm run test:ui`. Known-bad states avoided: a cover taking taps from a bar stuck above it, sideways rows clipped before the screen edge, tests leaving demo accounts behind. KEEP: the owner's chosen look and location order. None of this went through the four BMad reviewers. A further follow-up risk: the iPhone tick can only be judged on a real iPhone.
+
 ## Review Triage Log
 
 ### 2026-11-05 — Review pass
@@ -535,6 +539,7 @@ Static browsing pages make shared-element morphs possible, because the docs say 
 - `npm run typecheck` -- expected: no errors
 - `npm test` -- expected: all pass, against a production build
 - `npm run test:ui` -- expected: all pass, against a production build, with Chrome installed
+- `IPHONE=1 npm run test:ui` -- expected: all pass, with the iPhone tap covers in place
 - `npm run build` -- expected: success
 
 **Manual checks (if no CLI):**
@@ -560,7 +565,7 @@ The first pass did not run this audit, and the browser rows had no test at all. 
 
 ## Auto Run Result
 
-**Status:** done on the code and tests. The live check waits for the owner's deploy, and is recorded in `process-log.md` once it has run.
+**Status:** done on the code and tests. The owner deployed this pass and the live results are in `process-log.md`, rows 45 to 51, which also cover the changes made after it. Those changes wait for the owner's next deploy. See the Change Log entry "after the deploy".
 
 **Summary of the implemented change:** Round 2 turned Daypass into something that behaves like an app: working simulations of Wallet, inbox, Face ID, desk check-in and refused-entry refunds, a demo login, and the look the owner chose from the references, with a video opening, network location first and exact location after. The follow-up pass reviewed the changes since the first pass with all four layers. It fixed the door scanner's re-check loop, frosted glass that never rendered in Chrome, tests that wrote to the live site, and the smaller faults listed in the triage log, and it added the browser tests the first pass lacked.
 

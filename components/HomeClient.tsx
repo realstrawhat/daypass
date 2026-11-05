@@ -42,7 +42,7 @@ function untilSession(iso: string, tz: string) {
 
 const VIDEO_PAUSED = 'daypass-video-paused';
 
-function HeroVideo() {
+function useHeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
@@ -81,7 +81,8 @@ function HeroVideo() {
     else v.play().catch(() => {});
   };
 
-  return (
+  return {
+    media: (
     <>
       <picture>
         <source media="(orientation: portrait)" srcSet="/video/hero-portrait.jpg" />
@@ -93,11 +94,14 @@ function HeroVideo() {
         <source src="/video/hero-wide.mp4" type="video/mp4" />
       </video>
       <i className="vhero-shade" aria-hidden="true" />
+    </>
+    ),
+    pause: (
       <button type="button" className="round round-sm vhero-pause" aria-label={playing ? 'Pause background video' : 'Play background video'} onClick={toggle}>
         <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">{playing ? <path d="M3 1h3v12H3zM8 1h3v12H8z" /> : <path d="M3 1l9 6-9 6z" />}</svg>
       </button>
-    </>
-  );
+    ),
+  };
 }
 
 function NextCard({ next }: { next: NextBooking }) {
@@ -141,7 +145,7 @@ function RailSection({ id, title, action, children }: { id: string; title: React
   );
 }
 
-function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLocation }: { gyms: CardGym[]; heading: string; showCity: boolean; morphAllowed: (id: string) => boolean; onLocate: () => void; askLocation: string | null }) {
+function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLocation }: { gyms: CardGym[]; heading: string; showCity: boolean; morphAllowed: (id: string) => boolean; onLocate: () => void; askLocation: { lead: string; action: string } | null }) {
   const track = useRef<HTMLUListElement>(null);
   const [index, setIndex] = useState(0);
   const onScroll = () => {
@@ -160,7 +164,7 @@ function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLoca
         </div>
         <ScrollArrows target={track} label="Scroll featured gyms" />
       </div>
-      {askLocation ? <button type="button" className="where-note" onClick={onLocate}><IconLocate /> <span>{askLocation}</span></button> : null}
+      {askLocation ? <button type="button" className="where-note" onClick={onLocate}><IconLocate /> <span>{askLocation.lead} <b>{askLocation.action}</b></span></button> : null}
       <ul className="featured-track" ref={track} onScroll={onScroll} tabIndex={0}>
         {gyms.map((g, i) => <li key={g.id} className="featured-item"><FeatureCard gym={g} priority={i < 1} morph={morphAllowed(g.id)} showCity={showCity} /></li>)}
       </ul>
@@ -174,7 +178,7 @@ function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLoca
 function RailSkeleton() {
   return (
     <section className="featured" aria-busy="true" aria-label="Finding gyms near you">
-      <div className="rail-head"><h2 className="two-tone">Find your <em>next gym</em></h2></div>
+      <div className="rail-head"><div><h2 className="two-tone">Find your <em>next gym</em></h2><p className="featured-where"><span className="sk sk-word" /></p></div></div>
       <div className="featured-track"><div className="featured-item"><span className="sk feature-sk" /></div><div className="featured-item"><span className="sk feature-sk" /></div></div>
     </section>
   );
@@ -182,6 +186,7 @@ function RailSkeleton() {
 
 export function HomeClient({ picks }: { picks: CardGym[] }) {
   const { user, ready, next, toRate, unread, saved } = useSession();
+  const hero = useHeroVideo();
   const [overlay, setOverlay] = useState(false);
   const [note, setNote] = useState('');
   const [local, setLocalState] = useState<Local | null>(homeMemory);
@@ -285,7 +290,7 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
   const shown = local?.gyms ?? picks;
   const place = !local ? null : local.label === 'you' ? 'near you' : `in ${local.label}`;
   const heading = place ? `Top picks ${place}` : 'Top rated across Europe';
-  const askLocation = !local ? 'We don’t know where you are yet. Use my location' : local.source === 'area' ? `${local.label} is your general area. Use my exact location` : null;
+  const askLocation = !local ? { lead: 'We don’t know where you are yet.', action: 'Use my location' } : local.source === 'area' ? { lead: `${local.label} is your general area.`, action: 'Use my exact location' } : null;
   const featured = shown.slice(0, 5);
   const rest = shown.slice(5);
   const searchQuery = !local ? '' : local.label === 'you' ? 'near=1&' : `city=${encodeURIComponent(local.label)}&`;
@@ -295,7 +300,7 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
   return (
     <main className="home">
       <section className="vhero" aria-labelledby="home-title">
-        <HeroVideo />
+        {hero.media}
         <header className="home-top">
           <p className="home-brand"><Spark /> {!ready ? <span className="sk sk-word" /> : user ? `Hi ${user.name.split(' ')[0]}` : 'Daypass'}</p>
           <div className="home-actions">
@@ -312,6 +317,7 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
             ) : ready ? (
               <Link href="/login?next=/home" className="home-login">Log in</Link>
             ) : null}
+            {hero.pause}
           </div>
         </header>
 
@@ -328,10 +334,10 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
           </p>
           <h1 id="home-title" className="home-title"><span>One gym.</span><span>One day.</span><em>No contract.</em></h1>
           <div className="home-search">
-            <button type="button" className="search-pill is-large is-frost" onClick={() => { setNote(''); setOverlay(true); }}>
+            <button type="button" className="search-pill is-large" onClick={() => { setNote(''); setOverlay(true); }}>
               <IconSearch /> <span>Where are you training?</span>
             </button>
-            <button type="button" className="round round-volt round-lg" aria-label="Gyms near me" onClick={nearMe}><IconLocate /></button>
+            <button type="button" className="round home-locate" aria-label="Gyms near me" onClick={nearMe}><IconLocate /></button>
           </div>
         </div>
       </section>

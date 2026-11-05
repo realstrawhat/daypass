@@ -2,12 +2,12 @@
 import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, Spark } from '../Icons';
-import { feel, installTapFeedback, justFelt } from './sensory';
+import { feel, hapticsOn, installTapFeedback, justFelt } from './sensory';
 
 // Taps are handled globally by installTapFeedback. This remains for async moments without a tap.
 export const haptic = (ms = 8) => {
   try {
-    if (!justFelt() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) navigator.vibrate?.(Math.max(ms, 14));
+    if (!justFelt() && hapticsOn()) navigator.vibrate?.(Math.max(ms, 16));
   } catch {}
 };
 

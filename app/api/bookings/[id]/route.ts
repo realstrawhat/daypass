@@ -9,7 +9,8 @@ export const PATCH = handle(async (req, ctx) => {
   const body = await readJson(req);
   const method = body.method as PayMethod | undefined;
   if (method && !PAY_METHODS.includes(method)) throw new HttpError(400, 'Choose a way to pay.');
-  const { booking, difference, refund } = await changeBooking(user.id, id, { startsAt: String(body.startsAt), gymId: body.gymId ? String(body.gymId) : undefined, method });
+  const version = Number.isInteger(body.version) ? Number(body.version) : undefined;
+  const { booking, difference, refund } = await changeBooking(user.id, id, { startsAt: String(body.startsAt), gymId: body.gymId ? String(body.gymId) : undefined, method, version });
   return Response.json({ booking: { id: booking.id, starts_at: booking.starts_at, confirmation_version: booking.confirmation_version }, difference, refund });
 });
 

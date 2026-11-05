@@ -227,12 +227,31 @@ test('two changes at once: only one wins', async () => {
   const hold = await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: a.startsAt, key: key() } });
   const id = hold.data.booking.id;
   await call(`/api/checkout/${id}/pay`, { method: 'POST', body: { method: 'demo-card' } });
+  // Both say which version they were looking at, so the order they happen to arrive in cannot matter.
   const [x, y] = await Promise.all([
-    call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: b.startsAt } }),
-    call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: c.startsAt } }),
+    call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: b.startsAt, version: 1 } }),
+    call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: c.startsAt, version: 1 } }),
   ]);
   assert.equal([x, y].filter((r) => r.status === 200).length, 1);
-  assert.equal([x, y].filter((r) => r.status === 409).length, 1);
+  assert.equal([x, y].find((r) => r.status === 409)?.data.code, 'stale');
+});
+
+test('a change from an out-of-date screen cannot replace a newer one', async () => {
+  const call = await client();
+  const { gym, slots } = await freeSlots();
+  const [a, b, c] = [...later(slots)].sort(() => Math.random() - 0.5);
+  const hold = await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: a.startsAt, key: key() } });
+  const id = hold.data.booking.id;
+  await call(`/api/checkout/${id}/pay`, { method: 'POST', body: { method: 'demo-card' } });
+  const first = await call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: b.startsAt, version: 1 } });
+  assert.equal(first.data.booking.confirmation_version, 2);
+  // A second device still shows the booking as it was, however much later this arrives.
+  const stale = await call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: c.startsAt, version: 1 } });
+  assert.equal(stale.status, 409);
+  assert.equal(stale.data.code, 'stale');
+  const fresh = await call(`/api/bookings/${id}`, { method: 'PATCH', body: { startsAt: c.startsAt, version: 2 } });
+  assert.equal(fresh.status, 200);
+  assert.equal(fresh.data.booking.confirmation_version, 3);
 });
 
 test('a reused checkout key cannot pay for a different slot', async () => {

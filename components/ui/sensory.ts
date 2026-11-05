@@ -1,11 +1,12 @@
 // How the app feels under a finger: haptics and small synthesized sounds, with no audio files to download.
 export type Feel = 'tap' | 'select' | 'save' | 'unsave' | 'success' | 'error' | 'stamp' | 'notify';
 
+// Android's guidance: a key click lasts 10 to 20 ms, and stronger buzzes are for moments that matter more.
 const PATTERNS: Record<Feel, number | number[]> = {
-  tap: 16,
+  tap: 20,
   select: 24,
-  save: [18, 40, 30],
-  unsave: 16,
+  save: [20, 40, 30],
+  unsave: 20,
   success: [26, 60, 44],
   error: [50, 50, 50],
   stamp: [60, 30, 24],
@@ -13,23 +14,19 @@ const PATTERNS: Record<Feel, number | number[]> = {
 };
 
 const SOUND_KEY = 'daypass-sound';
+const HAPTICS_KEY = 'daypass-haptics';
+const TAPPABLE = 'button, a, [role="switch"], [role="radio"]';
 let audio: AudioContext | null = null;
 let output: AudioNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let iosSwitch: HTMLLabelElement | null = null;
 let lastTap = 0;
 let lastFelt = 0;
+// True while a real tap on a cover is being passed to its control. The switch has already played the tick.
+let underFinger = false;
 
 // True just after a tap or event has already buzzed.
 export const justFelt = () => performance.now() - lastFelt < 120;
-
-const reduced = () => {
-  try {
-    return window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  } catch {
-    return false;
-  }
-};
 
 export function soundOn() {
   try {
@@ -45,8 +42,27 @@ export function setSound(on: boolean) {
   } catch {}
 }
 
-// iPhones ignore the vibration API. Toggling a native switch control is the one web route to the
-// Taptic Engine, and it only fires during a real tap, on iOS 18 and later.
+// Apple's guidance: let people turn haptics off.
+export function hapticsOn() {
+  try {
+    return localStorage.getItem(HAPTICS_KEY) !== '0';
+  } catch {
+    return true;
+  }
+}
+
+export function setHaptics(on: boolean) {
+  try {
+    localStorage.setItem(HAPTICS_KEY, on ? '1' : '0');
+  } catch {}
+  document.documentElement.classList.toggle('no-haptics', !on);
+}
+
+const isIOS = () => /iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+
+// iPhones have no vibration API. Their one web route to the Taptic Engine is the native switch control, which
+// ticks when it is toggled. Up to iOS 26.4 a script could toggle it, so this still serves moments with no finger
+// on the glass, such as a payment finishing. From iOS 26.5 only a real tap counts: see coverControl.
 function iosTick() {
   if (!iosSwitch) {
     const label = document.createElement('label');
@@ -174,23 +190,112 @@ function sound(kind: Feel) {
   }
 }
 
+function buzz(kind: Feel) {
+  if (!hapticsOn()) return;
+  if (typeof navigator.vibrate === 'function') navigator.vibrate(PATTERNS[kind]);
+  else if (!underFinger && isIOS()) iosTick();
+}
+
+// The buzz goes first, so a problem with sound can never take it away. Reduced motion asks for less movement on
+// screen, not for less feedback in the hand, so it leaves haptics on.
 export function feel(kind: Feel) {
   if (typeof window === 'undefined') return;
+  lastFelt = performance.now();
+  try {
+    buzz(kind);
+  } catch {}
   try {
     sound(kind);
-    lastFelt = performance.now();
-    if (reduced()) return;
-    if (typeof navigator.vibrate === 'function') navigator.vibrate(PATTERNS[kind]);
-    else iosTick();
   } catch {}
+}
+
+const hydrated = (el: Element) => Object.keys(el).some((k) => k.startsWith('__reactFiber$'));
+
+// From iOS 26.5 an iPhone only ticks for a real finger on a switch, so each control gets a see-through label over it
+// with a hidden switch inside. This is the method of ios-haptics by tijnjh (MIT). A touch that starts on the label
+// can still scroll the page.
+function coverControl(el: HTMLElement) {
+  if (el.querySelector(':scope > [data-tick]') || !hydrated(el)) return;
+  // Drag handles, and links the browser should open itself.
+  if (el.hasAttribute('data-no-cover') || el.matches('a[target], a[download], a[href^="/api/"], a[href^="#"], a[href^="mailto:"], a[href^="tel:"]')) return;
+  // The heart sits above its card's cover. Any other control inside this one could end up beneath it.
+  if ([...el.querySelectorAll(TAPPABLE)].some((inner) => !inner.matches('.save'))) return;
+  const { display, position } = getComputedStyle(el);
+  // A link inside a sentence can wrap, and its cover would then spread over the text around it.
+  if (display === 'none' || display === 'inline' || display === 'contents') return;
+  const cover = document.createElement('label');
+  cover.setAttribute('data-tick', '');
+  cover.setAttribute('aria-hidden', 'true');
+  const input = document.createElement('input');
+  input.type = 'checkbox';
+  input.setAttribute('switch', '');
+  input.tabIndex = -1;
+  cover.append(input);
+  if (position === 'static') el.style.position = 'relative';
+  // The cover tops everything inside its control and nothing outside it, such as a bar stuck over a list.
+  el.style.isolation = 'isolate';
+  el.append(cover);
+}
+
+function watchControls() {
+  let waiting: ReturnType<typeof setTimeout> | undefined;
+  const scan = () => {
+    waiting = undefined;
+    document.querySelectorAll<HTMLElement>(TAPPABLE).forEach(coverControl);
+  };
+  const soon = () => {
+    if (waiting === undefined) waiting = setTimeout(scan, 150);
+  };
+  const watcher = new MutationObserver(soon);
+  watcher.observe(document.body, { childList: true, subtree: true });
+  // Waking a server-rendered screen changes nothing the watcher can see, so it gets looked at again.
+  const again = [150, 800, 2500].map((ms) => setTimeout(scan, ms));
+  return () => {
+    watcher.disconnect();
+    clearTimeout(waiting);
+    again.forEach(clearTimeout);
+  };
+}
+
+// A tap on a cover takes two steps. The browser passes it to the switch, which ticks, and then the control gets a
+// click of its own. Nothing else sees the first two clicks: a link cancels the click it receives, and cancelling this
+// one would stop it reaching the switch. The control goes second, because it may close the screen the cover is on.
+function passTapsToControls() {
+  let pending: ReturnType<typeof setTimeout> | undefined;
+  const onClick = (e: MouseEvent) => {
+    const target = e.target as Element | null;
+    const cover = target?.closest?.('[data-tick]');
+    if (!cover) return;
+    e.stopPropagation();
+    const control = cover.parentElement;
+    if (!control) return;
+    const send = () => {
+      underFinger = true;
+      try {
+        control.click();
+      } finally {
+        underFinger = false;
+      }
+    };
+    clearTimeout(pending);
+    // If the switch is never reached, the tap still has to work.
+    if (target === cover) pending = setTimeout(send, 0);
+    else send();
+  };
+  window.addEventListener('click', onClick, { capture: true });
+  return () => {
+    clearTimeout(pending);
+    window.removeEventListener('click', onClick, { capture: true });
+  };
 }
 
 // One place for tap feedback, so every control responds the same way. It listens for finished taps, so
 // starting to scroll over a card stays silent. A control can opt out with data-feel="none" when it has
 // its own sound. The touch listener also switches on :active press states in iOS Safari.
 export function installTapFeedback() {
+  document.documentElement.classList.toggle('no-haptics', !hapticsOn());
   const onClick = (e: MouseEvent) => {
-    const el = (e.target as Element | null)?.closest?.('button, a, [role="switch"], [role="radio"]') as HTMLElement | null;
+    const el = (e.target as Element | null)?.closest?.(TAPPABLE) as HTMLElement | null;
     if (!el || (el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true' || el.dataset.feel === 'none') return;
     const now = performance.now();
     if (now - lastTap < 40) return;
@@ -200,8 +305,10 @@ export function installTapFeedback() {
   const noop = () => {};
   document.addEventListener('click', onClick, { passive: true, capture: true });
   document.addEventListener('touchstart', noop, { passive: true });
+  const iPhoneTeardown = isIOS() ? [watchControls(), passTapsToControls()] : [];
   return () => {
     document.removeEventListener('click', onClick, { capture: true });
     document.removeEventListener('touchstart', noop);
+    iPhoneTeardown.forEach((stop) => stop());
   };
 }

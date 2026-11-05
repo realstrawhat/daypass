@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react';
 import { IconChevron } from './Icons';
 import { useSession, clearSavedPages } from './session';
 import { useFeedback } from './ui/feedback';
-import { feel, setSound, soundOn } from './ui/sensory';
+import { feel, hapticsOn, setHaptics, setSound, soundOn } from './ui/sensory';
 import { Sheet } from './ui/Sheet';
 
 type U = { name: string; email: string; home_city: string | null; default_sort: string; max_price_cents: number | null; saved_card: { brand: string; last4: string } | null; is_demo: boolean };
@@ -27,6 +27,8 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
   const [reminders, setReminders] = useState(true);
   const [sounds, setSounds] = useState(true);
   useEffect(() => setSounds(soundOn()), []);
+  const [buzzes, setBuzzes] = useState(true);
+  useEffect(() => setBuzzes(hapticsOn()), []);
   const [confirmText, setConfirmText] = useState('');
   const [deleteError, setDeleteError] = useState('');
   const [busy, setBusy] = useState(false);
@@ -145,6 +147,12 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
           <li>
             <button type="button" className="switch-row" role="switch" aria-checked={sounds} onClick={() => { const on = !sounds; setSounds(on); setSound(on); if (on) feel('success'); }}>
               <span>Sounds</span>
+              <i className="switch" aria-hidden="true" />
+            </button>
+          </li>
+          <li>
+            <button type="button" className="switch-row" role="switch" aria-checked={buzzes} onClick={() => { const on = !buzzes; setBuzzes(on); setHaptics(on); if (on) feel('success'); }}>
+              <span>Haptics</span>
               <i className="switch" aria-hidden="true" />
             </button>
           </li>

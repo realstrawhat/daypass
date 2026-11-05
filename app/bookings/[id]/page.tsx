@@ -59,7 +59,7 @@ export default async function BookingPage({ params, searchParams }: P) {
               <PassView
                 booking={{
                   id: b.id, code: b.code, gym_id: b.gym_id, gym_name: b.gym_name, gym_city: b.gym_city, starts_at: b.starts_at, price_cents: b.price_cents, timezone: tz, lat: b.gym_lat, lng: b.gym_lng,
-                  dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), checked_in_at: b.checked_in_at, checkedInLabel: b.checked_in_at ? timeLabel(b.checked_in_at, tz) : null, in_wallet: !!b.wallet_added_at,
+                  dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), checked_in_at: b.checked_in_at, checkedInLabel: b.checked_in_at ? timeLabel(b.checked_in_at, tz) : null, in_wallet: !!b.wallet_added_at, version: b.confirmation_version,
                 }}
                 pass={pass}
                 directions={directionsLinks(b.gym_lat, b.gym_lng, b.gym_name)}
