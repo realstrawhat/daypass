@@ -565,7 +565,7 @@ The first pass did not run this audit, and the browser rows had no test at all. 
 
 ## Auto Run Result
 
-**Status:** done on the code and tests. The owner deployed this pass and the live results are in `process-log.md`, rows 45 to 53, which also cover the changes made after it. Those changes wait for the owner's next deploy. See the Change Log entry "after the deploy".
+**Status:** done on the code and tests. The owner deployed this pass and the live results are in `process-log.md`, rows 45 to 57, which also cover the changes made after it. Those changes are live too, on the deploy recorded in row 54. See the Change Log entry "after the deploy".
 
 **Summary of the implemented change:** Round 2 turned Daypass into something that behaves like an app: working simulations of Wallet, inbox, Face ID, desk check-in and refused-entry refunds, a demo login, and the look the owner chose from the references, with a video opening, network location first and exact location after. The follow-up pass reviewed the changes since the first pass with all four layers. It fixed the door scanner's re-check loop, frosted glass that never rendered in Chrome, tests that wrote to the live site, and the smaller faults listed in the triage log, and it added the browser tests the first pass lacked.
 

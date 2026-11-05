@@ -2,7 +2,7 @@
 // press states and offline. Run against a production build, because the offline worker only runs there:
 //   npm run build && npx next start -p 3000      then, in another window:   npm run test:ui
 // BASE_URL points these at another address, such as the live site. IPHONE=1 runs every journey as an iPhone, with
-// the see-through tap covers in place.
+// the see-through tap covers in place. Run one suite at a time: at once they overload the computer and time out.
 import { after, before, test } from 'node:test';
 import assert from 'node:assert/strict';
 import { existsSync } from 'node:fs';
@@ -18,11 +18,14 @@ const TIMEOUT = 25000;
 const IPHONE_UA = 'Mozilla/5.0 (iPhone; CPU iPhone OS 26_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.5 Mobile/15E148 Safari/604.1';
 
 let browser;
+const everyone = new Set();
 before(async () => {
   if (CHROME) browser = await puppeteer.launch({ executablePath: CHROME, headless: true, args: ['--autoplay-policy=no-user-gesture-required'] });
 });
 after(async () => {
   await browser?.close();
+  // A failed test never reaches its own clean-up, so the end of the run removes everyone it saw.
+  if (sql && everyone.size) await sql`DELETE FROM users WHERE email = ANY(${[...everyone]}) AND (is_demo OR email LIKE 'qa+%')`;
   // Moving a booking's time in a test leaves its old slot count behind, so the counts are redone.
   if (sql) await sql`UPDATE slots s SET booked = (SELECT count(*) FROM bookings b WHERE b.gym_id = s.gym_id AND b.starts_at = s.starts_at AND b.status IN ('hold', 'confirmed'))`;
 });
@@ -40,7 +43,12 @@ async function visitor({ width = 390, height = 844, mobile = true, replace = {},
   const accounts = new Set();
   page.on('response', (r) => {
     if (!r.url().endsWith('/api/auth/me')) return;
-    r.json().then((d) => { if (d.user?.email) accounts.add(d.user.email); }).catch(() => {});
+    r.json().then((d) => {
+      if (d.user?.email) {
+        accounts.add(d.user.email);
+        everyone.add(d.user.email);
+      }
+    }).catch(() => {});
   });
   if (intercept || Object.keys(replace).length) {
     await page.setRequestInterception(true);
@@ -67,7 +75,11 @@ async function visitor({ width = 390, height = 844, mobile = true, replace = {},
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const text = (page, selector) => page.$eval(selector, (e) => e.innerText.replace(/\s+/g, ' ').trim());
+// On a real network a section can still be a hidden copy waiting to be swapped in, so only one on show counts.
+const text = async (page, selector) => {
+  const shown = await page.waitForFunction((s) => [...document.querySelectorAll(s)].find((e) => e.checkVisibility()) ?? null, {}, selector);
+  return shown.evaluate((e) => e.innerText.replace(/\s+/g, ' ').trim());
+};
 const exists = (page, selector) => page.$(selector).then(Boolean);
 const open = (page, path) => page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
 const address = (page) => page.evaluate(() => location.pathname + location.search);
@@ -205,7 +217,10 @@ test('filters apply, show as chips and clear again', needsChrome, async () => {
   const promised = await text(page, '.filter-actions .btn-volt');
   await page.click('.filter-actions .btn-volt');
   await page.waitForSelector('.applied');
-  await page.waitForFunction((b) => document.querySelector('.search-title')?.innerText.replace(/\s+/g, ' ').trim() !== b, {}, before);
+  await page.waitForFunction((b) => {
+    const now = document.querySelector('.search-title')?.innerText.replace(/\s+/g, ' ').trim() ?? '';
+    return /\d/.test(now) && now !== b;
+  }, {}, before);
   assert.ok((await address(page)).includes('minRating=4.5'));
   assert.match(promised, new RegExp((await text(page, '.search-title')).match(/\d+/)[0]), 'the button promised the number shown');
   await page.waitForFunction(() => !document.querySelector('.sheet'));
@@ -485,10 +500,9 @@ test('every sideways row has working arrows', needsChrome, async () => {
   const { page, done } = await visitor();
   await open(page, '/home');
   await page.waitForSelector('.city-card');
+  await page.waitForFunction(() => document.querySelectorAll('.rail-arrows').length >= 2);
   await page.$eval('#cities', (e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
   await sleep(500);
-  const rows = await page.$$eval('.rail-arrows', (a) => a.length);
-  assert.ok(rows >= 2, `found ${rows} rows with arrows`);
   const moved = await page.evaluate(async () => {
     const section = document.querySelector('#cities').closest('section');
     const row = section.querySelector('.h-rail');
@@ -544,6 +558,8 @@ test('a finished tap makes a sound, starting to scroll does not, and pressing tu
   });
   await open(page, '/home');
   await page.waitForSelector('.move');
+  // The tiles move down when the gym list arrives, so the finger waits for it.
+  await page.waitForSelector('.feature-card');
   await page.$eval('.move', (e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
   await sleep(500);
   const card = await (await page.$('.move')).boundingBox();
@@ -965,7 +981,9 @@ test('the floating navigation sits in the exact middle, with four equal circles,
       await open(page, path);
       await page.waitForSelector('.tabbar a');
       await sleep(500);
-      const m = await page.evaluate(() => {
+      // The current circle lands with a small bounce, so it is measured once that has finished.
+      const m = await page.evaluate(async () => {
+        await Promise.all(document.querySelector('.tabbar').getAnimations({ subtree: true }).map((a) => a.finished.catch(() => {})));
         const items = [...document.querySelectorAll('.tabbar a')].map((a) => a.getBoundingClientRect());
         return { offCentre: (Math.min(...items.map((r) => r.left)) + Math.max(...items.map((r) => r.right))) / 2 - innerWidth / 2, sizes: items.map((r) => r.width), heights: items.map((r) => r.height) };
       });
