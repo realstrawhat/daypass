@@ -1,13 +1,32 @@
 'use client';
 import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { GymCard, type CardGym } from './GymCard';
 import { IconHeart } from './Icons';
 import { useSession } from './session';
 
-// Follows the heart buttons live, so a gym leaves this list the moment it is removed.
-export function SavedList({ gyms }: { gyms: CardGym[] }) {
-  const { saved, ready } = useSession();
-  const shown = ready ? gyms.filter((g) => saved.includes(g.id)) : gyms;
+// Follows the heart buttons live: a gym leaves the moment it is removed, and one saved a moment ago shows up
+// even when this screen comes from memory. It only filters once the person is known, so a failed session
+// check can't blank a full list.
+export function SavedList({ gyms }: { gyms: (CardGym & { id: string })[] }) {
+  const { saved, user } = useSession();
+  const [list, setList] = useState(gyms);
+  const askedFor = useRef('');
+
+  useEffect(() => {
+    const ids = saved.join();
+    if (!user || askedFor.current === ids || !saved.some((id) => !list.some((g) => g.id === id))) return;
+    askedFor.current = ids;
+    let live = true;
+    fetch('/api/saved').then((r) => r.json()).then((d) => {
+      if (live && d.gyms) setList(d.gyms);
+    }).catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, [user, saved, list]);
+
+  const shown = user ? list.filter((g) => saved.includes(g.id)) : list;
 
   if (!shown.length) {
     return (

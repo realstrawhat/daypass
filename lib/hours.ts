@@ -78,3 +78,26 @@ export function ratingShares(rating: number | null) {
   const total = weights.reduce((a, b) => a + b, 0);
   return weights.map((w) => Math.round((w / total) * 100));
 }
+
+// The door rules, in one place for the screens and the server. Hours are counted to the session's start.
+export const hoursUntil = (iso: string, now = Date.now()) => (new Date(iso).getTime() - now) / 3600000;
+export const doorIsOpen = (hours: number) => hours <= 1 && hours >= -3;
+
+export function sameLocalDay(a: Date, b: Date, tz: string) {
+  const x = localParts(a, tz);
+  const y = localParts(b, tz);
+  return x.y === y.y && x.m === y.m && x.d === y.d;
+}
+
+// A refused-entry claim opens on the day of the session, and closes six hours after it starts.
+export function refusalIsOpen(iso: string, tz: string, now = Date.now()) {
+  const hours = hoursUntil(iso, now);
+  return hours >= -6 && (hours <= 3 || sameLocalDay(new Date(iso), new Date(now), tz));
+}
+
+// Whole calendar days until a session, on the gym's own calendar.
+export function daysUntil(iso: string, tz: string, now = Date.now()) {
+  const a = localParts(new Date(iso), tz);
+  const b = localParts(new Date(now), tz);
+  return Math.round((Date.UTC(a.y, a.m - 1, a.d) - Date.UTC(b.y, b.m - 1, b.d)) / 86400000);
+}

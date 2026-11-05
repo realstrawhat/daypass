@@ -57,7 +57,9 @@ export function SaveButton({ gymId, name, tone = 'photo' }: { gymId: string; nam
         e.preventDefault();
         e.stopPropagation();
         pressed.current = true;
-        toggleSaved(gymId, name);
+        toggleSaved(gymId, name).finally(() => {
+          pressed.current = false;
+        });
       }}
     >
       <IconHeart key={drop} filled={isSaved} width={20} height={20} />

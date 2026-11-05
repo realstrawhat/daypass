@@ -115,7 +115,7 @@ export default async function GymPage({ params }: P) {
                   <ul className="reviews">
                     {reviews.map((r, i) => (
                       <li key={i}>
-                        <div><strong>{r.author}</strong><span className="review-stars" aria-label={`${r.stars} out of 5 stars`}>{Array.from({ length: r.stars }, (_, n) => <IconStar key={n} />)}</span></div>
+                        <div><strong>{r.author}</strong><span className="review-stars" role="img" aria-label={`${r.stars} out of 5 stars`}>{Array.from({ length: r.stars }, (_, n) => <IconStar key={n} />)}</span></div>
                         {r.body ? <p>{r.body}</p> : null}
                       </li>
                     ))}

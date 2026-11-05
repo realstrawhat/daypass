@@ -29,3 +29,5 @@ export const directionsLinks = (lat: number, lng: number, name: string) => {
     web: `https://www.openstreetmap.org/directions?to=${lat}%2C${lng}#map=15/${lat}/${lng}`,
   };
 };
+
+export const isUuid = (s: string) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);

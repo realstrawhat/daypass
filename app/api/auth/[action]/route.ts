@@ -1,3 +1,5 @@
+import { dateLabel, timeLabel } from '@/lib/format';
+import { networkArea } from '@/lib/where';
 import { createSession, destroySession, getCurrentUser, handle, hashPassword, HttpError, readJson, refreshSessionCookie, verifyPassword } from '@/lib/auth';
 import { addMessage, addSamplePastVisit, createDemoUser } from '@/lib/bookings';
 import { db } from '@/lib/db';
@@ -13,12 +15,7 @@ export const POST = handle(async (req, ctx) => {
   }
 
   if (action === 'demo') {
-    const raw = req.headers.get('x-vercel-ip-city');
-    let area: string | null = null;
-    try {
-      area = raw ? decodeURIComponent(raw) : null;
-    } catch {}
-    const userId = await createDemoUser(area);
+    const userId = await createDemoUser(networkArea(req.headers).city);
     await createSession(userId);
     return Response.json({ ok: true });
   }
@@ -36,7 +33,7 @@ export const POST = handle(async (req, ctx) => {
     const rows = await db()`INSERT INTO users (email, name, password_hash) VALUES (${email}, ${name.slice(0, 80)}, ${hash}) ON CONFLICT (email) DO NOTHING RETURNING id`;
     if (!rows[0]) throw new HttpError(409, 'That email already has an account. Log in instead.', 'email');
     const userId = rows[0].id as string;
-    await addSamplePastVisit(userId).catch(() => {});
+    await addSamplePastVisit(userId, networkArea(req.headers).city).catch(() => {});
     await addMessage(userId, 'welcome', `Welcome, ${name.split(' ')[0]}`, 'Your account is ready. Book a session and your pass will appear in Passes.');
     await createSession(userId);
     return Response.json({ ok: true });
@@ -83,12 +80,11 @@ export const GET = handle(async (_req, ctx) => {
   const next = nextRows[0];
   let unreadCount = unread[0].n as number;
   if (next && new Date(next.starts_at as string).getTime() - Date.now() < 24 * 3600 * 1000 && new Date(next.starts_at as string).getTime() > Date.now()) {
-    // Compared on the gym's own calendar, so a session later today doesn't say "tomorrow".
-    const day = (d: Date) => new Intl.DateTimeFormat('en-CA', { timeZone: next.gym_timezone as string }).format(d);
-    const when = day(new Date(next.starts_at as string)) === day(new Date()) ? 'Today' : 'Tomorrow';
+    // A stored message can be read on a later day, so it gives the date, not "today" or "tomorrow".
+    const when = `${dateLabel(next.starts_at as string, next.gym_timezone as string)} at ${timeLabel(next.starts_at as string, next.gym_timezone as string)}`;
     const added = await db()`
       INSERT INTO messages (user_id, booking_id, kind, title, body)
-      VALUES (${user.id}::uuid, ${next.id as string}::uuid, 'reminder', ${`${when}: ${next.gym_name as string}`}, 'Your pass is ready in Passes. Check the gym page for what to bring.')
+      VALUES (${user.id}::uuid, ${next.id as string}::uuid, 'reminder', ${`Coming up: ${next.gym_name as string}`}, ${`Your session is ${when}. Your pass is ready in Passes.`})
       ON CONFLICT DO NOTHING RETURNING id`;
     unreadCount += added.length;
   }

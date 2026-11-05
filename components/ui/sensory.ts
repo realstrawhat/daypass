@@ -2,14 +2,14 @@
 export type Feel = 'tap' | 'select' | 'save' | 'unsave' | 'success' | 'error' | 'stamp' | 'notify';
 
 const PATTERNS: Record<Feel, number | number[]> = {
-  tap: 8,
-  select: 14,
-  save: [12, 40, 22],
-  unsave: 10,
-  success: [18, 60, 34],
-  error: [40, 50, 40],
-  stamp: [50, 30, 18],
-  notify: [10, 50, 10],
+  tap: 16,
+  select: 24,
+  save: [18, 40, 30],
+  unsave: 16,
+  success: [26, 60, 44],
+  error: [50, 50, 50],
+  stamp: [60, 30, 24],
+  notify: [14, 50, 14],
 };
 
 const SOUND_KEY = 'daypass-sound';
@@ -18,6 +18,10 @@ let output: AudioNode | null = null;
 let noiseBuffer: AudioBuffer | null = null;
 let iosSwitch: HTMLLabelElement | null = null;
 let lastTap = 0;
+let lastFelt = 0;
+
+// True just after a tap or event has already buzzed.
+export const justFelt = () => performance.now() - lastFelt < 120;
 
 const reduced = () => {
   try {
@@ -174,6 +178,7 @@ export function feel(kind: Feel) {
   if (typeof window === 'undefined') return;
   try {
     sound(kind);
+    lastFelt = performance.now();
     if (reduced()) return;
     if (typeof navigator.vibrate === 'function') navigator.vibrate(PATTERNS[kind]);
     else iosTick();
@@ -186,7 +191,7 @@ export function feel(kind: Feel) {
 export function installTapFeedback() {
   const onClick = (e: MouseEvent) => {
     const el = (e.target as Element | null)?.closest?.('button, a, [role="switch"], [role="radio"]') as HTMLElement | null;
-    if (!el || (el as HTMLButtonElement).disabled || el.dataset.feel === 'none') return;
+    if (!el || (el as HTMLButtonElement).disabled || el.getAttribute('aria-disabled') === 'true' || el.dataset.feel === 'none') return;
     const now = performance.now();
     if (now - lastTap < 40) return;
     lastTap = now;

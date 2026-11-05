@@ -43,7 +43,7 @@ export function SlotPicker({ days, dayIndex, onDay, selected, onSelect, exclude 
             type="button"
             role="radio"
             aria-checked={i === dayIndex}
-            aria-label={`${d.weekday} ${d.day} ${d.month}, ${d.free} ${d.free === 1 ? 'time' : 'times'} open`}
+            aria-label={`${i === 0 ? 'Today' : d.weekday} ${d.day} ${d.month}, ${d.free} ${d.free === 1 ? 'time' : 'times'} open`}
             className="day-pill"
             disabled={d.free === 0}
             onClick={() => { onDay(i); haptic(4); }}

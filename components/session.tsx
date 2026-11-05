@@ -52,15 +52,25 @@ const SessionContext = createContext<Ctx>({
 
 export const useSession = () => useContext(SessionContext);
 
+// Asks the offline worker to keep these pages on the device.
+export function savePagesForOffline(urls: string[]) {
+  if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
+  navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: 'save-pages', urls })).catch(() => {});
+}
+
+const PERSONAL_PAGES = ['/bookings', '/account', '/wallet', '/inbox', '/saved'];
+
 // Removes saved copies of personal pages from this device, so the next person can't read them offline.
 export async function clearSavedPages() {
   try {
     if (!('caches' in window)) return;
+    navigator.serviceWorker?.controller?.postMessage({ type: 'forget-pages' });
     for (const name of await caches.keys()) {
       if (!name.endsWith('-pages')) continue;
       const cache = await caches.open(name);
       for (const req of await cache.keys()) {
-        if (!new URL(req.url).pathname.endsWith('/offline.html')) await cache.delete(req);
+        const path = new URL(req.url).pathname;
+        if (PERSONAL_PAGES.some((p) => path === p || path.startsWith(`${p}/`))) await cache.delete(req);
       }
     }
   } catch {}
@@ -95,6 +105,9 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
       if (!res.ok) return null;
       const body = await res.json();
       const next: SessionData = body.user ? { ...EMPTY, ...body } : EMPTY;
+      // The next pass is always ready for the door. A session that has ended takes its saved pages with it.
+      if (body.user && body.next) savePagesForOffline([`/bookings/${body.next.id}`, '/bookings']);
+      if (!body.user) void clearSavedPages();
       setData(next);
       try {
         sessionStorage.setItem(KEY, JSON.stringify(next));
@@ -139,6 +152,7 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
     authResolve.current = null;
   }, []);
 
+  const toggleRef = useRef<Ctx['toggleSaved']>(async () => {});
   const toggleSaved = useCallback<Ctx['toggleSaved']>(async (gymId, gymName) => {
     const ok = await requireLogin('Log in to save gyms', gymName ? `Keep ${gymName} in your saved gyms.` : undefined);
     if (!ok) return;
@@ -148,12 +162,15 @@ function SessionProvider({ children }: { children: React.ReactNode }) {
     try {
       const res = await fetch('/api/saved', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ gymId, saved: !was }) });
       if (!res.ok) throw new Error();
-      if (!was) toast(gymName ? `${gymName} saved` : 'Saved', 'ok', { label: 'View saved', href: '/saved' });
+      if (was) toast(gymName ? `${gymName} removed` : 'Removed', 'ok', { label: 'Undo', onClick: () => void toggleRef.current(gymId, gymName) });
+      else toast(gymName ? `${gymName} saved` : 'Saved', 'ok', { label: 'View saved', href: '/saved' });
     } catch {
       setData((d) => ({ ...d, saved: was ? [...d.saved, gymId] : d.saved.filter((s) => s !== gymId) }));
       toast('That did not save. Try again.', 'error');
     }
   }, [requireLogin, toast]);
+
+  toggleRef.current = toggleSaved;
 
   const markRead = useCallback(() => setData((d) => ({ ...d, unread: 0 })), []);
 

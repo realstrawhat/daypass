@@ -23,6 +23,20 @@ const EXIT_MS = 300;
 // Only the top one answers the Back gesture, and closing it must not close the one beneath.
 const openSheets: object[] = [];
 let ownBack = false;
+let backsDue = 0;
+
+// Browsers collapse two back() calls made at once, which would leave a step behind. So sheets closing
+// together (paying inside Change booking closes both) take their steps in one go.
+function stepBack() {
+  backsDue += 1;
+  if (backsDue > 1) return;
+  setTimeout(() => {
+    const steps = backsDue;
+    backsDue = 0;
+    if (openSheets.length > 0) ownBack = true;
+    window.history.go(-steps);
+  }, 0);
+}
 
 // Closing a sheet steps back through history, which would undo a navigation made at the same moment.
 // So anything that changes the address waits for that step.
@@ -102,18 +116,26 @@ export function Sheet({ open, onClose, title, hideTitle, locked, keepHistory, cl
     }, EXIT_MS);
     if (pushedHistory.current) {
       pushedHistory.current = false;
-      if (!keepHistoryRef.current && window.history.state?.daypassSheet) {
-        if (openSheets.length > 0) ownBack = true;
-        window.history.back();
-      }
+      if (!keepHistoryRef.current && window.history.state?.daypassSheet) stepBack();
     }
     return () => clearTimeout(t);
   }, [open, rendered]);
 
-  useEffect(() => () => {
-    const at = openSheets.indexOf(token);
-    if (at >= 0) openSheets.splice(at, 1);
-    if (openSheets.length === 0) document.documentElement.classList.remove('sheet-open');
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      const at = openSheets.indexOf(token);
+      if (at >= 0) openSheets.splice(at, 1);
+      if (openSheets.length === 0) document.documentElement.classList.remove('sheet-open');
+      // Removed while still open, such as the payment sheet inside Change booking. Its step goes with it.
+      queueMicrotask(() => {
+        if (mounted.current || !pushedHistory.current || keepHistoryRef.current || !window.history.state?.daypassSheet) return;
+        pushedHistory.current = false;
+        stepBack();
+      });
+    };
   }, [token]);
 
   const onPointerDown = useCallback((e: React.PointerEvent) => {

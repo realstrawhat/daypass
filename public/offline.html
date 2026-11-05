@@ -10,7 +10,9 @@
   svg { width: 48px; height: 48px; margin: 0 auto; }
   h1 { margin: 0; font-size: 1.6rem; }
   p { margin: 0; color: #cfd0cb; max-width: 34ch; }
-  button { min-height: 48px; margin-top: 8px; border: 0; border-radius: 99px; background: #d7ff3e; color: #000; font: inherit; font-weight: 700; }
+  button, a { display: block; min-height: 48px; line-height: 48px; margin-top: 8px; border: 0; border-radius: 99px; background: #d7ff3e; color: #000; font: inherit; line-height: 48px; font-weight: 700; text-decoration: none; }
+  button { width: 100%; }
+  a { background: #1c1d1f; color: #fff; }
 </style>
 </head>
 <body>
@@ -18,5 +20,6 @@
   <h1>You are offline</h1>
   <p>This screen is not saved on your phone yet. Passes you have opened before still work with no signal.</p>
   <button type="button" onclick="location.reload()">Try again</button>
+  <a href="/bookings">Open my passes</a>
 </body>
 </html>

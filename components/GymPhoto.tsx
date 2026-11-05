@@ -1,6 +1,6 @@
 'use client';
 import Image from 'next/image';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Spark } from './Icons';
 
 type Props = { src?: string; name: string; sizes: string; priority?: boolean; tone?: 'mono' | 'color' };
@@ -9,9 +9,10 @@ type Props = { src?: string; name: string; sizes: string; priority?: boolean; to
 export function GymPhoto({ src, name, sizes, priority, tone = 'color' }: Props) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [src]);
   if (!src || failed) {
     return (
-      <div className="photo-empty" role="img" aria-label={`${name} has no photos yet`}>
+      <div className="photo-empty" role="img" aria-label={failed ? `The photo of ${name} did not load` : `${name} has no photos yet`}>
         <Spark width="34%" height="34%" />
       </div>
     );

@@ -5,16 +5,17 @@ import { GymPhoto } from '@/components/GymPhoto';
 import { IconChevron, IconWallet } from '@/components/Icons';
 import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
-import { listBookings, type BookingView } from '@/lib/bookings';
+import { inWalletNow, listBookings, type BookingView } from '@/lib/bookings';
 import { dateLabel, money, timeLabel } from '@/lib/format';
+import { daysUntil, hoursUntil } from '@/lib/hours';
 
 export const metadata: Metadata = { title: 'Passes' };
 
-const untilLabel = (iso: string) => {
-  const hours = (new Date(iso).getTime() - Date.now()) / 3600000;
+const untilLabel = (iso: string, tz: string) => {
+  const hours = hoursUntil(iso);
   if (hours < 0) return 'Happening now';
-  if (hours < 24) return `In ${Math.max(1, Math.round(hours))} ${Math.round(hours) <= 1 ? 'hour' : 'hours'}`;
-  const days = Math.round(hours / 24);
+  const days = daysUntil(iso, tz);
+  if (days === 0) return `In ${Math.max(1, Math.round(hours))} ${Math.round(hours) <= 1 ? 'hour' : 'hours'}`;
   return days === 1 ? 'Tomorrow' : `In ${days} days`;
 };
 
@@ -26,7 +27,7 @@ function Ticket({ b, next, past }: { b: BookingView; next?: boolean; past?: bool
         {next ? <i className="foil-sweep" aria-hidden="true" /> : null}
         <div className="ticket-photo"><GymPhoto src={b.gym_photos[0]} name={b.gym_name} sizes="120px" /></div>
         <div className="ticket-body">
-          {next ? <span className="ticket-tag">{untilLabel(b.starts_at)}</span> : null}
+          {next ? <span className="ticket-tag">{untilLabel(b.starts_at, b.gym_timezone)}</span> : null}
           <h3>{b.gym_name}</h3>
           <p>{dateLabel(b.starts_at, b.gym_timezone)}, {timeLabel(b.starts_at, b.gym_timezone)}</p>
           <p className="ticket-sub">
@@ -47,7 +48,7 @@ export default async function BookingsPage() {
   const isCurrent = (b: BookingView) => b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > now;
   const upcoming = all.filter(isCurrent).reverse();
   const past = all.filter((b) => !isCurrent(b));
-  const hasWallet = all.some((b) => b.wallet_added_at && b.status === 'confirmed');
+  const hasWallet = all.some((b) => inWalletNow(b));
 
   return (
     <Page>

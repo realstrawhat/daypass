@@ -2,17 +2,17 @@
 import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, Spark } from '../Icons';
-import { feel, installTapFeedback } from './sensory';
+import { feel, installTapFeedback, justFelt } from './sensory';
 
 // Taps are handled globally by installTapFeedback. This remains for async moments without a tap.
 export const haptic = (ms = 8) => {
   try {
-    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) navigator.vibrate?.(ms);
+    if (!justFelt() && !window.matchMedia('(prefers-reduced-motion: reduce)').matches) navigator.vibrate?.(Math.max(ms, 14));
   } catch {}
 };
 
 type Banner = { title: string; body: string; href?: string };
-type ToastAction = { label: string; href: string };
+type ToastAction = { label: string; href?: string; onClick?: () => void };
 type Toast = { id: number; text: string; tone?: 'ok' | 'error'; action?: ToastAction };
 type Ctx = { toast: (text: string, tone?: Toast['tone'], action?: ToastAction) => void; banner: (b: Banner) => void };
 
@@ -42,8 +42,11 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
       toast: (text, tone, action) => {
         clearTimeout(toastTimer.current);
         setToast({ id: next.current++, text, tone, action });
+        // Something finishing later gets its own small cue. A tap has just had one.
         if (tone === 'error') feel('error');
-        toastTimer.current = setTimeout(() => setToast(null), 3200);
+        else if (!action && !justFelt()) feel('select');
+        // A message with a button stays long enough to reach it.
+        toastTimer.current = setTimeout(() => setToast(null), action ? 6000 : 3200);
       },
       banner: (b) => {
         clearTimeout(bannerTimer.current);
@@ -102,7 +105,8 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
           <p key={toast.id} className={`toast${toast.tone === 'error' ? ' is-error' : ''}`} role="status">
             {toast.tone !== 'error' ? <IconCheck width={16} height={16} /> : null}
             <span>{toast.text}</span>
-            {toast.action ? <Link href={toast.action.href} className="toast-action" onClick={() => setToast(null)}>{toast.action.label}</Link> : null}
+            {toast.action?.href ? <Link href={toast.action.href} className="toast-action" onClick={() => setToast(null)}>{toast.action.label}</Link> : null}
+            {toast.action?.onClick ? <button type="button" className="toast-action" onClick={() => { setToast(null); toast.action?.onClick?.(); }}>{toast.action.label}</button> : null}
           </p>
         ) : null}
       </div>

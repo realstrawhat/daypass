@@ -3,11 +3,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { dateLabel, distanceLabel, money, timeLabel } from '@/lib/format';
+import { doorIsOpen, hoursUntil, refusalIsOpen } from '@/lib/hours';
 import type { Gym, SlotDay } from '@/lib/gyms';
 import type { PayMethod } from '@/lib/payments';
 import { HoloPass, type PassData } from './HoloPass';
 import { IconBack, IconCalendar, IconCheck, IconChevron, IconHelp, IconRoute, IconScan, IconWallet, Spark } from './Icons';
-import { useSession } from './session';
+import { savePagesForOffline, useSession } from './session';
 import { SlotPicker } from './SlotPicker';
 import { FaceScan } from './ui/FaceScan';
 import { haptic, useFeedback } from './ui/feedback';
@@ -63,14 +64,25 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
   const [checkedIn, setCheckedIn] = useState(!!b.checked_in_at);
   const close = () => setSheet(null);
   const used = checkedIn;
-  const canManage = !isOver && !used;
   useEffect(() => setCheckedIn(!!b.checked_in_at), [b.checked_in_at]);
   // Around the session, a real account can use the same door steps. Demo accounts can try them any time.
-  const [nearSession, setNearSession] = useState({ help: false, scan: false });
+  // These follow the clock, because a pass can stay open on a phone, or come from a saved copy.
+  const [door, setDoor] = useState({ help: false, scan: false, over: isOver });
   useEffect(() => {
-    const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
-    setNearSession({ help: hours <= 3, scan: hours <= 1 });
-  }, [b.starts_at]);
+    const check = () => {
+      const hours = hoursUntil(b.starts_at);
+      setDoor({ help: refusalIsOpen(b.starts_at, b.timezone), scan: doorIsOpen(hours), over: isOver || hours < -3 });
+    };
+    check();
+    const t = setInterval(check, 30000);
+    window.addEventListener('focus', check);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('focus', check);
+    };
+  }, [b.starts_at, b.timezone, isOver]);
+  const passOver = door.over;
+  const canManage = !passOver && !used;
 
   const afterChange = () => {
     refresh();
@@ -79,10 +91,10 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
 
   return (
     <>
-      <HoloPass pass={{ ...pass, state: used ? 'used' : isOver ? 'expired' : 'active' }} stamp={isNew} />
+      <HoloPass pass={{ ...pass, state: used ? 'used' : passOver ? 'expired' : 'active' }} stamp={isNew} />
 
       <div className="pass-actions">
-        {!used && !isOver ? (
+        {!used && !passOver ? (
           <button type="button" className="btn btn-volt btn-block pass-show" onClick={() => setSheet('desk')}><IconScan /> Show at the desk</button>
         ) : null}
         <div className="action-grid">
@@ -99,10 +111,14 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
           <ul className="rows">
             <li><button type="button" onClick={() => (changeable ? setSheet('change') : setLateNotice(true))}><span>Change date or gym</span><IconChevron /></button></li>
             <li><button type="button" onClick={() => (changeable ? setSheet('cancel') : setLateNotice(true))}><span>Cancel booking</span><IconChevron /></button></li>
-            <li><button type="button" onClick={() => (user?.is_demo || nearSession.help ? setSheet('help') : setEarlyHelp(true))}><span className="row-help"><IconHelp /> I can't get in</span><IconChevron /></button></li>
+            <li><button type="button" onClick={() => (user?.is_demo || door.help ? setSheet('help') : setEarlyHelp(true))}><span className="row-help"><IconHelp /> I can't get in</span><IconChevron /></button></li>
+          </ul>
+        ) : !used && door.help ? (
+          <ul className="rows">
+            <li><button type="button" onClick={() => setSheet('help')}><span className="row-help"><IconHelp /> I couldn't get in</span><IconChevron /></button></li>
           </ul>
         ) : null}
-        {earlyHelp ? <p className="fine" role="status">This is for problems at the door, so it opens 3 hours before your session.</p> : null}
+        {earlyHelp ? <p className="fine" role="status">This is for problems at the door, so it opens on the day of your session.</p> : null}
         {lateNotice ? <p className="form-error" role="alert">This visit is less than 24 hours away, so changes are no longer possible.</p> : canManage ? <p className="fine">You can change or cancel until 24 hours before your session.</p> : null}
       </div>
 
@@ -132,7 +148,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
           <DeskMode
             b={b}
             qrSvg={pass.qrSvg}
-            canSimulate={!!user?.is_demo || nearSession.scan}
+            canSimulate={!!user?.is_demo || door.scan}
             onCheckedIn={() => {
               setCheckedIn(true);
               afterChange();
@@ -366,6 +382,7 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
   }, [gym.id]);
 
   const openGyms = async () => {
+    setError('');
     setStep('gym');
     if (others) return;
     try {
@@ -469,8 +486,7 @@ function ChangeFlow({ b, onDone }: { b: PassBooking; onDone: () => void }) {
 // In-app links aren't full page loads, so a pass is saved for offline use whenever it is on screen.
 export function SaveForOffline({ id, version }: { id: string; version: string }) {
   useEffect(() => {
-    if (!('serviceWorker' in navigator) || process.env.NODE_ENV !== 'production') return;
-    navigator.serviceWorker.ready.then((reg) => reg.active?.postMessage({ type: 'save-pages', urls: [`/bookings/${id}`, '/bookings'] })).catch(() => {});
+    savePagesForOffline([`/bookings/${id}`, '/bookings', '/wallet']);
   }, [id, version]);
   return null;
 }

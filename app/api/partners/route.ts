@@ -1,3 +1,4 @@
+import { isUuid } from '@/lib/format';
 import { revalidatePath } from 'next/cache';
 import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
 import { db } from '@/lib/db';
@@ -48,7 +49,7 @@ export const PATCH = handle(async (req) => {
   const user = await requireUser();
   const b = await readJson(req);
   const id = String(b.id ?? '');
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, 'Gym not found on your account.');
+  if (!isUuid(id)) throw new HttpError(404, 'Gym not found on your account.');
   const rows = await db()`
     UPDATE gyms SET price_cents = ${price(b.price)}, confirmed_at = now()
     WHERE id = ${id}::uuid AND owner_user_id = ${user.id}::uuid RETURNING slug`;

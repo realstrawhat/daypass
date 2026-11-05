@@ -5,7 +5,7 @@ import { redirect } from 'next/navigation';
 import { IconBack, IconChevron, Spark } from '@/components/Icons';
 import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
-import { listBookings } from '@/lib/bookings';
+import { listBookings, inWalletNow } from '@/lib/bookings';
 import { dateLabel, timeLabel } from '@/lib/format';
 
 export const metadata: Metadata = { title: 'Wallet' };
@@ -14,8 +14,8 @@ export default async function WalletPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login?next=/wallet');
   const all = await listBookings(user.id);
-  // Only passes that can still get someone in. Used and past ones stay in Passes.
-  const passes = all.filter((b) => b.wallet_added_at && b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > Date.now());
+  // Used and past passes stay in Passes.
+  const passes = all.filter((b) => inWalletNow(b));
   const withQr = await Promise.all(passes.map(async (b) => ({ b, qr: await QRCode.toString(`DAYPASS:${b.code}`, { type: 'svg', margin: 0, color: { dark: '#000000', light: '#ffffff' } }) })));
 
   return (

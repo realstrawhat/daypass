@@ -18,7 +18,8 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
   };
 
   const finish = () => {
-    feel('success');
+    // Only a tick here. The success sound waits until the booking has really gone through.
+    feel('select');
     setOffset(0);
     onConfirm();
   };
@@ -33,6 +34,7 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
         data-feel="none"
         aria-label={ariaLabel}
         onPointerDown={(e) => {
+          if (e.button !== 0) return;
           start.current = { x: e.clientX, id: e.pointerId };
           moved.current = false;
           e.currentTarget.setPointerCapture(e.pointerId);
@@ -41,6 +43,13 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
         onPointerMove={(e) => {
           const s = start.current;
           if (!s || s.id !== e.pointerId) return;
+          // The release was lost, for example to a context menu, so the thumb stops following.
+          if (e.pointerType === 'mouse' && !e.buttons) {
+            start.current = null;
+            setDragging(false);
+            setOffset(0);
+            return;
+          }
           const dx = e.clientX - s.x;
           if (Math.abs(dx) > 6) moved.current = true;
           const max = maxOffset();
@@ -65,13 +74,11 @@ export function SwipeAction({ label, ariaLabel, onConfirm }: { label: React.Reac
           setDragging(false);
           setOffset(0);
         }}
-        onClick={() => {
-          // A drag ends in a click too. That one was already handled above.
-          if (moved.current) {
-            moved.current = false;
-            return;
-          }
-          finish();
+        onClick={(e) => {
+          // A drag ends in a click too, and that one was handled above. Keyboard clicks have detail 0.
+          const afterDrag = e.detail !== 0 && moved.current;
+          moved.current = false;
+          if (!afterDrag) finish();
         }}
       >
         <IconArrow />

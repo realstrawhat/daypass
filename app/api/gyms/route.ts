@@ -23,7 +23,7 @@ async function run(p: Params) {
   if (city) {
     let found;
     try {
-      found = await geocodeCity(city);
+      found = await geocodeCity(city, typeof p.country === 'string' ? p.country : null);
     } catch {
       throw new HttpError(503, 'City search is unavailable right now. Try again in a moment.', 'geocoder');
     }

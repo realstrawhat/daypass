@@ -4,6 +4,7 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useEffect, useRef, useState } from 'react';
 import { dateLabel, timeLabel } from '@/lib/format';
+import { daysUntil, hoursUntil } from '@/lib/hours';
 import { CityMark } from './CityMark';
 import { FeatureCard, PickCard, type CardGym } from './GymCard';
 import { GymPhoto } from './GymPhoto';
@@ -20,36 +21,64 @@ const CITIES = ['Amsterdam', 'Berlin', 'Paris', 'Lisbon', 'Barcelona', 'Prague',
 const MOVES = [
   { title: 'Lift heavy', note: 'heavy days', kit: 'Squat racks', img: '/cutouts/lift.webp', tone: 'is-lime', tall: true },
   { title: 'Core and mat', note: 'just breathe', kit: 'Yoga room', img: '/cutouts/core.webp', tone: 'is-pale', tall: false },
-  { title: 'Kettlebells', note: 'stronger everyday', kit: 'Kettlebells', img: '/cutouts/kettlebell.webp', tone: 'is-lime', tall: true },
+  { title: 'Kettlebells', note: 'stronger every day', kit: 'Kettlebells', img: '/cutouts/kettlebell.webp', tone: 'is-lime', tall: true },
   { title: 'Sled and sprint', note: 'push it', kit: 'Sled track', img: '/cutouts/sled.webp', tone: 'is-dark', tall: false },
 ];
 
 type Local = { label: string; gyms: CardGym[]; source: 'exact' | 'home' | 'area' };
 
-function untilSession(iso: string) {
-  const hours = (new Date(iso).getTime() - Date.now()) / 3600000;
+// Coming back to Home shows the last answer straight away, then checks it again.
+let homeMemory: Local | null = null;
+
+// Counted on the gym's calendar, so a session tomorrow evening is one day away, not two.
+function untilSession(iso: string, tz: string) {
+  const hours = hoursUntil(iso);
   if (hours < 0) return { n: 'Now', unit: 'happening' };
+  const days = daysUntil(iso, tz);
+  if (days >= 1) return { n: String(days), unit: days === 1 ? 'day to go' : 'days to go' };
   if (hours < 1) return { n: String(Math.max(1, Math.round(hours * 60))), unit: 'minutes to go' };
-  if (hours < 24) return { n: String(Math.round(hours)), unit: Math.round(hours) === 1 ? 'hour to go' : 'hours to go' };
-  const days = Math.round(hours / 24);
-  return { n: String(days), unit: days === 1 ? 'day to go' : 'days to go' };
+  return { n: String(Math.round(hours)), unit: Math.round(hours) === 1 ? 'hour to go' : 'hours to go' };
 }
+
+const VIDEO_PAUSED = 'daypass-video-paused';
 
 function HeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
   const [playing, setPlaying] = useState(false);
+  const [started, setStarted] = useState(false);
 
+  // Plays only while on screen, and a pause is remembered on this device.
   useEffect(() => {
+    const v = video.current;
+    if (!v) return;
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const saving = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    if (!calm && !saving) video.current?.play().catch(() => {});
+    const wanted = () => {
+      if (calm || saving) return false;
+      try {
+        return localStorage.getItem(VIDEO_PAUSED) !== '1';
+      } catch {
+        return true;
+      }
+    };
+    const watch = new IntersectionObserver(([e]) => {
+      if (!e.isIntersecting) v.pause();
+      else if (wanted()) v.play().catch(() => {});
+    }, { threshold: 0.15 });
+    watch.observe(v);
+    return () => watch.disconnect();
   }, []);
 
   const toggle = () => {
     const v = video.current;
     if (!v) return;
-    if (v.paused) v.play().catch(() => {});
-    else v.pause();
+    const pausing = !v.paused;
+    try {
+      if (pausing) localStorage.setItem(VIDEO_PAUSED, '1');
+      else localStorage.removeItem(VIDEO_PAUSED);
+    } catch {}
+    if (pausing) v.pause();
+    else v.play().catch(() => {});
   };
 
   return (
@@ -59,7 +88,7 @@ function HeroVideo() {
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="vhero-poster" src="/video/hero-wide.jpg" alt="" fetchPriority="high" />
       </picture>
-      <video ref={video} className={`vhero-video${playing ? ' is-on' : ''}`} muted loop playsInline preload="none" aria-hidden="true" tabIndex={-1} onPlaying={() => setPlaying(true)} onPause={() => setPlaying(false)}>
+      <video ref={video} className={`vhero-video${started ? ' is-on' : ''}`} muted loop playsInline preload="none" aria-hidden="true" tabIndex={-1} onPlaying={() => { setPlaying(true); setStarted(true); }} onPause={() => setPlaying(false)}>
         <source media="(orientation: portrait)" src="/video/hero-portrait.mp4" type="video/mp4" />
         <source src="/video/hero-wide.mp4" type="video/mp4" />
       </video>
@@ -73,7 +102,16 @@ function HeroVideo() {
 
 function NextCard({ next }: { next: NextBooking }) {
   const [when, setWhen] = useState<{ n: string; unit: string } | null>(null);
-  useEffect(() => setWhen(untilSession(next.starts_at)), [next.starts_at]);
+  useEffect(() => {
+    const update = () => setWhen(untilSession(next.starts_at, next.gym_timezone));
+    update();
+    const t = setInterval(update, 60000);
+    window.addEventListener('focus', update);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('focus', update);
+    };
+  }, [next.starts_at, next.gym_timezone]);
   return (
     <Link href={`/bookings/${next.id}`} transitionTypes={['nav-forward']} className="next-photo">
       <GymPhoto src={next.gym_photos[0]} name={next.gym_name} sizes="(max-width: 860px) 130vw, 900px" />
@@ -110,7 +148,8 @@ function FeaturedRail({ gyms, heading, showCity, morphAllowed, onLocate, askLoca
     const el = track.current;
     const first = el?.firstElementChild as HTMLElement | null;
     if (!el || !first) return;
-    setIndex(Math.round(el.scrollLeft / (first.offsetWidth + 12)));
+    // On wide screens the last cards can't reach the start, so the end of the row counts as the last dot.
+    setIndex(el.scrollLeft + el.clientWidth >= el.scrollWidth - 4 ? gyms.length - 1 : Math.round(el.scrollLeft / (first.offsetWidth + 12)));
   };
   return (
     <section className="featured" aria-labelledby="featured-title">
@@ -145,18 +184,21 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
   const { user, ready, next, toRate, unread, saved } = useSession();
   const [overlay, setOverlay] = useState(false);
   const [note, setNote] = useState('');
-  const [local, setLocal] = useState<Local | null>(null);
-  const [finding, setFinding] = useState(true);
+  const [local, setLocalState] = useState<Local | null>(homeMemory);
+  const [finding, setFinding] = useState(!homeMemory);
+  const exactFound = useRef(false);
+  const setLocal = (next: Local) => {
+    homeMemory = next;
+    setLocalState(next);
+  };
   const [savedGyms, setSavedGyms] = useState<CardGym[]>([]);
   const { toast } = useFeedback();
 
-  const loadCity = async (name: string, source: Local['source']) => {
-    const res = await fetch(`/api/gyms?city=${encodeURIComponent(name)}`);
-    if (!res.ok) return false;
+  const cityGyms = async (name: string, country: string | null, source: Local['source']): Promise<Local | null> => {
+    const res = await fetch(`/api/gyms?city=${encodeURIComponent(name)}${country ? `&country=${encodeURIComponent(country)}` : ''}`);
+    if (!res.ok) return null;
     const d = await res.json();
-    if (!d.gyms?.length) return false;
-    setLocal({ label: d.place?.name ?? name, gyms: d.gyms.slice(0, 12), source });
-    return true;
+    return d.gyms?.length ? { label: d.place?.name ?? name, gyms: d.gyms.slice(0, 12), source } : null;
   };
 
   const loadNear = async (coords: { lat: number; lng: number }) => {
@@ -164,31 +206,37 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
     if (!res.ok) return false;
     const d = await res.json();
     if (d.gyms?.length) {
+      exactFound.current = true;
       setLocal({ label: 'you', gyms: d.gyms.slice(0, 12), source: 'exact' });
       return true;
     }
     const found = await nearestCity(coords);
     if (!found) return false;
     setResolvedCity(found);
-    return loadCity(found, 'exact');
+    const city = await cityGyms(found, null, 'exact');
+    if (city) {
+      exactFound.current = true;
+      setLocal(city);
+    }
+    return !!city;
   };
 
-  // Exact location if it was allowed, then the saved home city, then the general area from the network.
-  // If none of those are known, the screen says so instead of guessing a city.
+  // The saved home city or the general area from the network shows straight away. Exact location, when it was
+  // allowed, can take seconds and replaces them when it arrives. If nothing is known, the screen says so
+  // instead of guessing a city.
   useEffect(() => {
     if (!ready) return;
     let live = true;
     (async () => {
-      if (await locationAllowed()) {
-        try {
-          const c = await locate();
-          if (live && (await loadNear(c))) return;
-        } catch {}
-      }
-      if (!live) return;
-      if (user?.home_city && (await loadCity(user.home_city, 'home'))) return;
-      const area = await generalArea();
-      if (live && area) await loadCity(area, 'area');
+      if (!(await locationAllowed())) return;
+      const c = await locate();
+      if (live && (await loadNear(c))) setFinding(false);
+    })().catch(() => {});
+    (async () => {
+      const home = user?.home_city;
+      const area = home ? null : await generalArea();
+      const found = home ? await cityGyms(home, null, 'home') : area ? await cityGyms(area.city, area.country, 'area') : null;
+      if (live && found && !exactFound.current && homeMemory?.source !== 'exact') setLocal(found);
     })()
       .catch(() => {})
       .finally(() => {
@@ -218,16 +266,20 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
   }, [user?.email, saved.length]);
 
   const nearMe = async () => {
+    let coords;
     try {
-      const c = await locate();
-      if (await loadNear(c)) toast('Showing gyms around you');
-      else toast('No gyms found around you. Try typing a city.', 'error');
+      coords = await locate();
     } catch (e) {
       const text = e instanceof Error ? e.message : 'Location is off. Type a city instead.';
       toast(text, 'error');
       setNote(text);
       setOverlay(true);
+      return;
     }
+    const found = await loadNear(coords).catch(() => false);
+    setFinding(false);
+    if (found) toast('Showing gyms around you');
+    else toast('Gyms near you did not load. Try typing a city.', 'error');
   };
 
   const shown = local?.gyms ?? picks;
@@ -264,6 +316,12 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
         </header>
 
         <div className="vhero-copy">
+          {ready && next ? (
+            <Link href={`/bookings/${next.id}`} transitionTypes={['nav-forward']} className="vhero-next">
+              <span>Next: {next.gym_name}, {dateLabel(next.starts_at, next.gym_timezone)}, {timeLabel(next.starts_at, next.gym_timezone)}</span>
+              <i aria-hidden="true"><IconArrow width={16} height={16} /></i>
+            </Link>
+          ) : null}
           <p className="hand vhero-note">
             no membership, no catch
             <svg viewBox="0 0 180 14" aria-hidden="true"><path d="M2 9c30-6 58-7 84-4s58 5 92-2" /></svg>
@@ -287,7 +345,13 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
         </Link>
       ) : null}
 
-      {finding ? <RailSkeleton /> : featured.length ? <FeaturedRail gyms={featured} heading={heading} showCity={!local} morphAllowed={canMorph} onLocate={nearMe} askLocation={askLocation} /> : null}
+      {finding ? <RailSkeleton /> : featured.length ? <FeaturedRail gyms={featured} heading={heading} showCity={!local} morphAllowed={canMorph} onLocate={nearMe} askLocation={askLocation} /> : (
+        <div className="empty">
+          <h2>Gyms did not load</h2>
+          <p>Check your signal, or search for a city.</p>
+          <button type="button" className="btn btn-ghost" onClick={() => setOverlay(true)}>Search a city</button>
+        </div>
+      )}
 
       <section className="moves-section" aria-labelledby="moves-title">
         <h2 id="moves-title" className="two-tone">Train <em>your way</em></h2>
@@ -329,7 +393,7 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
 
       {savedGyms.length ? (
         <RailSection id="saved" title={<span className="two-tone">Your <em>saved gyms</em></span>} action={<Link href="/saved">See all</Link>}>
-          {savedGyms.map((g) => <li key={g.id}><PickCard gym={g} /></li>)}
+          {savedGyms.slice(0, 12).map((g) => <li key={g.id}><PickCard gym={g} /></li>)}
         </RailSection>
       ) : null}
 

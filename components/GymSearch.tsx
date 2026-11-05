@@ -12,7 +12,7 @@ import { FilterSheet, filterCount, NO_FILTERS, type Filters } from './FilterShee
 import { GymCard, RatingLine } from './GymCard';
 import { GymPhoto } from './GymPhoto';
 import { IconClose, IconExpand, IconList, IconLocate, IconMap, IconSearch, IconSliders } from './Icons';
-import { getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, rememberCity, watchLocation, generalArea } from './location';
+import { type Area, getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, watchLocation, generalArea, placeUrl } from './location';
 import { SearchOverlay } from './SearchOverlay';
 import { useSession } from './session';
 import { haptic, useFeedback } from './ui/feedback';
@@ -48,9 +48,10 @@ async function fetchPage(params: URLSearchParams, coords: { lat: number; lng: nu
   return data;
 }
 
-const apiParams = (q: { city: string | null; sort: Sort; filters: Filters; area: string | null }, page = 1) => {
+const apiParams = (q: { city: string | null; country: string | null; sort: Sort; filters: Filters; area: string | null }, page = 1) => {
   const p = new URLSearchParams({ sort: q.sort, page: String(page) });
   if (q.city) p.set('city', q.city);
+  if (q.country) p.set('country', q.country);
   if (q.area) p.set('bbox', q.area);
   if (q.filters.maxPrice != null) p.set('maxPrice', String(q.filters.maxPrice));
   if (q.filters.minRating != null) p.set('minRating', String(q.filters.minRating));
@@ -68,6 +69,7 @@ export function GymSearch() {
   const near = params.get('near') === '1';
   const urlCity = params.get('city');
   const area = params.get('area');
+  const country = params.get('country');
   // A saved home city is the default when no search was asked for.
   const city = urlCity ?? (!near && ready ? user?.home_city ?? null : null);
   const sort = (params.get('sort') as Sort) || (user?.default_sort as Sort) || 'recommended';
@@ -85,7 +87,7 @@ export function GymSearch() {
   const [me, setMe] = useState<{ lat: number; lng: number } | null>(() => getLastCoords());
   const [locating, setLocating] = useState(false);
   const hasSearch = !!city || (near && !!coords);
-  const key = useMemo(() => JSON.stringify({ city, area, sort, filters, coords: near ? coords : null }), [city, area, sort, filters, coords, near]);
+  const key = useMemo(() => JSON.stringify({ city, country, area, sort, filters, coords: near ? coords : null }), [city, country, area, sort, filters, coords, near]);
 
   const cached = cache.get(key);
   const [result, setResult] = useState<Result | null>(cached?.result ?? null);
@@ -94,6 +96,7 @@ export function GymSearch() {
   const [loading, setLoading] = useState(!cached);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
+  const [retry, setRetry] = useState(0);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'map'>('list');
@@ -106,7 +109,7 @@ export function GymSearch() {
   const sentinel = useRef<HTMLDivElement>(null);
   const topMark = useRef<HTMLDivElement>(null);
   const sortRow = useRef<HTMLDivElement>(null);
-  const [roughCity, setRoughCity] = useState<string | null>(null);
+  const [roughCity, setRoughCity] = useState<Area | null>(null);
   const moreLock = useRef(false);
 
   // Update the address bar rather than navigate, so Back returns to this exact search.
@@ -133,7 +136,8 @@ export function GymSearch() {
   // Before that it opens the person's general area from their network, and offers exact location after.
   const [autoChecked, setAutoChecked] = useState(false);
   const [locFailed, setLocFailed] = useState(false);
-  const [fromArea, setFromArea] = useState(false);
+  // The city opened from the network. The note about it only applies while that city is showing.
+  const [areaCity, setAreaCity] = useState<string | null>(null);
   useEffect(() => {
     if (!ready) return;
     let live = true;
@@ -141,12 +145,15 @@ export function GymSearch() {
     locationAllowed().then(async (ok) => {
       if (!live) return;
       if (!ok) {
+        setMe(null);
         const rough = !urlCity && !near && !area && !user?.home_city ? await generalArea() : null;
         if (!live) return;
         const current = new URLSearchParams(window.location.search);
         if (rough && !current.get('city') && !current.get('near') && !current.get('area')) {
-          setFromArea(true);
-          router.replace(`/gyms?city=${encodeURIComponent(rough)}`);
+          setAreaCity(rough.city);
+          router.replace(placeUrl({ city: rough.city, country: rough.country }));
+          // The ask screen must not flash while the address changes.
+          return;
         }
         setAutoChecked(true);
         return;
@@ -165,7 +172,7 @@ export function GymSearch() {
         if (!current.get('city') && !current.get('near') && !current.get('area')) {
           const known = getResolvedCity();
           setCoords(c);
-          router.replace(known ? `/gyms?city=${encodeURIComponent(known)}` : '/gyms?near=1');
+          router.replace(placeUrl(known ? { city: known } : { near: '1' }));
         }
       } catch {
         if (live) setLocFailed(true);
@@ -220,7 +227,7 @@ export function GymSearch() {
     const id = ++request.current;
     setLoading(true);
     setError('');
-    fetchPage(apiParams({ city, sort, filters, area }), near ? coords : null)
+    fetchPage(apiParams({ city, country, sort, filters, area }), near ? coords : null)
       .then(async (data) => {
         if (id !== request.current) return;
         // Nothing listed near you yet: open your city, which fills in sample gyms.
@@ -234,7 +241,6 @@ export function GymSearch() {
           }
         }
         cache.set(key, { result: data, gyms: data.gyms, page: 1 });
-        if (data.place) rememberCity(data.place.name);
         setResult(data);
         setGyms(data.gyms);
         setPage(1);
@@ -242,6 +248,14 @@ export function GymSearch() {
       })
       .catch((e: Error) => {
         if (id !== request.current) return;
+        // The person typed nothing, so "check the spelling" would make no sense. Ask them instead.
+        if (areaCity && urlCity === areaCity) {
+          setAreaCity(null);
+          setAutoChecked(true);
+          setLoading(false);
+          router.replace('/gyms');
+          return;
+        }
         setError(e.message || 'Search did not finish. Try again.');
         setResult(null);
         setGyms([]);
@@ -249,7 +263,7 @@ export function GymSearch() {
       });
     // key already covers every input to this request.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [key, hasSearch]);
+  }, [key, hasSearch, retry]);
 
   useEffect(() => {
     if (!hasSearch) return;
@@ -268,7 +282,7 @@ export function GymSearch() {
     const startedFor = key;
     try {
       const nextPage = page + 1;
-      const data = await fetchPage(apiParams({ city, sort, filters, area }, nextPage), near ? coords : null);
+      const data = await fetchPage(apiParams({ city, country, sort, filters, area }, nextPage), near ? coords : null);
       if (keyRef.current !== startedFor) return;
       if (!data.gyms.length) {
         setResult((r) => (r ? { ...r, total: gyms.length } : r));
@@ -310,25 +324,25 @@ export function GymSearch() {
 
   const countFor = useCallback(async (f: Filters) => {
     try {
-      const data = await fetchPage(apiParams({ city, sort, filters: f, area }), near ? coords : null);
+      const data = await fetchPage(apiParams({ city, country, sort, filters: f, area }), near ? coords : null);
       return data.total;
     } catch {
       return null;
     }
     // Reads the current search location.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [city, sort, area, near, coords]);
+  }, [city, country, sort, area, near, coords]);
 
   const nearMe = async () => {
     setLocating(true);
     try {
       const c = await locate();
       setLocFailed(false);
-      setFromArea(false);
+      setAreaCity(null);
       setCoords(c);
       setMe(c);
       haptic(8);
-      router.replace('/gyms?near=1');
+      router.replace(placeUrl({ near: '1' }));
     } catch (e) {
       toast(e instanceof Error ? e.message : 'Location is off. Type a city instead.', 'error');
     } finally {
@@ -362,7 +376,7 @@ export function GymSearch() {
         <h1>Where do you want to train?</h1>
         <p>Share your location to see the closest gyms. It is used while you search and never saved.</p>
         <button type="button" className="btn btn-volt ask-btn" onClick={nearMe}><IconLocate /> Use my location</button>
-        {roughCity ? <button type="button" className="btn btn-white ask-btn" onClick={() => router.replace(`/gyms?city=${encodeURIComponent(roughCity)}`)}>Gyms in {roughCity}, my general area</button> : null}
+        {roughCity ? <button type="button" className="btn btn-white ask-btn" onClick={() => { setAreaCity(roughCity.city); router.replace(placeUrl({ city: roughCity.city, country: roughCity.country })); }}>Gyms in {roughCity.city}, my general area</button> : null}
         <button type="button" className="btn btn-ghost ask-btn" onClick={() => setOverlay(true)}><IconSearch /> Search a city</button>
         {overlays}
       </main>
@@ -370,7 +384,17 @@ export function GymSearch() {
   }
 
   return (
-    <main className="search" data-view={view}>
+    <main
+      className="search"
+      data-view={view}
+      onClickCapture={(e) => {
+        // Tells the gym page its back arrow can step back to this exact place in the list.
+        if (!(e.target as Element).closest?.('a[href^="/gyms/"]')) return;
+        try {
+          sessionStorage.setItem('daypass-from-search', '1');
+        } catch {}
+      }}
+    >
       <aside className="search-map" aria-label="Map">
         <GymMap
           gyms={gyms}
@@ -428,13 +452,13 @@ export function GymSearch() {
             </ul>
           ) : null}
         </div>
-        {fromArea && urlCity ? <button type="button" className="where-note" onClick={nearMe}><IconLocate /> <span>{urlCity} is your general area. Use my exact location</span></button> : null}
+        {areaCity && urlCity === areaCity ? <button type="button" className="where-note" onClick={nearMe}><IconLocate /> <span>{urlCity} is your general area. Use my exact location</span></button> : null}
         <h1 className="search-title" aria-live="polite">
           {loading ? <span className="sk sk-line" /> : <>{result?.place?.name ? <CityMark city={result.place.name} size={34} /> : null}<span>{error ? heading : `${total} ${total === 1 ? 'gym' : 'gyms'} ${near && !result?.place ? 'near you' : area ? 'in this area' : `in ${heading}`}`}</span></>}
         </h1>
 
         {error ? (
-          <div className="empty"><h2>No results</h2><p>{error}</p><button type="button" className="btn btn-ghost" onClick={() => setOverlay(true)}>Search another city</button></div>
+          <div className="empty"><h2>No results</h2><p>{error}</p><button type="button" className="btn btn-volt" onClick={() => setRetry((r) => r + 1)}>Try again</button><button type="button" className="btn btn-ghost" onClick={() => setOverlay(true)}>Search another city</button></div>
         ) : loading ? (
           <ul className="gym-grid" aria-hidden="true">{Array.from({ length: 6 }, (_, i) => <li key={i} className="gym-skeleton"><span className="sk sk-photo" /><span className="sk sk-line" /><span className="sk sk-line is-short" /></li>)}</ul>
         ) : gyms.length === 0 ? (

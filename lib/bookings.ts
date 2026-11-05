@@ -2,7 +2,8 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { db } from './db';
 import { hashPassword, HttpError, type User } from './auth';
 import { getAvailability, getGymById, getGymBySlug, isValidSlot, releaseExpiredHolds, type Gym, type GymFacts } from './gyms';
-import { dateLabel, money, timeLabel } from './format';
+import { dateLabel, isUuid, money, timeLabel } from './format';
+import { hoursUntil, refusalIsOpen, sameLocalDay } from './hours';
 import { charge, methodLabel, type PayMethod } from './payments';
 
 const HOLD_MINUTES = 10;
@@ -101,7 +102,7 @@ export async function createHold(userId: string, gymId: string, startsAtIso: str
 }
 
 async function getOwned(userId: string, id: string) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) throw new HttpError(404, 'Booking not found.');
+  if (!isUuid(id)) throw new HttpError(404, 'Booking not found.');
   const rows = await db()`SELECT * FROM bookings WHERE id = ${id}::uuid AND user_id = ${userId}::uuid`;
   if (!rows[0]) throw new HttpError(404, 'Booking not found.');
   return rows[0] as Booking;
@@ -291,8 +292,11 @@ export async function refuseEntryRefund(user: User, id: string, detail: string) 
   const b = await getOwned(user.id, id);
   if (b.status !== 'confirmed') throw new HttpError(409, 'This booking is not active, so there is nothing to refund.', 'not_confirmed');
   if (b.checked_in_at) throw new HttpError(409, 'This pass has already been used at the desk.', 'checked_in');
-  const hoursAway = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
-  if (!user.is_demo && (hoursAway > 3 || hoursAway < -6)) throw new HttpError(409, 'This is for problems at the door, so it opens 3 hours before your session.', 'too_early');
+  const { tz } = await gymLabel(b.gym_id);
+  if (!user.is_demo && !refusalIsOpen(b.starts_at, tz)) {
+    if (hoursUntil(b.starts_at) > 0) throw new HttpError(409, 'This is for problems at the door, so it opens on the day of your session.', 'too_early');
+    throw new HttpError(409, 'This session ended too long ago to claim a refund here.', 'too_late');
+  }
   const done = await refundBooking(user.id, id, detail.slice(0, 120) || 'entry refused', null);
   if (!done) throw new HttpError(409, 'This booking is not active, so there is nothing to refund.', 'not_confirmed');
   const { name } = await gymLabel(done.gym_id);
@@ -316,17 +320,18 @@ export async function deskCheck(scanner: User, code: string, apply: boolean) {
   const detail = { gym: b.gym_name, holder: b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
   if (b.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
   if (b.checked_in_at) return { result: 'used' as DeskResult, ...detail, usedAt: timeLabel(b.checked_in_at, b.gym_timezone) };
-  const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
-  if (hours > 1) {
-    const sameDay = dateLabel(b.starts_at, b.gym_timezone) === dateLabel(new Date().toISOString(), b.gym_timezone);
-    return { result: (sameDay ? 'too_early' : 'wrong_date') as DeskResult, ...detail };
+  // Demo passes skip the time window, so the door can be tried at any time.
+  if (!b.holder_is_demo) {
+    const hours = hoursUntil(b.starts_at);
+    if (hours > 1) return { result: (sameLocalDay(new Date(b.starts_at), new Date(), b.gym_timezone) ? 'too_early' : 'wrong_date') as DeskResult, ...detail };
+    if (hours < -3) return { result: 'expired' as DeskResult, ...detail };
   }
-  if (hours < -3) return { result: 'expired' as DeskResult, ...detail };
   // Two scans at once, or a cancel in between: only one can win, and the other is told what happened.
   if (apply && !(await markCheckedIn(b.id, b.user_id))) {
     const [now] = await db()`SELECT status, checked_in_at FROM bookings WHERE id = ${b.id}::uuid`;
-    if (now?.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
-    return { result: 'used' as DeskResult, ...detail, usedAt: timeLabel(now?.checked_in_at as string, b.gym_timezone) };
+    if (!now) return { result: 'unknown' as DeskResult };
+    if (now.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
+    return { result: 'used' as DeskResult, ...detail, usedAt: now.checked_in_at ? timeLabel(now.checked_in_at as string, b.gym_timezone) : undefined };
   }
   return { result: 'valid' as DeskResult, ...detail };
 }
@@ -345,9 +350,16 @@ async function markCheckedIn(id: string, userId: string) {
 export async function simulateCheckIn(user: User, id: string) {
   const b = await getOwned(user.id, id);
   if (b.status !== 'confirmed') throw new HttpError(409, 'This pass is not active.', 'not_confirmed');
-  const hours = (new Date(b.starts_at).getTime() - Date.now()) / 3600000;
-  if (!user.is_demo && !b.checked_in_at && (hours > 1 || hours < -3)) throw new HttpError(409, 'Check-in opens one hour before your session.', 'too_early');
-  if (!b.checked_in_at) await markCheckedIn(id, user.id);
+  if (!user.is_demo && !b.checked_in_at) {
+    const hours = hoursUntil(b.starts_at);
+    if (hours > 1) throw new HttpError(409, 'Check-in opens one hour before your session.', 'too_early');
+    if (hours < -3) throw new HttpError(409, 'This session has ended, so the pass can no longer be checked in.', 'too_late');
+  }
+  // A cancel can land in between. The person must not be told they are checked in.
+  if (!b.checked_in_at && !(await markCheckedIn(id, user.id))) {
+    const [now] = await db()`SELECT status FROM bookings WHERE id = ${id}::uuid`;
+    if (now?.status !== 'confirmed') throw new HttpError(409, 'This pass is not active.', 'not_confirmed');
+  }
   return getOwned(user.id, id);
 }
 
@@ -356,6 +368,10 @@ export async function addToWallet(userId: string, id: string) {
   if (b.status !== 'confirmed') throw new HttpError(409, 'Only active passes can go in your wallet.', 'not_confirmed');
   await db()`UPDATE bookings SET wallet_added_at = coalesce(wallet_added_at, now()) WHERE id = ${id}::uuid`;
 }
+
+// Whether a pass can still get someone in, which is what the Wallet holds.
+export const inWalletNow = (b: { wallet_added_at?: string | null; status: string; checked_in_at: string | null; starts_at: string }, now = Date.now()) =>
+  !!b.wallet_added_at && b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > now;
 
 export type BookingView = Booking & {
   gym_name: string;
@@ -386,18 +402,18 @@ export async function listBookings(userId: string) {
 }
 
 export async function getBookingView(userId: string, id: string) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  if (!isUuid(id)) return null;
   const rows = await db().query(`${VIEW} WHERE b.user_id = $1 AND b.id = $2 AND b.status IN ('confirmed','cancelled')`, [userId, id]);
   return (rows[0] as BookingView) ?? null;
 }
 
 // Gives a new account one finished visit, so past bookings and rating can be tried straight away.
-export async function addSamplePastVisit(userId: string) {
+export async function addSamplePastVisit(userId: string, area: string | null = null) {
   await db()`
     INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
     SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('hour', now()) - interval '9 days', g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int,
       'confirmed', 'sample-past-visit', true, date_trunc('hour', now()) - interval '9 days'
-    FROM gyms g WHERE g.slug = 'iron-gym-amsterdam'
+    FROM gyms g WHERE g.slug = coalesce((SELECT slug FROM gyms WHERE is_demo AND lower(city) = lower(${area}::text) ORDER BY name = 'Iron Gym' DESC LIMIT 1), 'iron-gym-amsterdam')
     ON CONFLICT DO NOTHING`;
 }
 

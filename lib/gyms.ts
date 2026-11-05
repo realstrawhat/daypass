@@ -1,4 +1,5 @@
 import { db } from './db';
+import { isUuid } from './format';
 import { heldByGym, isWeekend, localParts, localToUtc } from './hours';
 import { seedCity } from '../scripts/seed-data.mjs';
 
@@ -123,12 +124,12 @@ export async function listSavedGyms(userId: string) {
     `SELECT g.id, g.slug, g.name, g.city, g.price_cents, g.photos, g.timezone, g.open_hour, g.close_hour, g.weekend_open_hour, g.weekend_close_hour,
       ${GYM_SELECT_RATING}
     FROM saved_gyms s JOIN gyms g ON g.id = s.gym_id
-    WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT 60`,
+    WHERE s.user_id = $1 ORDER BY s.created_at DESC LIMIT 100`,
     [userId],
   );
 }
 
-export const GYM_SELECT_RATING = `
+const GYM_SELECT_RATING = `
   (SELECT round(((g.seed_rating * g.seed_rating_count + coalesce(sum(r.stars), 0)) / nullif(g.seed_rating_count + count(r.id), 0))::numeric, 1)::float8 FROM reviews r WHERE r.is_public AND r.gym_id = g.id) AS rating,
   (SELECT g.seed_rating_count + count(r.id) FROM reviews r WHERE r.is_public AND r.gym_id = g.id)::int AS rating_count`;
 
@@ -138,7 +139,7 @@ export async function getGymBySlug(slug: string): Promise<Gym | null> {
 }
 
 export async function getGymById(id: string): Promise<Gym | null> {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+  if (!isUuid(id)) return null;
   const rows = await db().query(`SELECT g.*, ${GYM_SELECT_RATING} FROM gyms g WHERE g.id = $1`, [id]);
   return (rows[0] as Gym) ?? null;
 }
@@ -236,7 +237,7 @@ export async function getAvailability(gym: Gym): Promise<SlotDay[]> {
 
 // Typed city search -----------------------------------------------------------
 
-export type Place = { name: string; country: string; admin?: string; lat: number; lng: number; timezone: string };
+export type Place = { name: string; country: string; code?: string; admin?: string; lat: number; lng: number; timezone: string };
 
 export async function suggestPlaces(query: string, count = 5): Promise<Place[]> {
   const q = query.trim().slice(0, 80);
@@ -246,21 +247,27 @@ export async function suggestPlaces(query: string, count = 5): Promise<Place[]> 
     signal: AbortSignal.timeout(5000),
   });
   if (!res.ok) throw new Error('geocoder unavailable');
-  const data = (await res.json()) as { results?: { name: string; country?: string; admin1?: string; latitude: number; longitude: number; timezone?: string }[] };
-  return (data.results ?? []).map((hit) => ({ name: hit.name, country: hit.country ?? '', admin: hit.admin1, lat: hit.latitude, lng: hit.longitude, timezone: hit.timezone ?? 'UTC' }));
+  const data = (await res.json()) as { results?: { name: string; country?: string; country_code?: string; admin1?: string; latitude: number; longitude: number; timezone?: string }[] };
+  return (data.results ?? []).map((hit) => ({ name: hit.name, country: hit.country ?? '', code: hit.country_code, admin: hit.admin1, lat: hit.latitude, lng: hit.longitude, timezone: hit.timezone ?? 'UTC' }));
 }
 
-export async function geocodeCity(query: string): Promise<Place | null> {
-  return (await suggestPlaces(query, 1))[0] ?? null;
+// The country code settles names shared around the world, such as Newcastle or Cordoba.
+export async function geocodeCity(query: string, countryCode?: string | null): Promise<Place | null> {
+  const hits = await suggestPlaces(query, countryCode ? 10 : 1);
+  return (countryCode ? hits.find((h) => h.code === countryCode.toUpperCase()) : hits[0]) ?? null;
 }
 
 // Sample listings let a tester search any city. They are flagged as demo data.
+// Anyone's network city can reach this, bots included, so new sample cities are limited per day.
+const NEW_SAMPLE_CITIES_PER_DAY = 20;
 export async function ensureCityHasGyms(place: Place) {
   const [{ n }] = (await db()`
     SELECT count(*)::int AS n FROM gyms
     WHERE lat BETWEEN ${place.lat - 0.22}::float8 AND ${place.lat + 0.22}::float8
       AND lng BETWEEN ${place.lng - 0.3}::float8 AND ${place.lng + 0.3}::float8`) as { n: number }[];
-  if (n < 10) await seedCity(db(), place);
+  if (n >= 10) return;
+  const [{ fresh }] = (await db()`SELECT count(DISTINCT city)::int AS fresh FROM gyms WHERE is_demo AND created_at > now() - interval '1 day'`) as { fresh: number }[];
+  if (fresh < NEW_SAMPLE_CITIES_PER_DAY) await seedCity(db(), place);
 }
 
 export async function listGymSlugsForCity(city: string) {

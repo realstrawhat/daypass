@@ -45,7 +45,7 @@ export default async function BookingPage({ params, searchParams }: P) {
     <Page>
       <main className="pass-page">
         {isNew && !cancelled ? <RevealIntro gym={b.gym_name} /> : null}
-        <SaveForOffline id={b.id} version={`${b.status}-${b.checked_in_at ?? ''}-${b.starts_at}`} />
+        <SaveForOffline id={b.id} version={`${b.status}-${b.checked_in_at ?? ''}-${b.starts_at}-${b.confirmation_version}`} />
         <Link href="/bookings" transitionTypes={['nav-back']} className="round round-solid pass-back" aria-label="Back to Passes"><IconBack /></Link>
 
         <div className="pass-layout">

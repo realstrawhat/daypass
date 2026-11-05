@@ -64,7 +64,7 @@ img, svg { display: block; max-width: 100%; }
 /* Buttons */
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 10px; min-height: 52px; padding: 12px 24px; border-radius: 99px; font-weight: 700; text-align: center; transition: transform var(--t-2) var(--spring), background var(--t-2), color var(--t-2), border-color var(--t-2); }
 /* Phones have no hover, so press is the main feedback: quick down, springy release. */
-.btn:active:not(:disabled), .action:active, .chip:active, .gym-card:active, .pick-card:active, .next-card:active, .ticket:active, .rows button:active, .rows a:active, .search-pill:active, .round:active:not(:disabled), .time-pill:active:not(:disabled), .day-pill:active:not(:disabled), .segmented button:active, .overlay-list button:active, .overlay-near:active { transform: scale(.94); transition: transform 90ms ease-out; }
+.btn:active:not(:disabled), .action:active, .chip:active, .gym-card:active, .pick-card:active, .ticket:active, .rows button:active, .rows a:active, .search-pill:active, .round:active:not(:disabled), .time-pill:active:not(:disabled), .day-pill:active:not(:disabled), .segmented button:active, .overlay-list button:active, .overlay-near:active { transform: scale(.94); transition: transform 90ms ease-out; }
 .gym-card:active .price-sticker, .pick-card:active .price-sticker { transform: rotate(-12deg) scale(1.120); }
 .rows button:active, .rows a:active, .overlay-list button:active { background: var(--s3); }
 button, a { -webkit-user-select: none; user-select: none; -webkit-touch-callout: none; }

@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "private": true,
   "engines": {
-    "node": ">=22"
+    "node": ">=22.18"
   },
   "scripts": {
     "dev": "next dev -p 3000",
@@ -11,7 +11,8 @@
     "start": "next start",
     "typecheck": "tsc --noEmit",
     "db:setup": "node --env-file=.env.local scripts/setup-db.mjs",
-    "test": "node --env-file-if-exists=.env.local --test tests/booking-rules.test.mjs tests/hours.test.mjs"
+    "test": "node --env-file-if-exists=.env.local --test tests/booking-rules.test.mjs tests/hours.test.mjs",
+    "test:ui": "node --env-file-if-exists=.env.local --test tests/journey.test.mjs"
   },
   "dependencies": {
     "@neondatabase/serverless": "latest",
@@ -28,6 +29,7 @@
     "@types/qrcode": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "puppeteer-core": "^25.16.0",
     "typescript": "latest"
   }
 }

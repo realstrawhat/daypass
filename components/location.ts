@@ -112,11 +112,24 @@ export function rememberCity(city: string) {
 }
 
 // The general area from the person's network, for when exact location hasn't been shared. Asked once per visit.
-let areaLookup: Promise<string | null> | null = null;
-export function generalArea(): Promise<string | null> {
-  areaLookup ??= fetch('/api/where')
-    .then((r) => (r.ok ? r.json() : null))
-    .then((d) => (d?.city as string) ?? null)
-    .catch(() => null);
+export type Area = { city: string; country: string | null };
+let areaLookup: Promise<Area | null> | null = null;
+export function generalArea(): Promise<Area | null> {
+  areaLookup ??= fetch('/api/where', { signal: AbortSignal.timeout(4000) })
+    .then((r) => (r.ok ? r.json() : Promise.reject(new Error('no answer'))))
+    .then((d) => (d?.city ? { city: d.city as string, country: (d.country as string) ?? null } : null))
+    .catch(() => {
+      // A weak connection shouldn't decide this for the whole visit, so the next caller can ask again.
+      areaLookup = null;
+      return null;
+    });
   return areaLookup;
+}
+
+// The address for another place. On Find it keeps the sort and filters the person has chosen.
+export function placeUrl(place: Record<string, string | null>) {
+  const next = new URLSearchParams(window.location.pathname === '/gyms' ? window.location.search : '');
+  for (const key of ['city', 'country', 'near', 'area']) next.delete(key);
+  for (const [key, value] of Object.entries(place)) if (value) next.set(key, value);
+  return `/gyms?${next}`;
 }

@@ -3,6 +3,7 @@ import { type RefObject, useEffect, useState } from 'react';
 import { IconBack, IconChevron } from '../Icons';
 
 // Previous and next buttons for anything that scrolls sideways. They hide when everything already fits.
+// At the ends they say so with aria-disabled, because a truly disabled button would drop keyboard focus.
 export function ScrollArrows({ target, label, className = '' }: { target: RefObject<HTMLElement | null>; label: string; className?: string }) {
   const [edge, setEdge] = useState({ start: true, end: true });
 
@@ -34,8 +35,8 @@ export function ScrollArrows({ target, label, className = '' }: { target: RefObj
 
   return (
     <div className={`rail-arrows ${className}`} role="group" aria-label={label}>
-      <button type="button" className="round round-sm rail-arrow" aria-label="Previous" disabled={edge.start} onClick={() => move(-1)}><IconBack /></button>
-      <button type="button" className="round round-sm rail-arrow" aria-label="Next" disabled={edge.end} onClick={() => move(1)}><IconChevron /></button>
+      <button type="button" className="round round-sm rail-arrow" aria-label="Previous" aria-disabled={edge.start} onClick={() => !edge.start && move(-1)}><IconBack /></button>
+      <button type="button" className="round round-sm rail-arrow" aria-label="Next" aria-disabled={edge.end} onClick={() => !edge.end && move(1)}><IconChevron /></button>
     </div>
   );
 }

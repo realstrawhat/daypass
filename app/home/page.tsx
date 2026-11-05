@@ -17,8 +17,11 @@ const SPREAD = [
 export const revalidate = 300;
 
 export default async function HomePage() {
-  const sets = await Promise.all(SPREAD.map((c) => searchGyms({ ...c, sort: 'recommended' }).then((r) => r.gyms.slice(0, 3)).catch(() => [])));
-  const picks = sets.flat();
+  const sets = await Promise.all(SPREAD.map((c) => searchGyms({ ...c, sort: 'rating' }).then((r) => r.gyms.slice(0, 3)).catch(() => [])));
+  // Taken in turn from each city, so the first cards show the spread.
+  const picks = [0, 1, 2].flatMap((i) => sets.flatMap((s) => (s[i] ? [s[i]] : [])));
+  // With nothing at all, stop here so the last good Home stays up, rather than keeping an empty one for 5 minutes.
+  if (!picks.length) throw new Error('Home gyms did not load');
   return (
     <Page>
       <div>

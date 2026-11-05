@@ -1,7 +1,7 @@
 // Opening hours and next-slot wording, with fixed times so the result never depends on when this runs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { gymStatus, ratingShares } from '../lib/hours.ts';
+import { daysUntil, doorIsOpen, gymStatus, hoursUntil, ratingShares, refusalIsOpen, sameLocalDay } from '../lib/hours.ts';
 
 const gym = { id: 'g', timezone: 'Europe/Amsterdam', open_hour: 7, close_hour: 21, weekend_open_hour: 9, weekend_close_hour: 18 };
 
@@ -30,4 +30,31 @@ test('rating bars cover five bands and follow the average', () => {
   const low = ratingShares(3.6);
   assert.equal(high.length, 5);
   assert.ok(high[0] > low[0], 'a higher average puts more in the top band');
+});
+
+test('the door is open from an hour before until three hours after the start', () => {
+  assert.equal(doorIsOpen(1.5), false);
+  assert.equal(doorIsOpen(1), true);
+  assert.equal(doorIsOpen(-3), true);
+  assert.equal(doorIsOpen(-3.1), false);
+  assert.equal(hoursUntil('2026-11-04T12:00:00Z', Date.parse('2026-11-04T10:00:00Z')), 2);
+});
+
+test('refused entry opens on the day of the session and closes six hours after it starts', () => {
+  const tz = 'Europe/Berlin';
+  const start = '2026-11-04T17:00:00Z';
+  assert.equal(refusalIsOpen(start, tz, Date.parse('2026-11-04T07:00:00Z')), true, 'that morning');
+  assert.equal(refusalIsOpen(start, tz, Date.parse('2026-11-03T22:00:00Z')), false, 'the evening before');
+  assert.equal(refusalIsOpen(start, tz, Date.parse('2026-11-04T22:30:00Z')), true, 'five and a half hours after');
+  assert.equal(refusalIsOpen(start, tz, Date.parse('2026-11-04T23:30:00Z')), false, 'six and a half hours after');
+});
+
+test('calendar days follow the gym\'s own clock, so tomorrow evening is one day away', () => {
+  const tz = 'Europe/Berlin';
+  const now = Date.parse('2026-11-04T06:00:00Z');
+  assert.equal(daysUntil('2026-11-05T18:00:00Z', tz, now), 1, '36 hours away is still tomorrow');
+  assert.equal(daysUntil('2026-11-04T20:00:00Z', tz, now), 0);
+  assert.equal(daysUntil('2026-11-04T23:30:00Z', tz, now), 1, 'past midnight in Berlin');
+  assert.equal(sameLocalDay(new Date('2026-11-04T22:30:00Z'), new Date(now), tz), true);
+  assert.equal(sameLocalDay(new Date('2026-11-04T23:30:00Z'), new Date(now), tz), false);
 });

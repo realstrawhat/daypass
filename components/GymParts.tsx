@@ -1,6 +1,7 @@
 'use client';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { GymPhoto } from './GymPhoto';
 import { SaveButton, useGymStatus } from './GymCard';
@@ -54,8 +55,14 @@ export function GymGallery({ gym, title }: { gym: { id: string; name: string; ph
 export function GymTopBar({ gym }: { gym: { id: string; name: string; city: string } }) {
   const [solid, setSolid] = useState(false);
   const [back, setBack] = useState(`/gyms?city=${encodeURIComponent(gym.city)}`);
+  const router = useRouter();
+  const fromSearch = useRef(false);
   useEffect(() => {
     try {
+      if (sessionStorage.getItem('daypass-from-search') === '1') {
+        fromSearch.current = true;
+        sessionStorage.removeItem('daypass-from-search');
+      }
       const last = sessionStorage.getItem('daypass-last-search');
       const params = new URLSearchParams(last ?? '');
       if (last && (params.get('near') || params.get('area') || params.get('city')?.toLowerCase() === gym.city.toLowerCase())) setBack(`/gyms${last}`);
@@ -69,7 +76,16 @@ export function GymTopBar({ gym }: { gym: { id: string; name: string; city: stri
   }, []);
   return (
     <header className={`gym-bar${solid ? ' is-solid' : ''}`}>
-      <Link href={back} transitionTypes={['nav-back']} className="round round-glass" aria-label={`Back to gyms in ${gym.city}`}><IconBack /></Link>
+      <Link
+        href={back}
+        transitionTypes={['nav-back']}
+        onClick={(e) => {
+          if (!fromSearch.current) return;
+          e.preventDefault();
+          router.back();
+        }}
+        className="round round-glass"
+        aria-label="Back to gyms"><IconBack /></Link>
       <p className="gym-bar-title" aria-hidden={!solid}>{gym.name}</p>
       <SaveButton gymId={gym.id} name={gym.name} tone="plain" />
     </header>

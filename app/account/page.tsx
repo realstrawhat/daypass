@@ -41,9 +41,9 @@ export default async function AccountPage() {
   const spent = visited.reduce((sum, b) => sum + b.price_cents - b.refund_cents, 0);
   const months = buildMonths(visited.map((b) => localParts(new Date(b.starts_at), b.gym_timezone)));
   const now = new Date();
-  const thisYear = visited.filter((b) => new Date(b.starts_at).getUTCFullYear() === now.getUTCFullYear());
+  const thisYear = visited.filter((b) => localParts(new Date(b.starts_at), b.gym_timezone).y === localParts(now, b.gym_timezone).y);
   const rings = [
-    { label: 'Visits this month', goal: 4, value: visited.filter((b) => { const d = new Date(b.starts_at); return d.getUTCFullYear() === now.getUTCFullYear() && d.getUTCMonth() === now.getUTCMonth(); }).length, color: '#d7ff3e', r: 66 },
+    { label: 'Visits this month', goal: 4, value: thisYear.filter((b) => localParts(new Date(b.starts_at), b.gym_timezone).m === localParts(now, b.gym_timezone).m).length, color: '#d7ff3e', r: 66 },
     { label: 'Gyms tried this year', goal: 10, value: new Set(thisYear.map((b) => b.gym_id)).size, color: '#a4c92a', r: 50 },
     { label: 'Cities this year', goal: 5, value: new Set(thisYear.map((b) => b.gym_city)).size, color: '#f2ffc4', r: 34 },
   ];

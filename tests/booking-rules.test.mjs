@@ -1,9 +1,11 @@
 // End-to-end checks for the booking rules in the build pack, run against the real API and database.
 // Start the app first. BASE_URL defaults to the local dev server.
-import { test } from 'node:test';
+import { after, test } from 'node:test';
 import assert from 'node:assert/strict';
 
 const BASE = process.env.BASE_URL ?? 'http://localhost:3000';
+const LOCAL = BASE.includes('localhost');
+const sql = process.env.DATABASE_URL ? (await import('@neondatabase/serverless')).neon(process.env.DATABASE_URL) : null;
 
 test('login is optional: guests open on Home and can browse, but need a login to book', async () => {
   const start = await fetch(`${BASE}/`, { redirect: 'manual' });
@@ -57,10 +59,20 @@ const later = (slots) => slots.filter((s) => new Date(s.startsAt).getTime() > Da
 const pick = (list) => list[Math.floor(Math.random() * list.length)];
 const key = () => crypto.randomUUID();
 
-async function demoClient() {
+// These tests share a database with the app, so they leave nothing behind: no accounts, no gyms, no reviews.
+const demoEmails = [];
+after(async () => {
+  if (!sql) return;
+  await sql`DELETE FROM users WHERE is_demo AND email = ANY(${demoEmails})`;
+  await sql`DELETE FROM users WHERE email LIKE 'qa+%@example.com'`;
+  await sql`DELETE FROM gyms WHERE slug LIKE 'qa-test-gym-%' AND is_demo = false`;
+  await sql`UPDATE slots s SET booked = (SELECT count(*) FROM bookings b WHERE b.gym_id = s.gym_id AND b.starts_at = s.starts_at AND b.status IN ('hold', 'confirmed'))`;
+});
+
+async function demoClient(headers = {}) {
   let cookie = '';
   const call = async (path, options = {}) => {
-    const res = await fetch(BASE + path, { ...options, redirect: 'manual', headers: { 'Content-Type': 'application/json', cookie }, body: options.body ? JSON.stringify(options.body) : undefined });
+    const res = await fetch(BASE + path, { ...options, redirect: 'manual', headers: { 'Content-Type': 'application/json', cookie, ...headers }, body: options.body ? JSON.stringify(options.body) : undefined });
     const set = res.headers.get('set-cookie');
     if (set) cookie = set.split(';')[0];
     let data = null;
@@ -68,6 +80,7 @@ async function demoClient() {
     return { status: res.status, data };
   };
   assert.equal((await call('/api/auth/demo', { method: 'POST' })).status, 200);
+  demoEmails.push((await call('/api/auth/me')).data.user.email);
   return call;
 }
 
@@ -85,8 +98,8 @@ test('wallet, desk check-in, staff check and locked changes all work', async () 
   const { data } = await call('/api/auth/me');
   const { id, code } = data.next;
   assert.equal((await call(`/api/bookings/${id}/wallet`, { method: 'POST', body: {} })).status, 200);
-  const early = await call('/api/staff', { method: 'POST', body: { code } });
-  assert.equal(early.data.result, 'wrong_date', 'a future pass is the wrong date at the desk');
+  const look = await call('/api/staff', { method: 'POST', body: { code, apply: false } });
+  assert.equal(look.data.result, 'valid', 'a demo pass can be tried at the door any time');
   assert.equal((await call('/api/staff', { method: 'POST', body: { code: 'DP-NOPE1' } })).data.result, 'unknown');
   const checkin = await call(`/api/bookings/${id}/checkin`, { method: 'POST', body: {} });
   assert.ok(checkin.data.checked_in_at);
@@ -97,9 +110,12 @@ test('wallet, desk check-in, staff check and locked changes all work', async () 
 test('refused entry refunds in full and frees the spot, once', async () => {
   const call = await demoClient();
   const { data } = await call('/api/auth/me');
+  const taken = () => sql`SELECT s.booked FROM slots s JOIN bookings b ON b.gym_id = s.gym_id AND b.starts_at = s.starts_at WHERE b.id = ${data.next.id}::uuid`;
+  const before = sql ? (await taken())[0].booked : 0;
   const refund = await call(`/api/bookings/${data.next.id}/refused`, { method: 'POST', body: { reason: 'The gym was closed' } });
   assert.equal(refund.status, 200);
   assert.ok(refund.data.refund_cents > 0);
+  if (sql) assert.equal((await taken())[0].booked, before - 1, 'the spot is free again');
   assert.equal((await call(`/api/bookings/${data.next.id}/refused`, { method: 'POST', body: { reason: 'again' } })).status, 409);
   assert.equal((await call('/api/auth/me')).data.next, null);
 });
@@ -322,7 +338,6 @@ test('moving to a pricier gym charges the difference, a cheaper gym refunds it',
 
 // Door, refund and privacy rules for real accounts. These move a booking's time in the database,
 // because the rules depend on how close the session is.
-const sql = process.env.DATABASE_URL ? (await import('@neondatabase/serverless')).neon(process.env.DATABASE_URL) : null;
 const needsDb = { skip: sql ? false : 'needs DATABASE_URL (npm test loads it from .env.local)' };
 
 async function booked(call) {
@@ -340,6 +355,10 @@ const moveTo = (id, hours) => sql`UPDATE bookings SET starts_at = now() + make_i
 test('the door: valid once, then used, with the QR prefix, and expired or cancelled passes refused', needsDb, async () => {
   const call = await client();
   const a = await booked(call);
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'wrong_date', 'a real pass days away');
+  await moveTo(a.id, 1.5);
+  const [{ same_day: sameDay }] = await sql`SELECT (b.starts_at AT TIME ZONE g.timezone)::date = (now() AT TIME ZONE g.timezone)::date AS same_day FROM bookings b JOIN gyms g ON g.id = b.gym_id WHERE b.id = ${a.id}::uuid`;
+  assert.equal((await call('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, sameDay ? 'too_early' : 'wrong_date', 'later today is too early, not the wrong date');
   await moveTo(a.id, 0.5);
   assert.equal((await call('/api/staff', { method: 'POST', body: { code: `DAYPASS:${a.code}` } })).data.result, 'valid');
   const [row] = await sql`SELECT checked_in_at FROM bookings WHERE id = ${a.id}::uuid`;
@@ -354,6 +373,23 @@ test('the door: valid once, then used, with the QR prefix, and expired or cancel
   const gone = await booked(call);
   assert.equal((await call(`/api/bookings/${gone.id}`, { method: 'DELETE' })).status, 200);
   assert.equal((await call('/api/staff', { method: 'POST', body: { code: gone.code } })).data.result, 'cancelled');
+});
+
+test('two scans at once let one person in', needsDb, async () => {
+  const call = await client();
+  const a = await booked(call);
+  await moveTo(a.id, 0.5);
+  const scans = await Promise.all([1, 2].map(() => call('/api/staff', { method: 'POST', body: { code: a.code } })));
+  assert.deepEqual(scans.map((s) => s.data.result).sort(), ['used', 'valid']);
+});
+
+test('a demo pass can be scanned from another phone, so the door can be acted out', async () => {
+  const demo = await demoClient();
+  const { data } = await demo('/api/auth/me');
+  const other = await client();
+  const seen = await other('/api/staff', { method: 'POST', body: { code: data.next.code, apply: false } });
+  assert.equal(seen.data.result, 'valid');
+  assert.ok(seen.data.holder, 'reception sees the name');
 });
 
 test('another account cannot read, use or change a real person\'s pass', needsDb, async () => {
@@ -386,26 +422,43 @@ test('a real account can only check in and claim refused entry around its sessio
   const b = await booked(call);
   await moveTo(b.id, 0.5);
   assert.ok((await call(`/api/bookings/${b.id}/checkin`, { method: 'POST', body: {} })).data.checked_in_at);
+
+  const late = await booked(call);
+  await moveTo(late.id, -4);
+  assert.equal((await call(`/api/bookings/${late.id}/checkin`, { method: 'POST', body: {} })).data.code, 'too_late', 'a finished session says so');
+  const [row] = await sql`SELECT checked_in_at FROM bookings WHERE id = ${late.id}::uuid`;
+  assert.equal(row.checked_in_at, null);
+  const lateClaim = await call(`/api/bookings/${late.id}/refused`, { method: 'POST', body: { reason: 'closed' } });
+  assert.equal(lateClaim.data.refund_cents, late.price, 'turned away and claiming four hours later still works');
+  const gone = await booked(call);
+  await moveTo(gone.id, -7);
+  assert.equal((await call(`/api/bookings/${gone.id}/refused`, { method: 'POST', body: { reason: 'closed' } })).data.code, 'too_late');
 });
 
-test('demo ratings stay private and a real visit counts', needsDb, async () => {
-  const slug = 'iron-gym-amsterdam';
-  const score = async () => {
-    const [g] = await sql`SELECT id FROM gyms WHERE slug = ${slug}`;
-    const [r] = await sql`SELECT count(*)::int AS n FROM reviews WHERE gym_id = ${g.id}::uuid AND is_public`;
-    return r.n;
-  };
-  const before = await score();
+async function qaGym() {
+  const slug = `qa-test-gym-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+  const [gym] = await sql`INSERT INTO gyms (slug, name, city, country, timezone, address, lat, lng, price_cents, is_demo) VALUES (${slug}, 'QA Test Gym', 'Testville', 'Testland', 'Europe/Berlin', '1 Test Street', 10.5, 10.5, 1000, false) RETURNING id`;
+  return gym;
+}
+
+test('demo ratings stay private, and a real visit counts on saved gyms too', needsDb, async () => {
+  const publicCount = async () => (await sql`SELECT count(*)::int AS n FROM reviews WHERE is_public`)[0].n;
+  const before = await publicCount();
   const demo = await demoClient();
   const { data } = await demo('/api/auth/me');
   assert.equal((await demo('/api/reviews', { method: 'POST', body: { bookingId: data.toRate.id, stars: 5 } })).status, 200);
-  assert.equal(await score(), before, 'a demo rating changes nothing');
+  assert.equal(await publicCount(), before, 'a demo rating changes nothing');
+
+  const gym = await qaGym();
   const call = await client();
   const a = await booked(call);
-  await sql`UPDATE bookings SET gym_id = (SELECT id FROM gyms WHERE slug = ${slug}) WHERE id = ${a.id}::uuid`;
+  await sql`UPDATE bookings SET gym_id = ${gym.id}::uuid WHERE id = ${a.id}::uuid`;
   await moveTo(a.id, -5);
   assert.equal((await call('/api/reviews', { method: 'POST', body: { bookingId: a.id, stars: 4 } })).status, 200);
-  assert.equal(await score(), before + 1, 'a real rating counts');
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: gym.id, saved: true } })).status, 200);
+  const saved = (await call('/api/saved')).data.gyms.find((g) => g.id === gym.id);
+  assert.equal(saved.rating, 4, 'the saved list counts the real review');
+  assert.equal(saved.rating_count, 1);
 });
 
 test('filters really narrow the results', async () => {
@@ -452,19 +505,43 @@ test('a reminder arrives once, and opening the inbox clears the count', needsDb,
   const first = (await call('/api/auth/me')).data.unread;
   const second = (await call('/api/auth/me')).data.unread;
   assert.equal(second, first, 'no duplicate reminder');
-  const [msg] = await sql`SELECT title FROM messages WHERE booking_id = ${a.id}::uuid AND kind = 'reminder'`;
-  assert.ok(msg, 'the reminder was written');
+  const [msg] = await sql`SELECT title, body FROM messages WHERE booking_id = ${a.id}::uuid AND kind = 'reminder'`;
+  assert.equal(msg.title, `Coming up: ${a.gym.name}`, 'the title stays true on any day it is read');
+  assert.match(msg.body, /\d{2}:\d{2}/, 'the message gives the time');
   assert.equal((await call('/api/messages', { method: 'POST' })).status, 200);
   assert.equal((await call('/api/auth/me')).data.unread, 0);
 });
 
-test('saved gyms use the same rating as everywhere else', needsDb, async () => {
+test('a gym that is no longer listed cannot be saved, and a malformed id is refused plainly', async () => {
   const call = await client();
-  const search = await (await fetch(`${BASE}/api/gyms?city=Amsterdam`)).json();
-  const gym = search.gyms[0];
-  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: gym.id, saved: true } })).status, 200);
-  const saved = (await call('/api/saved')).data.gyms.find((g) => g.id === gym.id);
-  assert.equal(saved.rating, gym.rating);
-  assert.equal(saved.rating_count, gym.rating_count);
-  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: crypto.randomUUID(), saved: true } })).status, 200, 'a gym that no longer exists is ignored');
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: crypto.randomUUID(), saved: true } })).status, 404);
+  const dashes = '-'.repeat(36);
+  assert.equal((await call('/api/saved', { method: 'POST', body: { gymId: dashes, saved: true } })).status, 400);
+  assert.equal((await call(`/api/bookings/${dashes}/checkin`, { method: 'POST', body: {} })).status, 404);
+});
+
+test('general area: decoded, safe with bad input, and absent when unknown', { skip: LOCAL ? false : 'Vercel sets these headers itself on the live site' }, async () => {
+  const where = async (headers) => (await fetch(`${BASE}/api/where`, { headers })).json();
+  assert.deepEqual(await where({ 'x-vercel-ip-city': 'M%C3%BCnchen', 'x-vercel-ip-country': 'DE' }), { city: 'M\u00fcnchen', country: 'DE' });
+  assert.equal((await where({ 'x-vercel-ip-city': '%E0%A4%A' })).city, null);
+  assert.equal((await where({})).city, null);
+});
+
+test('a demo pass is placed in the visitor\'s area when it has gyms', { skip: LOCAL ? false : 'Vercel sets this header itself on the live site' }, async () => {
+  const here = await demoClient({ 'x-vercel-ip-city': 'Berlin' });
+  assert.equal((await here('/api/auth/me')).data.next.gym_city, 'Berlin');
+  const elsewhere = await demoClient({ 'x-vercel-ip-city': 'Nowhereville' });
+  assert.equal((await elsewhere('/api/auth/me')).data.next.gym_city, 'Amsterdam');
+});
+
+test('the country settles which city a name means', async () => {
+  const paris = await (await fetch(`${BASE}/api/gyms?city=Paris&country=FR`)).json();
+  assert.equal(paris.place.country, 'France');
+  assert.equal((await fetch(`${BASE}/api/gyms?city=Paris&country=ZZ`)).status, 404);
+});
+
+test('city suggestions can be cached when the lookup worked', async () => {
+  const res = await fetch(`${BASE}/api/places?q=Berlin`);
+  assert.match(res.headers.get('cache-control') ?? '', /public/);
+  assert.ok((await res.json()).places.length > 0);
 });

@@ -26,6 +26,7 @@ export function StaffScanner() {
   const stream = useRef<MediaStream | null>(null);
   const timer = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const lastScan = useRef('');
+  const lastSeen = useRef(0);
 
   const check = useCallback(async (value: string) => {
     if (!value.trim()) return;
@@ -53,7 +54,14 @@ export function StaffScanner() {
     stream.current = null;
   }, []);
 
-  useEffect(() => stop, [stop]);
+  const alive = useRef(true);
+  useEffect(() => {
+    alive.current = true;
+    return () => {
+      alive.current = false;
+      stop();
+    };
+  }, [stop]);
 
   const startCamera = async () => {
     const Detector = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
@@ -63,6 +71,11 @@ export function StaffScanner() {
     }
     try {
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
+      // The person may have left, or tapped twice, while the camera was starting.
+      if (!alive.current) {
+        s.getTracks().forEach((t) => t.stop());
+        return;
+      }
       stop();
       stream.current = s;
       setCamera('on');
@@ -77,8 +90,14 @@ export function StaffScanner() {
         if (!video.current || video.current.readyState < 2) return;
         const found = await detector.detect(video.current).catch(() => []);
         const value = found[0]?.rawValue;
-        if (value && !value.startsWith('DAYPASS:')) return;
-        if (value && value !== lastScan.current) {
+        // Ready for the same pass again only once it has left the camera for a moment.
+        if (!value) {
+          if (Date.now() - lastSeen.current > 2500) lastScan.current = '';
+          return;
+        }
+        if (!value.startsWith('DAYPASS:')) return;
+        lastSeen.current = Date.now();
+        if (value !== lastScan.current) {
           lastScan.current = value;
           check(value);
         }
@@ -112,13 +131,13 @@ export function StaffScanner() {
       {error ? <p className="form-error" role="alert">{error}</p> : null}
 
       {result && copy ? (
-        <div onAnimationEnd={() => { lastScan.current = ''; }} key={`${result.code}-${result.result}`} className={`staff-result ${copy.tone}`} role="status">
+        <div key={`${result.code}-${result.result}`} className={`staff-result ${copy.tone}`} role="status">
           <h2>{copy.title}</h2>
           <p>{copy.line(result)}</p>
           {result.result !== 'unknown' && result.code ? <p><strong>{result.code}</strong></p> : null}
         </div>
       ) : null}
-      <p className="fine">Demo door scanner. A pass is valid from one hour before its session until three hours after it starts.</p>
+      <p className="fine">Demo door scanner. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time, from any account. A real pass can only be scanned from its own account, so it says Not found anywhere else.</p>
     </div>
   );
 }

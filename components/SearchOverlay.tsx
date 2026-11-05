@@ -2,12 +2,12 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { IconClock, IconLocate, IconPin, IconSearch } from './Icons';
-import { locate, recentCities, rememberCity } from './location';
+import { locate, placeUrl, recentCities, rememberCity } from './location';
 import { Sheet } from './ui/Sheet';
 import { useFeedback } from './ui/feedback';
 
 const POPULAR = ['Amsterdam', 'Berlin', 'Lisbon', 'Barcelona', 'Paris', 'Prague', 'Vienna', 'Rome'];
-type Place = { name: string; country: string; admin?: string };
+type Place = { name: string; country: string; code?: string; admin?: string };
 
 // Full-screen search with suggestions, recent places and Near me.
 export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose: () => void; note?: string }) {
@@ -49,11 +49,11 @@ export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose:
     };
   }, [q]);
 
-  const go = (city: string) => {
+  const go = (city: string, country: string | null = null) => {
     rememberCity(city);
     setNavigating(true);
     onClose();
-    router.push(`/gyms?city=${encodeURIComponent(city)}`);
+    router.push(placeUrl({ city, country }));
   };
 
   const nearMe = async () => {
@@ -63,7 +63,7 @@ export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose:
       await locate();
       setNavigating(true);
       onClose();
-      router.push('/gyms?near=1');
+      router.push(placeUrl({ near: '1' }));
     } catch (e) {
       const text = e instanceof Error ? e.message : 'Location is off. Type a city instead.';
       setMessage(text);
@@ -75,7 +75,7 @@ export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose:
 
   return (
     <Sheet open={open} onClose={onClose} title="Where to?" full keepHistory={navigating} className="sheet-search">
-      <form className="overlay-search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) go(places[0]?.name ?? q.trim()); }}>
+      <form className="overlay-search" role="search" onSubmit={(e) => { e.preventDefault(); if (q.trim()) go(places[0]?.name ?? q.trim(), places[0]?.code ?? null); }}>
         <IconSearch />
         <label htmlFor="overlay-q" className="sr">City</label>
         <input id="overlay-q" autoFocus value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search a city" autoComplete="off" enterKeyHint="search" />
@@ -86,7 +86,7 @@ export function SearchOverlay({ open, onClose, note }: { open: boolean; onClose:
         <ul className="overlay-list" aria-label="Suggestions">
           {places.map((p) => (
             <li key={`${p.name}-${p.admin}-${p.country}`}>
-              <button type="button" onClick={() => go(p.name)}>
+              <button type="button" onClick={() => go(p.name, p.code ?? null)}>
                 <i><IconPin /></i>
                 <span><strong>{p.name}</strong><small>{[p.admin, p.country].filter(Boolean).join(', ')}</small></span>
               </button>

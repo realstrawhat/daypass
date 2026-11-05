@@ -128,7 +128,7 @@ export function GymBooking({ gym }: Props) {
         )}
         {error ? <p className="form-error" role="alert">{error}</p> : null}
         {selected && !busy ? (
-          <SwipeAction key={selected} label={<>Swipe to book <em>{money(gym.price_cents)}</em></>} ariaLabel={`Book ${selectedLabel} for ${money(gym.price_cents)}`} onConfirm={book} />
+          <SwipeAction key={selected} label={<><span>Swipe to book <em>{money(gym.price_cents)}</em></span><small>{selectedLabel}</small></>} ariaLabel={`Swipe to book ${money(gym.price_cents)} ${selectedLabel}`} onConfirm={book} />
         ) : (
           <button type="button" className="book-cta" disabled>
             <span key={selected ?? 'none'} className="book-cta-label">{busy ? 'Holding your spot' : 'Pick a time'}</span>

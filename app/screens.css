@@ -40,16 +40,7 @@
 .search-pill.is-large { min-height: 56px; }
 .search-pill.is-large span { color: #555; font-weight: 600; }
 
-.next-card { position: relative; overflow: hidden; display: flex; justify-content: space-between; align-items: flex-end; gap: 14px; flex-wrap: wrap; padding: 20px; border-radius: 30px; background: var(--volt); color: #000; transition: transform var(--t-2) var(--spring); animation: card-up 520ms var(--spring) both; }
 @keyframes card-up { from { transform: translateY(16px); opacity: 0; } }
-.next-card:focus-visible { outline-color: #fff; }
-.next-main { position: relative; min-width: 0; }
-.next-label { font-weight: 800; font-size: .92rem; min-height: 1.400em; }
-.next-card h2 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(2.300rem, 5.400vw, 4.200rem); line-height: 1.060; overflow-wrap: anywhere; }
-.next-when { font-weight: 700; }
-.next-open { position: relative; display: inline-flex; align-items: center; gap: 10px; font-weight: 800; }
-.next-open i { width: 44px; height: 44px; display: grid; place-items: center; border-radius: 50%; background: #000; color: var(--volt); transition: transform var(--t-3) var(--bounce); }
-.next-card:hover .next-open i { transform: rotate(45deg); }
 /* Swipeable featured gyms: each card eases to full size as it reaches the centre. */
 .featured { display: grid; gap: 10px; min-width: 0; }
 .featured-track { display: flex; gap: 12px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; margin: 0 calc(var(--gutter) * -1); padding: 2px var(--gutter); scroll-padding-inline: var(--gutter); overscroll-behavior-x: contain; }
@@ -74,13 +65,6 @@
 }
 
 /* City marks */
-.city-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
-.city-tile { display: grid; justify-items: center; align-content: center; gap: 8px; aspect-ratio: 1 / 1.100; padding: 10px 4px; border-radius: 22px; background: var(--s1); text-align: center; transition: transform var(--t-2) var(--spring), background var(--t-2); }
-.city-tile:hover { background: var(--s2); }
-.city-tile .city-mark { color: var(--volt); transition: transform var(--t-3) var(--bounce); }
-.city-tile:active { transform: scale(.94); }
-.city-tile:active .city-mark { transform: translateY(-3px) scale(1.080); }
-.city-tile span { font-size: .8rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; max-width: 100%; }
 .search-title { display: flex; align-items: center; flex-wrap: wrap; gap: 4px 10px; }
 .search-title .city-mark { color: var(--volt); }
 /* A single foil pass across something freshly earned */
@@ -114,10 +98,6 @@
 .price-sticker.is-small { font-size: 1.160rem; padding: 4px 11px; }
 .price-sticker.is-large { font-size: 2rem; padding: 8px 15px; border-radius: 16px; }
 .pick-card:hover .price-sticker, .gym-card:hover .price-sticker, .feature-card:hover .price-sticker { transform: rotate(-9deg) scale(1.060); }
-.city-chip { position: relative; display: block; width: 156px; aspect-ratio: 1; border-radius: 26px; overflow: hidden; background: var(--s3); transition: transform var(--t-2) var(--spring); contain: paint; }
-.city-chip img { object-fit: cover; filter: grayscale(1) contrast(1.080) brightness(.62); transition: filter var(--t-3); }
-.city-chip:hover img { filter: grayscale(0) brightness(.8); }
-.city-chip span { position: absolute; left: 12px; bottom: 8px; font-family: var(--display); font-size: 1.500rem; text-transform: uppercase; }
 .home-partner { display: grid; gap: 2px; margin-top: 10px; padding: 16px 18px; border-radius: 24px; background: var(--s1); }
 .home-partner strong { font-weight: 800; }
 .home-partner span { color: var(--text-2); }

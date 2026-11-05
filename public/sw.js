@@ -1,7 +1,8 @@
 // Keeps passes and the app shell available with no signal, such as in a gym basement.
-const VERSION = 'daypass-v2';
+const VERSION = 'daypass-v3';
 const STATIC = `${VERSION}-static`;
-const PAGES = `${VERSION}-pages`;
+// Saved passes keep this name across versions, so an update doesn't lose them.
+const PAGES = 'daypass-pages';
 const OFFLINE = '/offline.html';
 
 self.addEventListener('install', (event) => {
@@ -10,14 +11,40 @@ self.addEventListener('install', (event) => {
 
 self.addEventListener('activate', (event) => {
   event.waitUntil(
-    caches.keys().then((keys) => Promise.all(keys.filter((k) => !k.startsWith(VERSION)).map((k) => caches.delete(k)))).then(() => self.clients.claim()),
+    (async () => {
+      const pages = await caches.open(PAGES);
+      for (const name of await caches.keys()) {
+        if (name === STATIC || name === PAGES) continue;
+        // Passes saved by an older version move across, so an update doesn't lose them.
+        if (name.endsWith('-pages')) {
+          const old = await caches.open(name);
+          for (const req of await old.keys()) {
+            const res = await old.match(req);
+            if (res) await pages.put(req, res);
+          }
+        }
+        await caches.delete(name);
+      }
+      await self.clients.claim();
+    })(),
   );
 });
 
+// A log-out moves this on, so a save that was still on its way can't land after the pages were cleared.
+let generation = 0;
+
+// A redirect to the login screen must never be saved in place of a pass.
+async function savePage(cache, url) {
+  const started = generation;
+  const res = await fetch(url);
+  if (started === generation && res.ok && !res.redirected) await cache.put(url, res);
+}
+
 // In-app links aren't full page loads, so an opened pass asks to be saved directly.
 self.addEventListener('message', (event) => {
+  if (event.data?.type === 'forget-pages') generation += 1;
   if (event.data?.type !== 'save-pages') return;
-  event.waitUntil(caches.open(PAGES).then((c) => Promise.all(event.data.urls.map((u) => c.add(u).catch(() => {})))));
+  event.waitUntil(caches.open(PAGES).then((c) => Promise.all(event.data.urls.map((u) => savePage(c, u).catch(() => {})))));
 });
 
 self.addEventListener('fetch', (event) => {
@@ -45,7 +72,7 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(request)
         .then((res) => {
-          if (res.ok) {
+          if (res.ok && !res.redirected) {
             const copy = res.clone();
             caches.open(PAGES).then((c) => c.put(request, copy));
           }
