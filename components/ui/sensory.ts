@@ -26,7 +26,7 @@ let lastFelt = 0;
 let underFinger = false;
 
 // True just after a tap or event has already buzzed.
-export const justFelt = () => performance.now() - lastFelt < 120;
+export const justFelt = (ms = 120) => performance.now() - lastFelt < ms;
 
 export function soundOn() {
   try {

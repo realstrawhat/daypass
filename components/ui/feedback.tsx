@@ -4,10 +4,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import { IconCheck, Spark } from '../Icons';
 import { feel, hapticsOn, installTapFeedback, justFelt } from './sensory';
 
-// Taps are handled globally by installTapFeedback. This remains for async moments without a tap.
+// Taps are handled globally by installTapFeedback. This remains for async moments without a tap. A tap made while a
+// server-drawn screen is still waking up reaches its button's handler later, when React replays it, so a buzz within
+// the last 1.5 seconds counts as this tap's.
 export const haptic = (ms = 8) => {
   try {
-    if (!justFelt() && hapticsOn()) navigator.vibrate?.(Math.max(ms, 16));
+    if (!justFelt(1500) && hapticsOn()) navigator.vibrate?.(Math.max(ms, 16));
   } catch {}
 };
 

@@ -117,7 +117,7 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
         sessionStorage.removeItem('daypass-session');
       } catch {}
       await clearSavedPages();
-      toast('Deletion requested. Your account will be erased within 30 days.');
+      toast('Account deleted');
       setTimeout(() => window.location.assign('/home'), 1400);
     } catch (e) {
       setDeleteError(e instanceof Error ? e.message : 'That did not work. Try again.');
@@ -221,10 +221,10 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
 
       <Sheet open={sheet === 'delete'} onClose={() => setSheet(null)} title="Delete account">
         <div className="link-list">
-          <p className="sheet-sub">We erase your account and bookings within 30 days of your request, and you are logged out now. <Link href="/privacy" className="link">Read the privacy notice</Link>.</p>
+          <p className="sheet-sub">This erases your account straight away, with your bookings, passes, ratings and saved gyms, and logs you out. It can't be undone. <Link href="/privacy" className="link">Read the privacy notice</Link>.</p>
           <div className="field"><label htmlFor="del-confirm">Type DELETE to confirm</label><input id="del-confirm" value={confirmText} onChange={(e) => setConfirmText(e.target.value)} autoComplete="off" /></div>
           {deleteError ? <p className="form-error" role="alert">{deleteError}</p> : null}
-          <button type="button" className="btn btn-danger btn-block" disabled={busy} onClick={removeAccount}>Request deletion</button>
+          <button type="button" className="btn btn-danger btn-block" disabled={busy} onClick={removeAccount}>Delete my account</button>
         </div>
       </Sheet>
     </>

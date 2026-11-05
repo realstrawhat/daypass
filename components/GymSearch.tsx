@@ -6,12 +6,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { distanceLabel, money } from '@/lib/format';
 import { gymStatus } from '@/lib/hours';
 import type { Gym, Sort } from '@/lib/gyms';
+import { searchQueryKey } from '@/lib/search-query';
 import { CityMark } from './CityMark';
 import { ScrollArrows } from './ui/Rail';
 import { FilterSheet, filterCount, NO_FILTERS, type Filters } from './FilterSheet';
 import { GymCard, RatingLine } from './GymCard';
 import { GymPhoto } from './GymPhoto';
 import { IconClose, IconExpand, IconList, IconLocate, IconMap, IconSearch, IconSliders } from './Icons';
+import { MapPreview } from './MapPreview';
 import { type Area, getLastCoords, getResolvedCity, kmBetween, locate, locationAllowed, nearestCity, watchLocation, generalArea, placeUrl } from './location';
 import { SearchOverlay } from './SearchOverlay';
 import { useSession } from './session';
@@ -60,7 +62,7 @@ const apiParams = (q: { city: string | null; country: string | null; sort: Sort;
   return p;
 };
 
-export function GymSearch() {
+export function GymSearch({ initial = null }: { initial?: { query: string; result: Result } | null }) {
   const params = useSearchParams();
   const router = useRouter();
   const { user, ready } = useSession();
@@ -89,11 +91,24 @@ export function GymSearch() {
   const hasSearch = !!city || (near && !!coords);
   const key = useMemo(() => JSON.stringify({ city, country, area, sort, filters, coords: near ? coords : null }), [city, country, area, sort, filters, coords, near]);
 
+  // The server sends a city search's first page with the page. It only stands for the search it was made for: this
+  // same address, seen as a guest. A saved sort or price limit, or a change made here since, is another search.
+  const guestKey = useMemo(() => JSON.stringify({
+    city: urlCity,
+    country,
+    area,
+    sort: (params.get('sort') as Sort) || 'recommended',
+    filters: { maxPrice: params.get('maxPrice') === 'any' ? null : validNumber(params.get('maxPrice')), minRating: validNumber(params.get('minRating')), openNow: params.get('openNow') === '1', equipment: paramEquipment ? paramEquipment.split('|') : [] },
+    coords: null,
+  }), [params, urlCity, country, area, paramEquipment]);
+  const seed = initial && !near && key === guestKey && initial.query === searchQueryKey((k) => params.get(k)) ? initial.result : null;
+
   const cached = cache.get(key);
-  const [result, setResult] = useState<Result | null>(cached?.result ?? null);
-  const [gyms, setGyms] = useState<Gym[]>(cached?.gyms ?? []);
-  const [page, setPage] = useState(cached?.page ?? 1);
-  const [loading, setLoading] = useState(!cached);
+  const start = cached ?? (seed ? { result: seed, gyms: seed.gyms, page: 1 } : undefined);
+  const [result, setResult] = useState<Result | null>(start?.result ?? null);
+  const [gyms, setGyms] = useState<Gym[]>(start?.gyms ?? []);
+  const [page, setPage] = useState(start?.page ?? 1);
+  const [loading, setLoading] = useState(!start);
   const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState('');
   const [retry, setRetry] = useState(0);
@@ -103,6 +118,7 @@ export function GymSearch() {
   const [overlay, setOverlay] = useState(false);
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [showPill, setShowPill] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
   const request = useRef(0);
   const keyRef = useRef(key);
   keyRef.current = key;
@@ -213,7 +229,11 @@ export function GymSearch() {
 
   useEffect(() => {
     if (!hasSearch) return;
-    const hit = cache.get(key);
+    let hit = cache.get(key);
+    if (!hit && seed) {
+      hit = { result: seed, gyms: seed.gyms, page: 1 };
+      cache.set(key, hit);
+    }
     if (hit) {
       // A slower, older search must not replace this one when it lands.
       request.current += 1;
@@ -361,6 +381,7 @@ export function GymSearch() {
   const selectedGym = gyms.find((g) => g.id === selected) ?? null;
   const count = filterCount(filters);
   const removeEquipment = (k: string) => applyFilters({ ...filters, equipment: filters.equipment.filter((e) => e !== k) });
+  const mapPadding = { top: 72, bottom: view === 'map' ? 200 : 72, left: 40, right: 40 };
 
   const overlays = (
     <>
@@ -396,6 +417,7 @@ export function GymSearch() {
       }}
     >
       <aside className="search-map" aria-label="Map">
+        <MapPreview gyms={gyms} padding={mapPadding} done={mapReady} onSelect={selectPin} />
         <GymMap
           gyms={gyms}
           center={result?.center ?? coords}
@@ -403,7 +425,8 @@ export function GymSearch() {
           onSelect={selectPin}
           onBackground={() => setSelected(null)}
           onAreaSearch={(b) => setQuery({ area: b.join(','), city: urlCity })}
-          padding={{ top: 72, bottom: view === 'map' ? 200 : 72, left: 40, right: 40 }}
+          padding={mapPadding}
+          onReady={() => setMapReady(true)}
           me={me}
           onLocate={nearMe}
           locating={locating}

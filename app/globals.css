@@ -31,6 +31,8 @@
 }
 
 *, *::before, *::after { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+/* Read out by screen readers, not shown. */
+.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 html { -webkit-text-size-adjust: 100%; background: var(--black); overflow-x: clip; }
 html.sheet-open { overflow: hidden; }
 body { margin: 0; min-height: 100svh; background: var(--black); color: var(--white); font-family: var(--body); font-size: 1rem; line-height: 1.5; font-weight: 500; overflow-x: clip; overscroll-behavior-y: none; -webkit-font-smoothing: antialiased; text-rendering: optimizeLegibility; }

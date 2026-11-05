@@ -84,8 +84,16 @@ const exists = (page, selector) => page.$(selector).then(Boolean);
 const open = (page, path) => page.goto(BASE + path, { waitUntil: 'domcontentloaded' });
 const address = (page) => page.evaluate(() => location.pathname + location.search);
 
+// A screen drawn on the server shows before its buttons work, so a tap waits until React has taken over the element.
+// A person takes longer than that to aim. The wait gives up after 15 seconds and taps anyway.
+const ready = (page, selector) => page.waitForFunction((s) => {
+  const e = document.querySelector(s);
+  return !!e && Object.keys(e).some((k) => k.startsWith('__reactProps$'));
+}, { timeout: 15000 }, selector).catch(() => {});
+
 // Taps a gym card that is on screen, at the point a finger would, leaving the scroll position alone.
 async function tapCardOnScreen(page) {
+  await ready(page, 'a.gym-card');
   const at = await page.evaluate(() => {
     const card = [...document.querySelectorAll('a.gym-card')].find((c) => {
       const r = c.getBoundingClientRect();
@@ -106,6 +114,7 @@ async function tapStackedCard(page, selector) {
 
 async function tap(page, selector) {
   await page.waitForSelector(selector, { visible: true });
+  await ready(page, selector);
   await page.$eval(selector, (e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
   await page.click(selector);
 }
@@ -118,6 +127,7 @@ async function tapText(page, words) {
     return [...scope.querySelectorAll('button, a')].find((b) => b.innerText.trim().startsWith(w) && !b.disabled && b.offsetParent !== null) ?? null;
   }, {}, words);
   await handle.evaluate((e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await handle.asElement().evaluateHandle((e) => e).then((el) => page.waitForFunction((x) => Object.keys(x).some((k) => k.startsWith('__reactProps$')), { timeout: 15000 }, el)).catch(() => {});
   // A sheet may still be sliding into place.
   await sleep(420);
   await handle.asElement().click();
@@ -852,7 +862,7 @@ test('deleting an account removes its saved pages too', needsChrome, async () =>
   await page.waitForSelector('#del-confirm');
   await sleep(450);
   await page.type('#del-confirm', 'DELETE');
-  await tapText(page, 'Request deletion');
+  await tapText(page, 'Delete my account');
   await page.waitForFunction(() => location.pathname === '/home');
   const left = await page.evaluate(async () => (await (await caches.open('daypass-pages')).keys()).map((r) => new URL(r.url).pathname));
   assert.ok(!left.some((p) => /^\/(bookings|account)/.test(p)), `found ${left}`);

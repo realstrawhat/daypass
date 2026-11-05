@@ -564,3 +564,28 @@ test('city suggestions can be cached when the lookup worked', async () => {
   assert.match(res.headers.get('cache-control') ?? '', /public/);
   assert.ok((await res.json()).places.length > 0);
 });
+
+test('deleting an account erases it at once, frees its spot and ends its login', async () => {
+  const call = await client();
+  const email = (await call('/api/auth/me')).data.user.email;
+  const { gym, slots } = await freeSlots();
+  const slot = pick(later(slots));
+  const hold = await call('/api/checkout', { method: 'POST', body: { gymId: gym.id, startsAt: slot.startsAt, key: key() } });
+  await call(`/api/checkout/${hold.data.booking.id}/pay`, { method: 'POST', body: { method: 'demo-card' } });
+  const spots = async () => (await (await fetch(`${BASE}/api/gyms/${gym.id}/slots`)).json()).days.flatMap((d) => d.slots).find((s) => s.startsAt === slot.startsAt)?.spots;
+  const before = await spots();
+  assert.equal((await call('/api/account', { method: 'DELETE', body: { confirm: 'delete it' } })).status, 400, 'needs the word DELETE');
+  assert.equal((await call('/api/account', { method: 'DELETE', body: { confirm: 'DELETE' } })).status, 200);
+  assert.equal((await call('/api/auth/me')).data.user, null, 'logged out');
+  assert.equal(await spots(), before + 1, 'the spot is free again');
+  const again = await fetch(`${BASE}/api/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, password: 'testing-123' }) });
+  assert.equal(again.status, 401, 'the account is gone, so it cannot log in');
+  if (sql) assert.equal((await sql`SELECT count(*)::int AS n FROM users WHERE email = ${email}`)[0].n, 0, 'erased from the database');
+});
+
+test('a city search arrives with its first gyms and their map pins already in the page', async () => {
+  const html = await (await fetch(`${BASE}/gyms?city=Berlin`)).text();
+  const cards = html.match(/class="gym-card/g)?.length ?? 0;
+  assert.ok(cards >= 20, `found ${cards} gyms in the page`);
+  assert.ok((html.match(/class="pin"/g)?.length ?? 0) >= 2, 'pins drawn before the map loads');
+});

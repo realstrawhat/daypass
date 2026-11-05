@@ -21,6 +21,8 @@ type Props = {
   me?: { lat: number; lng: number } | null;
   onLocate?: () => void;
   locating?: boolean;
+  /** Called once the street map has drawn. */
+  onReady?: () => void;
 };
 
 const STYLE = 'https://tiles.openfreemap.org/styles/dark';
@@ -42,7 +44,7 @@ function tuneStyle(m: any) {
 }
 
 // MapLibre loads only when a map is on screen, which keeps the list fast on mobile data.
-export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaSearch, zoom = 12.5, single = false, padding, me, onLocate, locating }: Props) {
+export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaSearch, zoom = 12.5, single = false, padding, me, onLocate, locating, onReady }: Props) {
   const meMarker = useRef<any>(null);
   const box = useRef<HTMLDivElement>(null);
   const map = useRef<any>(null);
@@ -59,6 +61,10 @@ export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaS
   backgroundRef.current = onBackground;
   const padRef = useRef(padding);
   padRef.current = padding;
+  const readyRef = useRef(onReady);
+  readyRef.current = onReady;
+  const gymsRef = useRef(gyms);
+  gymsRef.current = gyms;
 
   // A map further down a page waits until it is nearly on screen.
   useEffect(() => {
@@ -77,11 +83,14 @@ export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaS
         const maplibre = mod.default ?? mod;
         if (cancelled || !box.current) return;
         lib.current = maplibre;
+        // Opening straight onto the gyms' frame loads the right tiles first, and keeps the pins that were drawn
+        // before the map arrived exactly where they were.
+        const first = single ? [] : gymsRef.current.slice(0, 12);
+        const frame = first.length > 1 ? first.reduce((b: any, g) => b.extend([g.lng, g.lat]), new maplibre.LngLatBounds()) : null;
         const m = new maplibre.Map({
           container: box.current,
           style: STYLE,
-          center: center ? [center.lng, center.lat] : [4.9041, 52.3676],
-          zoom,
+          ...(frame ? { bounds: frame, fitBoundsOptions: { padding: padRef.current ?? 56, maxZoom: 14 } } : { center: center ? [center.lng, center.lat] : [4.9041, 52.3676], zoom }),
           attributionControl: { compact: true },
           fadeDuration: reduced() ? 0 : 150,
           cooperativeGestures: single,
@@ -95,6 +104,7 @@ export function GymMap({ gyms, center, activeId, onSelect, onBackground, onAreaS
           tuneStyle(m);
           setFailed(false);
           setReady(true);
+          readyRef.current?.();
         });
         m.on('error', (e: { error?: { status?: number } }) => {
           if (!m.isStyleLoaded() && !m.loaded() && e?.error) setFailed(true);

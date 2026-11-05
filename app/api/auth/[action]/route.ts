@@ -33,7 +33,8 @@ export const POST = handle(async (req, ctx) => {
     const rows = await db()`INSERT INTO users (email, name, password_hash) VALUES (${email}, ${name.slice(0, 80)}, ${hash}) ON CONFLICT (email) DO NOTHING RETURNING id`;
     if (!rows[0]) throw new HttpError(409, 'That email already has an account. Log in instead.', 'email');
     const userId = rows[0].id as string;
-    await addSamplePastVisit(userId, networkArea(req.headers).city).catch(() => {});
+    // A real account's example visit is always in the same city, so nothing about where its owner is gets stored.
+    await addSamplePastVisit(userId).catch(() => {});
     await addMessage(userId, 'welcome', `Welcome, ${name.split(' ')[0]}`, 'Your account is ready. Book a session and your pass will appear in Passes.');
     await createSession(userId);
     return Response.json({ ok: true });

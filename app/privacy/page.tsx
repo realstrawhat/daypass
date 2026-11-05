@@ -24,7 +24,7 @@ export default function PrivacyPage() {
         <h2 className="section-title">Simulated features</h2>
         <p>Payments, the Wallet, email and push messages, and demo Face ID are simulated. We never ask for card details and no money moves.</p>
         <h2 className="section-title">Deleting your account</h2>
-        <p>Request deletion from your <Link href="/account" className="link">account page</Link>. You are logged out at once, and your account is erased within 30 days of the request.</p>
+        <p>Delete your account from your <Link href="/account" className="link">account page</Link>. It is erased straight away, with your bookings, ratings and saved gyms, and you are logged out.</p>
         <h2 className="section-title">Credits</h2>
         <p>See the <Link href="/credits" className="link">photo and video credits</Link>.</p>
       </main>

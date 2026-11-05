@@ -304,6 +304,8 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
         <header className="home-top">
           <p className="home-brand"><Spark /> {!ready ? <span className="sk sk-word" /> : user ? `Hi ${user.name.split(' ')[0]}` : 'Daypass'}</p>
           <div className="home-actions">
+            {/* First in the row, so nothing that appears later pushes it along. */}
+            {hero.pause}
             {user ? (
               <>
                 <Link href="/saved" className="round round-frost" aria-label={saved.length ? `Saved gyms, ${saved.length}` : 'Saved gyms'}>
@@ -317,7 +319,6 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
             ) : ready ? (
               <Link href="/login?next=/home" className="home-login">Log in</Link>
             ) : null}
-            {hero.pause}
           </div>
         </header>
 

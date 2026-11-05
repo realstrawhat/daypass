@@ -1,4 +1,5 @@
 import { destroySession, handle, HttpError, readJson, requireUser } from '@/lib/auth';
+import { eraseUser } from '@/lib/bookings';
 import { db } from '@/lib/db';
 
 const SORTS = ['recommended', 'nearest', 'price_asc', 'price_desc', 'rating'];
@@ -15,13 +16,12 @@ export const PATCH = handle(async (req) => {
   return Response.json({ ok: true });
 });
 
-// Records a deletion request. The account is erased within 30 days and the user is logged out now.
+// Erases the account at once, which meets the 30 days the build pack allows, and logs it out.
 export const DELETE = handle(async (req) => {
   const user = await requireUser();
   const body = await readJson(req);
   if (body.confirm !== 'DELETE') throw new HttpError(400, 'Type DELETE to confirm.');
-  await db()`UPDATE users SET deletion_requested_at = now() WHERE id = ${user.id}::uuid`;
-  await db()`DELETE FROM sessions WHERE user_id = ${user.id}::uuid`;
+  await eraseUser(user.id);
   await destroySession();
   return Response.json({ ok: true });
 });

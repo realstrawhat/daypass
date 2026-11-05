@@ -433,6 +433,21 @@ export async function addReview(user: User, bookingId: string, stars: number, bo
   return b.gym_id;
 }
 
+// Erases an account at once. Its future spots are freed first, then the account goes, and with it its bookings,
+// passes, payments, ratings, saved gyms, messages, passkeys and logins. A gym it listed stays listed, without an owner.
+export async function eraseUser(userId: string) {
+  await db()`
+    WITH live AS (
+      SELECT gym_id, starts_at, count(*)::int AS c FROM bookings
+      WHERE user_id = ${userId}::uuid AND status IN ('hold', 'confirmed') AND starts_at > now()
+      GROUP BY gym_id, starts_at
+    ), freed AS (
+      UPDATE slots s SET booked = greatest(s.booked - l.c, 0) FROM live l
+      WHERE s.gym_id = l.gym_id AND s.starts_at = l.starts_at RETURNING 1
+    )
+    DELETE FROM users WHERE id = ${userId}::uuid`;
+}
+
 // The subtle demo login. Every tap makes a new throwaway account with a lived-in history,
 // so it can never reach anyone's real account.
 export async function createDemoUser(area: string | null = null) {
