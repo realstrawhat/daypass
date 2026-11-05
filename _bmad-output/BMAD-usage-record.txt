@@ -1252,6 +1252,13 @@ After the deploy
 [2026-11-05 14:43] Told Claude Code to deploy
     "DEPLOY THEN"
 
+[2026-11-05 15:59] Asked whether the app was ready, with everything ticked and all logic working
+    "anyway is this app readty to use as oer my assignment and my docs wt i
+    mentiomed and everything is ticked or no? does all logic work correctly?"
+
+[2026-11-05 22:29] Approved the fixes and the merge, and asked for the computer to stay fast while gaming
+    "yea do 2-3 fast asap im plaing game so dont make performance bad lol"
+
 
 ==============================================================================
 12. WHERE THE BMAD PROCESS WAS NOT FOLLOWED IN ROUND 2
@@ -1376,6 +1383,10 @@ like real counts. Bars are now labelled as estimated.
 2026-11-05 15:08  Browser tests against the live site: 32 passed, 1 failed
 2026-11-05 15:11  Browser tests against the live site: 33 passed, 0 failed
 2026-11-05 15:14  Browser tests as an iPhone against the live site: 33 passed, 0 failed
+2026-11-05 22:47  API tests + Browser tests: 45 passed, 0 failed / 32 passed, 1 failed
+2026-11-05 22:57  API tests: 8 passed, 1 failed
+2026-11-05 23:00  API tests: 0 passed, 1 failed / 0 passed, 1 failed
+2026-11-05 23:02  API tests: 7 passed, 0 failed
 
 Failed runs above were investigated, not ignored. The process log's failures
 table explains them, including a stale local server, an invalid first offline
@@ -3202,6 +3213,24 @@ Speed
     nor clearly hurt load speed: main content in 1.74 s before and 1.82 s
     after, with run-to-run spread larger than the gap. It also found a small
     new fault for the next deploy: the pause button moves when Log in appears.
+
+Readiness check
+    Asked whether everything was ticked, Claude Code checked each build pack
+    line against the code and the live site. NFR1 had never been measured on
+    Find, and failed: in a phone simulation the list took 5.6 to 6.2 s and the
+    map 14 to 16 s. Account deletion promised erasure within 30 days, but
+    nothing erased. The process log wrongly said NFR5 was partly met. A real
+    account's example visit was stored in its network city. The peer test is
+    still the student's.
+
+Fixes after the check
+    With the student's go-ahead, a city search's first 20 gyms and their map
+    pins now come with the page. Side by side under the same phone simulation,
+    the list went from 2.4 to 1.4 s and the pins from 6.0 to 1.4 s. The street
+    map stayed at about 6 to 7 s. Deletion now erases at once, with a test.
+    The changes were saved to GitHub, and main now matches the latest version.
+    The automated check refused the deploy this time, so the student was asked
+    to run it.
 
 Not done
     Nothing here has been felt or seen on a real phone. The student has not

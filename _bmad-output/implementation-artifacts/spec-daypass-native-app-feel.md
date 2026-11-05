@@ -286,6 +286,10 @@ Owner's request: finish the BMad steps and logs. The intent contract is unchange
 
 Owner's feedback from a phone: no haptics, and Home feels clunky, followed by "use big company design rule". The intent contract is unchanged. Changes: iPhones get a real-tap route to the system tick, because a script can reportedly no longer trigger it from iOS 26.5; haptics can be turned off; Home is refined against Apple's and Google's published guidance, without a redesign. A booking change now states the version it was made from, so a change from an out-of-date screen is refused. Verification gains `IPHONE=1 npm run test:ui`. Known-bad states avoided: a cover taking taps from a bar stuck above it, sideways rows clipped before the screen edge, tests leaving demo accounts behind. KEEP: the owner's chosen look and location order. None of this went through the four BMad reviewers. A further follow-up risk: the iPhone tick can only be judged on a real iPhone. The owner then asked for a centred navigation and a calmer reminder: the round tabs are four equal circles again, centred in a row that fills the screen, and the reminder card is smaller and darker, with the chip kept. The owner also chose to clear the demo accounts the tests had left behind.
 
+### 2026-11-06 (readiness check)
+
+The owner asked whether everything in the build pack and the brief was ticked. A line-by-line check found NFR1 unmeasured and failing on Find, account deletion that never erased, a wrong NFR5 line in the process log, and a real account's example visit stored in its network city. The intent contract is unchanged. Changes: a city search's first page and its map pins now come with the page, the map opens on the same frame, deletion erases at once, and the example visit is always in one city. Verification gains an API test for each of the first two. Known-bad state avoided: an early tap counted twice. KEEP: guests browse without logging in, and exact location stays in the browser. These changes were tested, not reviewed by the four BMad reviewers.
+
 ## Review Triage Log
 
 ### 2026-11-05 — Review pass
