@@ -589,3 +589,163 @@ test('a city search arrives with its first gyms and their map pins already in th
   assert.ok(cards >= 20, `found ${cards} gyms in the page`);
   assert.ok((html.match(/class="pin"/g)?.length ?? 0) >= 2, 'pins drawn before the map loads');
 });
+
+test('entry and exit: a double scan stays in, a later scan lets them out, and the times are kept', needsDb, async () => {
+  const call = await client();
+  const a = await booked(call);
+  await moveTo(a.id, 0.5);
+  const scan = () => call('/api/staff', { method: 'POST', body: { code: a.code } }).then((r) => r.data);
+  assert.equal((await scan()).result, 'valid');
+  assert.equal((await call('/api/auth/me')).data.inGym.id, a.id, 'Home knows they are in the gym');
+  const double = await scan();
+  assert.equal(double.result, 'used', 'a scan straight after is a double scan');
+  assert.equal(double.inside, true);
+  const [{ checked_out_at: still }] = await sql`SELECT checked_out_at FROM bookings WHERE id = ${a.id}::uuid`;
+  assert.equal(still, null, 'and does not end the visit');
+  await sql`UPDATE bookings SET checked_in_at = now() - interval '5 minutes' WHERE id = ${a.id}::uuid`;
+  const out = await scan();
+  assert.equal(out.result, 'out');
+  assert.equal(out.stay, '5 min');
+  assert.equal((await call('/api/auth/me')).data.inGym, null);
+  const again = await scan();
+  assert.equal(again.result, 'used');
+  assert.ok(again.leftAt, 'a third scan shows both times');
+});
+
+test('checking out from the pass: only once inside, only your own, can be undone, and not days later', needsDb, async () => {
+  const call = await client();
+  const stranger = await client();
+  const a = await booked(call);
+  const exit = (c = call) => c(`/api/bookings/${a.id}/exit`, { method: 'POST', body: {} });
+  assert.equal((await exit()).data.code, 'not_in', 'nobody can leave before they arrive');
+  await moveTo(a.id, 0.5);
+  await call(`/api/bookings/${a.id}/checkin`, { method: 'POST', body: {} });
+  assert.equal((await exit(stranger)).status, 404, "someone else's pass");
+  const first = await exit();
+  assert.equal(first.status, 200);
+  assert.ok(first.data.checked_out_at);
+  assert.equal(new Date((await exit()).data.checked_out_at).getTime(), new Date(first.data.checked_out_at).getTime(), 'leaving twice keeps the first time');
+  assert.equal((await stranger(`/api/bookings/${a.id}/exit-undo`, { method: 'POST', body: {} })).status, 409, "a stranger can't undo it");
+  assert.equal((await call(`/api/bookings/${a.id}/exit-undo`, { method: 'POST', body: {} })).status, 200);
+  assert.equal((await call('/api/auth/me')).data.inGym.id, a.id, 'back in the gym');
+  await sql`UPDATE bookings SET checked_out_at = now() - interval '10 minutes' WHERE id = ${a.id}::uuid`;
+  assert.equal((await call(`/api/bookings/${a.id}/exit-undo`, { method: 'POST', body: {} })).data.code, 'too_late');
+  await sql`UPDATE bookings SET checked_out_at = NULL, checked_in_at = now() - interval '7 hours' WHERE id = ${a.id}::uuid`;
+  assert.equal((await exit()).data.code, 'too_late', 'a forgotten visit stays unrecorded, not seven hours long');
+  assert.equal((await call('/api/auth/me')).data.inGym, null, 'and no timer keeps running');
+});
+
+test('calendar notes save, replace and delete, and stay private', needsDb, async () => {
+  const call = await client();
+  const other = await client();
+  const put = (c, day, body) => c('/api/notes', { method: 'PUT', body: { day, body } });
+  assert.equal((await fetch(`${BASE}/api/notes`, { method: 'PUT', body: '{}' })).status, 401, 'needs a login');
+  assert.equal((await put(call, '2026-02-31', 'x')).status, 400, 'a day that does not exist');
+  assert.equal((await put(call, 'soon', 'x')).status, 400);
+  assert.equal((await put(call, '2026-11-01', 'x'.repeat(501))).status, 400, 'too long');
+  assert.equal((await put(call, '2026-11-01', '  Rest day  ')).data.body, 'Rest day');
+  assert.equal((await put(call, '2026-11-01', 'Rest day, sore knees')).status, 200);
+  await put(other, '2026-11-01', 'Not yours');
+  const { data: me } = await call('/api/auth/me');
+  const rows = await sql`SELECT n.body FROM day_notes n JOIN users u ON u.id = n.user_id WHERE u.email = ${me.user.email}`;
+  assert.deepEqual(rows.map((r) => r.body), ['Rest day, sore knees'], 'one note a day, and only your own');
+  assert.equal((await put(call, '2026-11-01', '   ')).data.body, '');
+  assert.equal((await sql`SELECT count(*)::int AS n FROM day_notes n JOIN users u ON u.id = n.user_id WHERE u.email = ${me.user.email}`)[0].n, 0, 'an empty note is removed');
+});
+
+async function ownerClient() {
+  let cookie = '';
+  return async (path, options = {}) => {
+    const res = await fetch(BASE + path, { ...options, redirect: 'manual', headers: { 'Content-Type': 'application/json', cookie }, body: options.body ? JSON.stringify(options.body) : undefined });
+    const set = res.headers.get('set-cookie');
+    if (set) cookie = set.split(';')[0];
+    return { status: res.status, data: await res.clone().json().catch(() => null) };
+  };
+}
+
+test('the owner panel is locked without the admin password', async () => {
+  const owner = await ownerClient();
+  assert.equal((await owner('/api/owner?gym=iron-gym-amsterdam')).status, 401);
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: 'iron-gym-amsterdam', kind: 'guest', id: '1', action: 'out' } })).status, 401);
+  assert.equal((await owner('/api/owner/session', { method: 'POST', body: { password: 'wrong' } })).status, 401);
+  assert.equal((await owner('/api/owner/session', { method: 'POST', body: {} })).status, 401);
+  assert.equal((await owner('/api/owner?gym=iron-gym-amsterdam')).status, 401);
+  // A made-up cookie gets nowhere.
+  const forged = await fetch(`${BASE}/api/owner?gym=iron-gym-amsterdam`, { headers: { cookie: 'daypass_owner=abc' } });
+  assert.equal(forged.status, 401);
+  assert.equal((await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } })).status, 200);
+  assert.equal((await owner('/api/owner?gym=iron-gym-amsterdam')).status, 200);
+  assert.equal((await owner('/api/owner?gym=no-such-gym')).status, 404);
+  assert.equal((await owner('/api/owner/session', { method: 'DELETE' })).status, 200);
+  assert.equal((await owner('/api/owner?gym=iron-gym-amsterdam')).status, 401, 'locking the panel locks it');
+});
+
+test('the owner panel: sample guests come and go, the owner can move them, and the totals agree', async () => {
+  const owner = await ownerClient();
+  await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
+  const { data: s } = await owner('/api/owner?gym=iron-gym-amsterdam');
+  assert.equal(s.gym.slug, 'iron-gym-amsterdam');
+  assert.equal(s.stats.inside, s.inside.length);
+  assert.equal(s.hours.reduce((a, b) => a + b, 0), s.stats.entries, 'the hour chart adds up to the entries');
+  assert.ok(s.arriving.length > 0 || s.hourNow === 23, 'someone is always on the way');
+  const next = s.arriving.find((v) => v.kind === 'guest');
+  if (next) {
+    const body = { gym: s.gym.slug, kind: 'guest', id: next.id };
+    const inn = await owner('/api/owner', { method: 'POST', body: { ...body, action: 'in' } });
+    assert.equal(inn.status, 200);
+    assert.ok(inn.data.snapshot.inside.some((v) => v.key === next.key), 'checked in early');
+    assert.equal((await owner('/api/owner', { method: 'POST', body: { ...body, action: 'in' } })).status, 409, 'only once');
+    const out = await owner('/api/owner', { method: 'POST', body: { ...body, action: 'out' } });
+    assert.equal(out.status, 200);
+    assert.ok(!out.data.snapshot.inside.some((v) => v.key === next.key), 'checked out');
+    assert.equal((await owner('/api/owner', { method: 'POST', body: { ...body, action: 'out' } })).status, 409, 'not in the gym any more');
+  }
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: s.gym.slug, kind: 'guest', id: '99999', action: 'in' } })).status, 404);
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: s.gym.slug, kind: 'guest', id: '1', action: 'wave' } })).status, 400);
+});
+
+test('the owner panel shows demo passes live, and never a real person', needsDb, async () => {
+  const owner = await ownerClient();
+  await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
+
+  // A demo pass checked in on one phone appears on the other, and the owner can check it out.
+  const member = await demoClient();
+  const { next } = (await member('/api/auth/me')).data;
+  await member(`/api/bookings/${next.id}/checkin`, { method: 'POST', body: {} });
+  const seen = (await owner(`/api/owner?gym=${next.gym_slug}`)).data;
+  assert.ok(seen.inside.some((v) => v.id === next.id && v.name === 'Sam Demo' && v.live));
+  const out = await owner('/api/owner', { method: 'POST', body: { gym: next.gym_slug, kind: 'pass', id: next.id, action: 'out' } });
+  assert.equal(out.status, 200);
+  assert.ok(out.data.snapshot.log.some((e) => e.key === `p${next.id}-out`), 'it is in the log');
+  assert.equal((await member('/api/auth/me')).data.inGym, null, 'and the member sees they have left');
+
+  // A real person's pass at the same gym is not on the panel, and can't be touched from it.
+  const call = await client();
+  const a = await booked(call);
+  await moveTo(a.id, 0.5);
+  await call('/api/staff', { method: 'POST', body: { code: a.code } });
+  const text = JSON.stringify((await owner(`/api/owner?gym=${a.gym.slug}`)).data);
+  assert.ok(!text.includes(a.code), 'their code is not shown');
+  assert.ok(!text.includes('QA Tester'), 'their name is not shown');
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: a.gym.slug, kind: 'pass', id: a.id, action: 'out' } })).status, 404);
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: a.gym.slug, code: a.code } })).data.desk.result, 'unknown');
+  const [row] = await sql`SELECT checked_out_at FROM bookings WHERE id = ${a.id}::uuid`;
+  assert.equal(row.checked_out_at, null);
+
+  // A pass for another gym is refused at the door, and not checked in.
+  const second = await demoClient();
+  const other = (await second('/api/auth/me')).data.next;
+  const elsewhere = other.gym_slug === 'iron-gym-amsterdam' ? 'iron-gym-berlin' : 'iron-gym-amsterdam';
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: elsewhere, code: other.code } })).data.desk.result, 'other_gym');
+  assert.equal((await second('/api/auth/me')).data.inGym, null);
+});
+
+test('a new demo account has finished visits with exit times and notes', needsDb, async () => {
+  const call = await demoClient();
+  const { data } = await call('/api/auth/me');
+  const rows = await sql`SELECT b.checked_in_at, b.checked_out_at FROM bookings b JOIN users u ON u.id = b.user_id WHERE u.email = ${data.user.email} AND b.is_sample`;
+  assert.equal(rows.length, 8);
+  assert.ok(rows.every((r) => new Date(r.checked_out_at) > new Date(r.checked_in_at)));
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM day_notes d JOIN users u ON u.id = d.user_id WHERE u.email = ${data.user.email}`;
+  assert.equal(n, 2);
+});

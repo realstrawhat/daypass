@@ -5,7 +5,7 @@ import { useSession } from './session';
 import { IconHome, IconPass, IconSearch, IconStore, IconUser, Spark } from './Icons';
 import { haptic } from './ui/feedback';
 
-const HIDE_ON = ['/login', '/staff'];
+const HIDE_ON = ['/login', '/staff', '/owner'];
 
 export function Nav() {
   const path = usePathname();

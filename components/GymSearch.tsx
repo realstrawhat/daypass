@@ -139,7 +139,13 @@ export function GymSearch({ initial = null }: { initial?: { query: string; resul
     window.history.replaceState(null, '', `/gyms?${next}`);
   }, []);
 
+  // A new sort or filter is a new list, so it starts from the top, not somewhere in the middle of it.
+  const toTop = () => {
+    window.scrollTo({ top: 0, behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+  };
+
   const applyFilters = (f: Filters) => {
+    toTop();
     setQuery({
       maxPrice: f.maxPrice != null ? String(f.maxPrice) : user?.max_price_cents != null ? 'any' : null,
       minRating: f.minRating != null ? String(f.minRating) : null,
@@ -461,7 +467,7 @@ export function GymSearch({ initial = null }: { initial?: { query: string; resul
           <div className="chips-row">
             <div className="filter-sort" role="group" aria-label="Sort gyms" ref={sortRow}>
               {SORTS.map((s) => (
-                <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { setQuery({ sort: s.id }); haptic(4); }}>{s.label}</button>
+                <button key={s.id} type="button" className="chip" aria-pressed={sort === s.id} onClick={() => { toTop(); setQuery({ sort: s.id }); haptic(4); }}>{s.label}</button>
               ))}
             </div>
             <ScrollArrows target={sortRow} label="Scroll sort options" />

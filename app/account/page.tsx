@@ -1,52 +1,64 @@
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { AccountClient } from '@/components/AccountClient';
+import { VisitCalendar, type CalRing, type CalVisit } from '@/components/VisitCalendar';
 import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
 import { listBookings } from '@/lib/bookings';
 import { db } from '@/lib/db';
-import { money } from '@/lib/format';
-import { localParts } from '@/lib/hours';
+import { dateLabel, money, timeLabel } from '@/lib/format';
+import { localParts, stayLabel, visitState } from '@/lib/hours';
 
 export const metadata: Metadata = { title: 'Account' };
 
-// Three months of visits as a dot grid, one column per weekday.
-function buildMonths(visits: { y: number; m: number; d: number }[]) {
-  const now = new Date();
-  return [2, 1, 0].map((back) => {
-    const first = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - back, 1));
-    const y = first.getUTCFullYear();
-    const m = first.getUTCMonth() + 1;
-    const days = new Date(Date.UTC(y, m, 0)).getUTCDate();
-    const lead = (first.getUTCDay() + 6) % 7;
-    const seen = new Set(visits.filter((v) => v.y === y && v.m === m).map((v) => v.d));
-    return {
-      label: new Intl.DateTimeFormat('en-GB', { month: 'long', timeZone: 'UTC' }).format(first),
-      lead,
-      days: Array.from({ length: days }, (_, i) => ({ day: i + 1, on: seen.has(i + 1) })),
-    };
-  });
-}
+const dayKey = (iso: string, tz: string) => {
+  const p = localParts(new Date(iso), tz);
+  return `${p.y}-${String(p.m).padStart(2, '0')}-${String(p.d).padStart(2, '0')}`;
+};
 
 export default async function AccountPage() {
   const user = await getCurrentUser();
   if (!user) redirect('/login?next=/account');
-  const [all, keys] = await Promise.all([
+  const [all, keys, noteRows] = await Promise.all([
     listBookings(user.id),
     db()`SELECT count(*)::int AS n FROM passkeys WHERE user_id = ${user.id}::uuid`,
+    db()`SELECT to_char(day, 'YYYY-MM-DD') AS day, body FROM day_notes WHERE user_id = ${user.id}::uuid`,
   ]);
   // A real account's one sample visit is for trying the rating screen, so it doesn't count as training.
   const visited = all.filter((b) => b.status === 'confirmed' && (user.is_demo || !b.is_sample) && (b.checked_in_at || new Date(b.starts_at).getTime() < Date.now()));
   const cities = new Set(visited.map((b) => b.gym_city)).size;
   const spent = visited.reduce((sum, b) => sum + b.price_cents - b.refund_cents, 0);
-  const months = buildMonths(visited.map((b) => localParts(new Date(b.starts_at), b.gym_timezone)));
   const now = new Date();
   const thisYear = visited.filter((b) => localParts(new Date(b.starts_at), b.gym_timezone).y === localParts(now, b.gym_timezone).y);
-  const rings = [
-    { label: 'Visits this month', goal: 4, value: thisYear.filter((b) => localParts(new Date(b.starts_at), b.gym_timezone).m === localParts(now, b.gym_timezone).m).length, color: '#d7ff3e', r: 66 },
-    { label: 'Gyms tried this year', goal: 10, value: new Set(thisYear.map((b) => b.gym_id)).size, color: '#a4c92a', r: 50 },
-    { label: 'Cities this year', goal: 5, value: new Set(thisYear.map((b) => b.gym_city)).size, color: '#f2ffc4', r: 34 },
+  const thisMonth = thisYear.filter((b) => localParts(new Date(b.starts_at), b.gym_timezone).m === localParts(now, b.gym_timezone).m);
+  const ids = (list: typeof visited) => list.map((b) => b.id);
+  const rings: CalRing[] = [
+    { key: 'month', label: 'Visits this month', title: 'This month', goal: 4, value: thisMonth.length, color: '#d7ff3e', r: 66, ids: ids(thisMonth), groupBy: null },
+    { key: 'gyms', label: 'Gyms tried this year', title: 'Gyms this year', goal: 10, value: new Set(thisYear.map((b) => b.gym_id)).size, color: '#a4c92a', r: 50, ids: ids(thisYear), groupBy: 'gym' },
+    { key: 'cities', label: 'Cities this year', title: 'Cities this year', goal: 5, value: new Set(thisYear.map((b) => b.gym_city)).size, color: '#f2ffc4', r: 34, ids: ids(thisYear), groupBy: 'city' },
   ];
+  const visitedIds = new Set(ids(visited));
+  // The calendar also shows passes still to come. Those don't count towards the stats or rings.
+  const calendar: CalVisit[] = all
+    .filter((b) => visitedIds.has(b.id) || (b.status === 'confirmed' && !b.is_sample && new Date(b.starts_at).getTime() >= now.getTime()))
+    .map((b) => {
+      const tz = b.gym_timezone;
+      return {
+        id: b.id,
+        day: dayKey(b.checked_in_at ?? b.starts_at, tz),
+        gym: b.gym_name,
+        city: b.gym_city,
+        date: dateLabel(b.checked_in_at ?? b.starts_at, tz),
+        start: timeLabel(b.starts_at, tz),
+        upcoming: !visitedIds.has(b.id),
+        state: visitState(b.checked_in_at, b.checked_out_at),
+        inIso: b.checked_in_at,
+        inLabel: b.checked_in_at ? timeLabel(b.checked_in_at, tz) : null,
+        outLabel: b.checked_out_at ? timeLabel(b.checked_out_at, tz) : null,
+        stay: b.checked_in_at && b.checked_out_at ? stayLabel(new Date(b.checked_out_at).getTime() - new Date(b.checked_in_at).getTime()) : null,
+      };
+    });
+  const notes = Object.fromEntries(noteRows.map((n) => [n.day as string, n.body as string]));
 
   return (
     <Page>
@@ -65,44 +77,7 @@ export default async function AccountPage() {
           <div className="stat"><dt>Spent</dt><dd>{money(spent)}</dd></div>
         </dl>
 
-        <section className="rings" aria-labelledby="rings-title">
-          <h2 id="rings-title" className="section-title">Your rings</h2>
-          <dl className="rings-list">
-            {rings.map((ring) => (
-              <div key={ring.label}>
-                <dt style={{ '--c': ring.color } as React.CSSProperties}><i aria-hidden="true" />{ring.label}</dt>
-                <dd>{ring.value} <small>of {ring.goal}</small></dd>
-              </div>
-            ))}
-          </dl>
-          <svg className="rings-art" viewBox="0 0 160 160" aria-hidden="true">
-            {rings.map((ring) => {
-              const length = 2 * Math.PI * ring.r;
-              return (
-                <g key={ring.label}>
-                  <circle className="track" cx="80" cy="80" r={ring.r} />
-                  {ring.value > 0 ? <circle cx="80" cy="80" r={ring.r} stroke={ring.color} strokeDasharray={`${Math.min(1, ring.value / ring.goal) * length} ${length}`} /> : null}
-                </g>
-              );
-            })}
-          </svg>
-        </section>
-
-        <section className="visits" aria-labelledby="visits-title">
-          <h2 id="visits-title" className="section-title">Your visits</h2>
-          <div className="visits-months">
-            {months.map((mo) => (
-              <div key={mo.label} className="visits-month">
-                <h3>{mo.label}</h3>
-                <div className="dots" role="img" aria-label={`${mo.label}: ${mo.days.filter((d) => d.on).length} visits${mo.days.some((d) => d.on) ? `, on the ${mo.days.filter((d) => d.on).map((d) => d.day).join(', ')}` : ''}`}>
-                  {Array.from({ length: mo.lead }, (_, i) => <span key={`b${i}`} />)}
-                  {mo.days.map((d) => <i key={d.day} className={d.on ? 'on' : ''} title={d.on ? `Visit on ${mo.label} ${d.day}` : undefined} />)}
-                </div>
-              </div>
-            ))}
-          </div>
-          <p className="visits-legend"><span><i aria-hidden="true" /> A day you trained</span></p>
-        </section>
+        <VisitCalendar visits={calendar} rings={rings} notes={notes} thisMonth={{ y: now.getUTCFullYear(), m: now.getUTCMonth() + 1 }} />
 
         <AccountClient
           user={{ name: user.name, email: user.email, home_city: user.home_city, default_sort: user.default_sort, max_price_cents: user.max_price_cents, saved_card: user.saved_card, is_demo: user.is_demo }}

@@ -13,6 +13,7 @@ import { generalArea, locate, locationAllowed, nearestCity, setResolvedCity } fr
 import { useSession, type NextBooking } from './session';
 import { useFeedback } from './ui/feedback';
 import { ScrollArrows } from './ui/Rail';
+import { StayTimer } from './ui/StayTimer';
 
 const SearchOverlay = dynamic(() => import('./SearchOverlay').then((m) => m.SearchOverlay), { ssr: false });
 
@@ -40,68 +41,38 @@ function untilSession(iso: string, tz: string) {
   return { n: String(Math.round(hours)), unit: Math.round(hours) === 1 ? 'hour to go' : 'hours to go' };
 }
 
-const VIDEO_PAUSED = 'daypass-video-paused';
-
 function useHeroVideo() {
   const video = useRef<HTMLVideoElement>(null);
-  const [playing, setPlaying] = useState(false);
   const [started, setStarted] = useState(false);
 
-  // Plays only while on screen, and a pause is remembered on this device.
+  // Plays only while on screen, and stays still for reduced motion and data saver.
   useEffect(() => {
     const v = video.current;
     if (!v) return;
     const calm = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     const saving = (navigator as Navigator & { connection?: { saveData?: boolean } }).connection?.saveData;
-    const wanted = () => {
-      if (calm || saving) return false;
-      try {
-        return localStorage.getItem(VIDEO_PAUSED) !== '1';
-      } catch {
-        return true;
-      }
-    };
     const watch = new IntersectionObserver(([e]) => {
       if (!e.isIntersecting) v.pause();
-      else if (wanted()) v.play().catch(() => {});
+      else if (!calm && !saving) v.play().catch(() => {});
     }, { threshold: 0.15 });
     watch.observe(v);
     return () => watch.disconnect();
   }, []);
 
-  const toggle = () => {
-    const v = video.current;
-    if (!v) return;
-    const pausing = !v.paused;
-    try {
-      if (pausing) localStorage.setItem(VIDEO_PAUSED, '1');
-      else localStorage.removeItem(VIDEO_PAUSED);
-    } catch {}
-    if (pausing) v.pause();
-    else v.play().catch(() => {});
-  };
-
-  return {
-    media: (
+  return (
     <>
       <picture>
         <source media="(orientation: portrait)" srcSet="/video/hero-portrait.jpg" />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img className="vhero-poster" src="/video/hero-wide.jpg" alt="" fetchPriority="high" />
       </picture>
-      <video ref={video} className={`vhero-video${started ? ' is-on' : ''}`} muted loop playsInline preload="none" aria-hidden="true" tabIndex={-1} onPlaying={() => { setPlaying(true); setStarted(true); }} onPause={() => setPlaying(false)}>
+      <video ref={video} className={`vhero-video${started ? ' is-on' : ''}`} muted loop playsInline preload="none" aria-hidden="true" tabIndex={-1} onPlaying={() => setStarted(true)}>
         <source media="(orientation: portrait)" src="/video/hero-portrait.mp4" type="video/mp4" />
         <source src="/video/hero-wide.mp4" type="video/mp4" />
       </video>
       <i className="vhero-shade" aria-hidden="true" />
     </>
-    ),
-    pause: (
-      <button type="button" className="round round-sm vhero-pause" aria-label={playing ? 'Pause background video' : 'Play background video'} onClick={toggle}>
-        <svg width="14" height="14" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">{playing ? <path d="M3 1h3v12H3zM8 1h3v12H8z" /> : <path d="M3 1l9 6-9 6z" />}</svg>
-      </button>
-    ),
-  };
+  );
 }
 
 function NextCard({ next }: { next: NextBooking }) {
@@ -185,7 +156,7 @@ function RailSkeleton() {
 }
 
 export function HomeClient({ picks }: { picks: CardGym[] }) {
-  const { user, ready, next, toRate, unread, saved } = useSession();
+  const { user, ready, next, inGym, toRate, unread, saved } = useSession();
   const hero = useHeroVideo();
   const [overlay, setOverlay] = useState(false);
   const [note, setNote] = useState('');
@@ -300,12 +271,10 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
   return (
     <main className="home">
       <section className="vhero" aria-labelledby="home-title">
-        {hero.media}
+        {hero}
         <header className="home-top">
           <p className="home-brand"><Spark /> {!ready ? <span className="sk sk-word" /> : user ? `Hi ${user.name.split(' ')[0]}` : 'Daypass'}</p>
           <div className="home-actions">
-            {/* First in the row, so nothing that appears later pushes it along. */}
-            {hero.pause}
             {user ? (
               <>
                 <Link href="/saved" className="round round-frost" aria-label={saved.length ? `Saved gyms, ${saved.length}` : 'Saved gyms'}>
@@ -323,6 +292,13 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
         </header>
 
         <div className="vhero-copy">
+          {ready && inGym ? (
+            <Link href={`/bookings/${inGym.id}`} transitionTypes={['nav-forward']} className="vhero-next is-live">
+              <b className="live-dot" aria-hidden="true" />
+              <span>{inGym.gym_name} <StayTimer from={inGym.checked_in_at} /></span>
+              <i aria-hidden="true"><IconArrow width={16} height={16} /></i>
+            </Link>
+          ) : null}
           {ready && next ? (
             <Link href={`/bookings/${next.id}`} transitionTypes={['nav-forward']} className="vhero-next">
               <span>Next: {next.gym_name}, {dateLabel(next.starts_at, next.gym_timezone)}, {timeLabel(next.starts_at, next.gym_timezone)}</span>

@@ -25,7 +25,6 @@
 .vhero-video { opacity: 0; transition: opacity 700ms var(--ease); }
 .vhero-video.is-on { opacity: 1; }
 .vhero-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.55), rgba(0,0,0,.05) 26%, rgba(0,0,0,.12) 44%, rgba(0,0,0,.86) 86%); }
-.vhero-pause { background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); }
 .home-top { position: absolute; left: var(--gutter); right: var(--gutter); top: calc(14px + var(--safe-t)); z-index: 2; flex-direction: row-reverse; }
 .home-top .home-login { background: var(--frost); box-shadow: inset 0 0 0 1px var(--frost-edge); backdrop-filter: blur(14px); }
 /* The lifter stands on the left of the video, so the words sit on the right, with the search in the middle. */
@@ -51,7 +50,6 @@
 
 /* Your next booking: a calm card with a lime number, so it doesn't compete with the rest of Home. */
 .next-photo { position: relative; display: flex; flex-direction: column; justify-content: space-between; gap: 4px; padding: 16px 18px; border-radius: 28px; overflow: hidden; isolation: isolate; background: var(--s2); transition: transform var(--t-2) var(--spring); }
-.next-photo:active { transform: scale(.98); }
 .next-photo > .photo, .next-photo > .photo-empty { z-index: -2; object-fit: cover; }
 .next-photo-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(90deg, rgba(0,0,0,.84), rgba(0,0,0,.7) 55%, rgba(0,0,0,.6)); }
 /* A thin edge, so the dark side of the card still reads as a card on the black page. */
@@ -93,7 +91,6 @@
 .moves li { grid-row: span 1; min-width: 0; }
 .moves li.is-tall { grid-row: span 2; }
 .move { position: relative; display: block; height: 100%; padding: 12px; border-radius: 26px; overflow: hidden; color: #000; transition: transform var(--t-2) var(--spring); }
-.move:active { transform: scale(.97); }
 .move.is-lime { background: var(--volt); }
 .move.is-pale { background: #e9f3c0; }
 .move.is-dark { background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-edge); color: #fff; }
@@ -112,7 +109,6 @@
 
 /* City photos */
 .city-card { position: relative; display: block; width: 158px; aspect-ratio: 3 / 4; border-radius: 24px; overflow: hidden; background: var(--s2); isolation: isolate; transition: transform var(--t-2) var(--spring); }
-.city-card:active { transform: scale(.96); }
 .city-card img { z-index: -2; object-fit: cover; transition: transform var(--t-3) var(--ease); }
 .city-card:hover img { transform: scale(1.060); }
 .city-card-shade { position: absolute; inset: 0; z-index: -1; background: linear-gradient(180deg, rgba(0,0,0,.34), rgba(0,0,0,.05) 38%, rgba(0,0,0,.8)); }
@@ -172,10 +168,6 @@
 .rings { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 18px; border-radius: 28px; }
 .rings h2 { grid-column: 1 / -1; }
 .rings-list { display: grid; gap: 10px; min-width: 0; }
-.rings-list dt { display: flex; align-items: center; gap: 7px; color: var(--mute); font-size: .86rem; font-weight: 400; line-height: 1.250; }
-.rings-list dt i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
-.rings-list dd { font-weight: 300; font-size: 1.620rem; letter-spacing: -.02em; line-height: 1.150; }
-.rings-list dd small { font-size: .9rem; color: var(--mute); letter-spacing: 0; }
 .rings-art { width: clamp(124px, 38vw, 170px); height: auto; transform: rotate(-90deg); }
 .rings-art circle { fill: none; stroke-width: 11; stroke-linecap: round; }
 .rings-art .track { stroke: rgba(255,255,255,.08); }
@@ -219,19 +211,21 @@
 /* Every diagonal arrow turns to point forward, on hover with a mouse and on press with a finger. */
 .next-photo-open, .move-foot i, .feature-book i, .rate-nudge > svg { transition: transform var(--t-3) var(--bounce); }
 .next-photo-open svg, .move-foot svg, .feature-book svg { display: block; }
-.next-photo:active .next-photo-open, .move:active .move-foot i, .feature-card:active .feature-book i, .rate-nudge:active > svg { transform: rotate(45deg) scale(1.100); }
+.next-photo.is-pressed .next-photo-open, .move.is-pressed .move-foot i, .feature-card.is-pressed .feature-book i, .rate-nudge:active > svg { transform: rotate(45deg) scale(1.100); }
 @media (hover: hover) {
   .next-photo:hover .next-photo-open, .move:hover .move-foot i, .feature-card:hover .feature-book i, .rate-nudge:hover > svg { transform: rotate(45deg); }
 }
 .rate-nudge { transition: transform var(--t-2) var(--spring); }
 .rate-nudge:active, .home-partner:active { transform: scale(.98); }
 .home-partner { transition: transform var(--t-2) var(--spring); }
-.city-card:active .city-mark { transform: translateY(-3px) scale(1.120); }
+.city-card.is-pressed .city-mark { transform: translateY(-3px) scale(1.120); }
 .city-card .city-mark { transition: transform var(--t-3) var(--bounce); }
-.feature-card, .pick-card, .gym-card { transition: transform var(--t-3) var(--spring); }
-.feature-card:active, .pick-card:active, .gym-card:active { transform: scale(.975); }
+/* A pressed card sinks and leans towards the finger. These are separate properties from transform, because the big
+   Home cards' scroll animation owns transform and would hide the press. The spring brings it back on release. */
+.feature-card, .pick-card, .gym-card, .move, .city-card, .next-photo, .ticket { transition: scale var(--t-3) var(--spring), translate var(--t-3) var(--spring), rotate var(--t-3) var(--spring), box-shadow var(--t-2); }
+.is-pressed { scale: .955; translate: calc(var(--press-x, 0) * 5px) calc(var(--press-y, 0) * 5px); rotate: calc(var(--press-x, 0) * .8deg); transition-duration: 110ms; }
 .feature-card .card-photo img, .pick-card .card-photo img, .gym-card .card-photo img { transition: transform 700ms var(--ease); }
-.feature-card:active .card-photo img, .pick-card:active .card-photo img, .gym-card:active .card-photo img { transform: scale(1.040); }
+.feature-card.is-pressed .card-photo img, .pick-card.is-pressed .card-photo img, .gym-card.is-pressed .card-photo img { transform: scale(1.040); }
 
 /* Selecting a date, time or chip lands with a small pop. */
 .chip[aria-pressed='true'], .day-pill[aria-checked='true'], .time-pill[aria-checked='true'] { animation: land 380ms var(--bounce); }
@@ -292,4 +286,144 @@
 @media (prefers-reduced-motion: reduce) {
   .save.is-on svg, .save.is-dropped:not(.is-on) svg, .save-ring, .save-burst b, .swipe-thumb, .chip[aria-pressed='true'], .day-pill[aria-checked='true'], .time-pill[aria-checked='true'], .tabbar a[aria-current='page'], .tabbar a[aria-current='page'] svg { animation: none !important; }
   .save-burst { display: none; }
+}
+
+/* Timers: digits keep their width, so a running clock doesn't wobble. */
+.stay-timer, .owner-clock { font-variant-numeric: tabular-nums; }
+.live-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 2px; border-radius: 50%; background: var(--volt); vertical-align: 1px; animation: live-pulse 1.800s ease-out infinite; }
+@keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(215,255,62,.5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(215,255,62,0); } }
+.vhero-next.is-live .stay-timer { font-weight: 800; color: var(--volt); margin-left: 4px; }
+
+/* The pass while someone is in the gym, and after they leave. */
+.visit-clock { display: grid; gap: 10px; padding: 16px; border-radius: 26px; background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.visit-clock.is-live { box-shadow: inset 0 0 0 1.500px rgba(215,255,62,.55); }
+.visit-clock-head { color: var(--text-2); font-weight: 600; font-size: .94rem; }
+.visit-clock-time { font-weight: 300; font-size: clamp(2.800rem, 15vw, 3.800rem); line-height: 1.050; letter-spacing: -.03em; }
+.visit-times { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.visit-times dt { color: var(--mute); font-size: .84rem; font-weight: 400; }
+.visit-times dd { font-weight: 700; line-height: 1.250; }
+
+/* Rings you can open. */
+.rings-list { list-style: none; margin: 0; padding: 0; }
+.rings-list button { display: grid; width: 100%; min-height: 56px; padding: 4px 8px; margin: -4px -8px; text-align: left; border-radius: 16px; color: inherit; transition: background var(--t-2), scale var(--t-3) var(--spring); }
+.rings-list button:hover { background: rgba(255,255,255,.05); }
+.rings-list button:active { background: rgba(255,255,255,.09); scale: .97; transition-duration: 90ms; }
+.rings-label { display: flex; align-items: center; gap: 7px; color: var(--mute); font-size: .86rem; font-weight: 400; line-height: 1.250; }
+.rings-label i { flex: none; width: 8px; height: 8px; border-radius: 50%; background: var(--c); }
+.rings-value { display: flex; align-items: baseline; gap: 4px; font-weight: 300; font-size: 1.620rem; letter-spacing: -.02em; line-height: 1.150; }
+.rings-value small { font-size: .9rem; color: var(--mute); letter-spacing: 0; }
+.rings-value svg { width: 14px; height: 14px; align-self: center; color: var(--mute); }
+.rings-art .rings-hit { stroke: transparent; stroke-width: 16; pointer-events: stroke; cursor: pointer; }
+
+/* The calendar: one month at a time on a phone, so each day is big enough to tap. */
+.visits .rail-head { align-items: center; }
+.cal-track { display: flex; gap: 16px; overflow-x: auto; scroll-snap-type: x mandatory; scrollbar-width: none; overscroll-behavior-x: contain; }
+.cal-track::-webkit-scrollbar { display: none; }
+.cal-month { flex: none; width: 100%; scroll-snap-align: start; }
+.cal-month h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 1rem; font-weight: 700; margin: 0 0 6px; }
+.cal-month h3 small { font-size: .84rem; font-weight: 400; color: var(--mute); }
+.cal-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); color: var(--mute); font-size: .76rem; text-align: center; }
+.dots { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 0; }
+.dot { position: relative; display: grid; place-items: center; aspect-ratio: 1; min-height: 40px; border-radius: 50%; transition: background var(--t-2), scale var(--t-3) var(--bounce); }
+.dot:hover { background: rgba(255,255,255,.06); }
+.dot:active { background: rgba(255,255,255,.12); scale: .86; transition-duration: 70ms; }
+.dot i { width: 6px; height: 6px; border-radius: 50%; background: #55585c; }
+.dot.on i { width: 16px; height: 16px; background: var(--volt); box-shadow: 0 0 10px rgba(215,255,62,.55); }
+.dot.is-booked i { width: 14px; height: 14px; background: none; box-shadow: inset 0 0 0 2px var(--volt); }
+.dot.is-today { box-shadow: inset 0 0 0 1.500px rgba(255,255,255,.4); }
+.dot.has-note::after { content: ''; position: absolute; left: 50%; bottom: 12%; width: 12px; height: 2.500px; margin-left: -6px; border-radius: 2px; background: #fff; }
+.visits-legend { flex-wrap: wrap; }
+.visits-legend i { background: none; }
+.visits-legend i.is-on { background: var(--volt); }
+.visits-legend i.is-booked { box-shadow: inset 0 0 0 2px var(--volt); }
+.visits-legend i.is-note { height: 2.500px; width: 12px; border-radius: 2px; background: #fff; }
+@media (min-width: 640px) {
+  .cal-month { width: calc(50% - 8px); }
+}
+
+/* A day, or a ring's history. */
+.log-day, .log-ring { display: grid; gap: 14px; }
+.log-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.log-visit { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 12px; min-height: 56px; padding: 12px 14px; border-radius: 18px; background: var(--s2); text-align: left; color: inherit; }
+.log-visit:active { background: var(--s3); }
+.log-visit > svg { flex: none; width: 18px; height: 18px; color: var(--mute); }
+.log-visit-copy { display: grid; gap: 1px; min-width: 0; color: var(--text-2); font-size: .92rem; font-weight: 400; }
+.log-visit-copy strong { color: #fff; font-size: 1rem; font-weight: 700; }
+.log-visit-copy em { margin-top: 3px; font-style: normal; color: #fff; overflow-wrap: anywhere; }
+.log-visit-live { color: var(--volt); font-weight: 700; }
+.log-group { display: grid; gap: 6px; }
+.log-group h3 { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 1rem; font-weight: 800; }
+.log-group h3 small { color: var(--mute); font-weight: 400; font-size: .84rem; }
+.log-note-foot { justify-self: end; }
+.back-chevron { transform: scaleX(-1); }
+.field textarea { resize: vertical; line-height: 1.400; }
+
+/* The live owner panel. */
+.owner { max-width: 1120px; margin: 0 auto; padding: calc(14px + var(--safe-t)) var(--gutter) calc(32px + var(--safe-b)); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.owner-locked { min-height: 100svh; align-content: center; justify-items: center; }
+.owner-gate { display: grid; gap: 14px; width: min(100%, 440px); }
+.owner-gate h1 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: clamp(2.600rem, 12vw, 3.600rem); line-height: 1.060; }
+.owner-gate > p { color: var(--text-2); font-weight: 400; }
+.owner-top { display: flex; align-items: center; gap: 12px; }
+.owner-title { flex: 1; min-width: 0; }
+.owner-title h1 { font-family: var(--display); font-weight: 400; text-transform: uppercase; font-size: 2rem; line-height: 1.100; }
+.owner-title p { display: flex; align-items: center; gap: 6px; color: var(--text-2); font-size: .9rem; }
+.owner-offline { color: #ffb4a5; font-weight: 700; }
+.owner-gym select { min-height: 48px; }
+.owner-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+.owner-stats .stat { display: grid; align-content: start; gap: 2px; min-width: 0; padding: 12px; }
+.owner-stats .stat dt { font-size: .82rem; line-height: 1.200; }
+.owner-stats .stat dd { margin: 0; font-size: clamp(1.300rem, 5.600vw, 2rem); overflow-wrap: anywhere; }
+.owner-stats .stat small { color: var(--mute); font-size: .76rem; line-height: 1.200; }
+.owner-stats .stat.is-main { grid-column: 1 / -1; background: var(--volt); color: #000; box-shadow: none; display: flex; justify-content: space-between; align-items: center; }
+.owner-stats .stat.is-main dt { color: #000; font-weight: 700; font-size: 1rem; }
+.owner-stats .stat.is-main dd { font-size: clamp(3rem, 15vw, 4.400rem); font-weight: 400; line-height: 1; }
+.owner-card { display: grid; gap: 10px; align-content: start; min-width: 0; padding: 16px; border-radius: 26px; background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-edge); }
+.owner-card .section-title small { font-family: var(--body); font-weight: 300; font-size: .7em; color: var(--mute); }
+.owner-columns { display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; align-items: start; }
+.owner-side { display: grid; gap: 12px; min-width: 0; }
+.owner-list { list-style: none; margin: 0; padding: 0; display: grid; }
+.owner-row { display: flex; align-items: center; gap: 10px; min-height: 60px; padding: 6px 0; animation: card-up 460ms var(--spring) both; }
+.owner-row + .owner-row { border-top: 1px solid rgba(255,255,255,.08); }
+.owner-avatar { flex: none; width: 36px; height: 36px; border-radius: 50%; display: grid; place-items: center; background: var(--s3); font-weight: 800; }
+.owner-who { flex: 1; display: grid; min-width: 0; }
+.owner-who strong { font-weight: 700; display: flex; flex-wrap: wrap; align-items: center; gap: 2px 6px; }
+.owner-who small { color: var(--mute); font-size: .8rem; line-height: 1.250; }
+.owner-code { white-space: nowrap; }
+.owner-live { display: inline-block; padding: 0 7px; border-radius: 99px; background: var(--volt); color: #000; font-size: .68rem; font-weight: 800; line-height: 1.500; white-space: nowrap; }
+.owner-row .stay-timer { flex: none; font-size: .96rem; font-weight: 600; }
+.owner-btn { flex: none; min-height: 44px; min-width: 56px; padding: 0 14px; }
+.owner-link { display: inline-flex; align-items: center; gap: 8px; min-height: 44px; font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.owner-log { list-style: none; margin: 0; padding: 0; display: grid; max-height: 420px; overflow-y: auto; overscroll-behavior: contain; }
+.owner-event { display: grid; grid-template-columns: auto auto minmax(0, 1fr); align-items: baseline; column-gap: 8px; padding: 8px 0; font-size: .92rem; font-weight: 400; animation: card-up 460ms var(--spring) both; }
+.owner-event + .owner-event { border-top: 1px solid rgba(255,255,255,.08); }
+.owner-event time { font-variant-numeric: tabular-nums; color: var(--text-2); }
+.owner-event > i { width: 8px; height: 8px; border-radius: 50%; align-self: center; }
+.owner-event > i.is-in { background: var(--volt); }
+.owner-event > i.is-out { background: none; box-shadow: inset 0 0 0 1.500px var(--mute); }
+.owner-event strong { font-weight: 700; }
+.owner-event .owner-live { margin-left: 6px; }
+.owner-event small { grid-column: 3; color: var(--mute); font-size: .78rem; }
+.owner-chart-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: baseline; gap: 2px 12px; }
+.owner-chart-head p { color: var(--text-2); font-size: .9rem; font-weight: 400; }
+.owner-chart-head strong { color: #fff; font-weight: 800; }
+.hour-bars { display: flex; align-items: stretch; height: 96px; border-bottom: 1px solid var(--line); }
+.hour-bar { flex: 1 1 0; min-width: 0; display: flex; align-items: flex-end; justify-content: center; padding: 0 1px; }
+.hour-bar i { display: block; width: 100%; max-width: 24px; min-height: 0; border-radius: 4px 4px 0 0; background: var(--volt); opacity: .5; transition: height var(--t-3) var(--ease), opacity var(--t-2); }
+.hour-bar:hover i { opacity: .8; }
+.hour-bar.is-picked i { opacity: 1; }
+.hour-axis { display: flex; justify-content: space-between; color: var(--mute); font-size: .76rem; font-variant-numeric: tabular-nums; }
+.owner-fine .link { display: inline; }
+.owner-try { display: flex; justify-content: space-between; align-items: center; gap: 12px; min-height: 64px; padding: 14px 18px; border-radius: 24px; background: var(--glass-card); box-shadow: inset 0 0 0 1px var(--glass-edge); transition: scale var(--t-3) var(--spring); }
+.owner-try:active { scale: .98; transition-duration: 90ms; }
+.owner-try > svg { flex: none; color: var(--volt); }
+.owner-try-copy { display: grid; gap: 2px; font-weight: 400; color: var(--text-2); font-size: .94rem; }
+.owner-try-copy strong { color: #fff; font-weight: 800; font-size: 1rem; }
+@media (min-width: 760px) {
+  .owner-stats { grid-template-columns: 1.300fr repeat(3, minmax(0, 1fr)); }
+  .owner-stats .stat.is-main { grid-column: auto; }
+  .owner-columns { grid-template-columns: minmax(0, 1.300fr) minmax(0, 1fr); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .live-dot { animation: none; }
 }

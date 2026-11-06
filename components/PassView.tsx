@@ -3,7 +3,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { dateLabel, distanceLabel, money, timeLabel } from '@/lib/format';
-import { doorIsOpen, hoursUntil, refusalIsOpen } from '@/lib/hours';
+import { doorIsOpen, hoursUntil, refusalIsOpen, stayLabel, visitState } from '@/lib/hours';
 import type { Gym, SlotDay } from '@/lib/gyms';
 import type { PayMethod } from '@/lib/payments';
 import { HoloPass, type PassData } from './HoloPass';
@@ -14,6 +14,8 @@ import { FaceScan } from './ui/FaceScan';
 import { haptic, useFeedback } from './ui/feedback';
 import { feel } from './ui/sensory';
 import { afterSheetClosed, Sheet } from './ui/Sheet';
+import { StayTimer, useNow } from './ui/StayTimer';
+import { SwipeAction } from './ui/SwipeAction';
 import { WalletSheet } from './WalletSheet';
 
 export type PassBooking = {
@@ -31,6 +33,7 @@ export type PassBooking = {
   dateLabel: string;
   timeLabel: string;
   checked_in_at: string | null;
+  checked_out_at: string | null;
   checkedInLabel: string | null;
   in_wallet: boolean;
 };
@@ -62,10 +65,12 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
   const [lateNotice, setLateNotice] = useState(false);
   const [earlyHelp, setEarlyHelp] = useState(false);
   const [inWallet, setInWallet] = useState(b.in_wallet);
-  const [checkedIn, setCheckedIn] = useState(!!b.checked_in_at);
+  const [inAt, setInAt] = useState(b.checked_in_at);
+  const [outAt, setOutAt] = useState(b.checked_out_at);
   const close = () => setSheet(null);
-  const used = checkedIn;
-  useEffect(() => setCheckedIn(!!b.checked_in_at), [b.checked_in_at]);
+  const used = !!inAt;
+  useEffect(() => setInAt(b.checked_in_at), [b.checked_in_at]);
+  useEffect(() => setOutAt(b.checked_out_at), [b.checked_out_at]);
   // Around the session, a real account can use the same door steps. Demo accounts can try them any time.
   // These follow the clock, because a pass can stay open on a phone, or come from a saved copy.
   const [door, setDoor] = useState({ help: false, scan: false, over: isOver });
@@ -95,6 +100,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
       <HoloPass pass={{ ...pass, state: used ? 'used' : passOver ? 'expired' : 'active' }} stamp={isNew} />
 
       <div className="pass-actions">
+        {inAt ? <VisitClock id={b.id} timezone={b.timezone} inAt={inAt} outAt={outAt} onOut={(at) => { setOutAt(at); afterChange(); }} /> : null}
         {!used && !passOver ? (
           <button type="button" className="btn btn-volt btn-block pass-show" onClick={() => setSheet('desk')}><IconScan /> Show at the desk</button>
         ) : null}
@@ -150,8 +156,8 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
             b={b}
             qrSvg={pass.qrSvg}
             canSimulate={!!user?.is_demo || door.scan}
-            onCheckedIn={() => {
-              setCheckedIn(true);
+            onCheckedIn={(at) => {
+              setInAt(at);
               afterChange();
               banner({ title: 'Daypass', body: `Checked in at ${b.gym_name}. Enjoy your session.`, href: '/inbox' });
             }}
@@ -189,7 +195,7 @@ export function PassView({ booking: b, pass, directions, googleCal, changeable, 
 }
 
 // Full-screen pass for reception: bright, large and kept awake.
-function DeskMode({ b, qrSvg, canSimulate, onCheckedIn, onClose }: { b: PassBooking; qrSvg: string; canSimulate: boolean; onCheckedIn: () => void; onClose: () => void }) {
+function DeskMode({ b, qrSvg, canSimulate, onCheckedIn, onClose }: { b: PassBooking; qrSvg: string; canSimulate: boolean; onCheckedIn: (at: string) => void; onClose: () => void }) {
   const [time, setTime] = useState('');
   const [state, setState] = useState<'show' | 'scanning' | 'done'>('show');
   const [error, setError] = useState('');
@@ -210,10 +216,10 @@ function DeskMode({ b, qrSvg, canSimulate, onCheckedIn, onClose }: { b: PassBook
     setState('scanning');
     setError('');
     try {
-      await Promise.all([postAction(b.id, 'checkin'), new Promise((r) => setTimeout(r, 1200))]);
+      const [done] = await Promise.all([postAction(b.id, 'checkin'), new Promise((r) => setTimeout(r, 1200))]);
       setState('done');
       feel('success');
-      onCheckedIn();
+      onCheckedIn(done.checked_in_at);
       setTimeout(onClose, 1500);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That did not work. Try again.');
@@ -244,6 +250,53 @@ function DeskMode({ b, qrSvg, canSimulate, onCheckedIn, onClose }: { b: PassBook
       {error ? <p className="form-error" role="alert">{error}</p> : null}
       {canSimulate ? <button type="button" className="desk-sim" disabled={state === 'scanning'} onClick={simulate}>{state === 'scanning' ? 'Scanning' : 'Demo: simulate the desk scan'}</button> : <p className="fine">Check-in opens one hour before your session.</p>}
     </div>
+  );
+}
+
+// From the moment someone is let in: a running timer, then the times once they have left.
+function VisitClock({ id, timezone, inAt, outAt, onOut }: { id: string; timezone: string; inAt: string; outAt: string | null; onOut: (at: string | null) => void }) {
+  const { toast } = useFeedback();
+  const now = useNow();
+  const [busy, setBusy] = useState(false);
+  const state = visitState(inAt, outAt, now ?? new Date(inAt).getTime());
+
+  const leave = async () => {
+    if (busy) return;
+    setBusy(true);
+    try {
+      const { checked_out_at: at } = await postAction(id, 'exit');
+      feel('success');
+      onOut(at);
+      toast(`Checked out after ${stayLabel(new Date(at).getTime() - new Date(inAt).getTime())}`, 'ok', {
+        label: 'Undo',
+        onClick: () => {
+          postAction(id, 'exit-undo').then(() => onOut(null)).catch((e) => toast(e instanceof Error ? e.message : 'That did not work. Try again.', 'error'));
+        },
+      });
+    } catch (e) {
+      toast(e instanceof Error ? e.message : 'That did not work. Try again.', 'error');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  if (state === 'inside') {
+    return (
+      <section className="visit-clock is-live" aria-label="Time in the gym">
+        <p className="visit-clock-head"><i className="live-dot" aria-hidden="true" /> In the gym since {timeLabel(inAt, timezone)}</p>
+        <StayTimer from={inAt} className="visit-clock-time" />
+        <SwipeAction label="Slide to check out" ariaLabel="Check out now" onConfirm={leave} />
+      </section>
+    );
+  }
+  return (
+    <section className="visit-clock" aria-label="Your visit">
+      <dl className="visit-times">
+        <div><dt>In</dt><dd>{timeLabel(inAt, timezone)}</dd></div>
+        <div><dt>Out</dt><dd>{outAt ? timeLabel(outAt, timezone) : 'Not recorded'}</dd></div>
+        <div><dt>Time inside</dt><dd>{outAt ? stayLabel(new Date(outAt).getTime() - new Date(inAt).getTime()) : 'Unknown'}</dd></div>
+      </dl>
+    </section>
   );
 }
 

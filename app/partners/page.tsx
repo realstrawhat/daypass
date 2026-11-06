@@ -1,6 +1,7 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import type { Metadata } from 'next';
+import { IconArrow } from '@/components/Icons';
 import { PartnerClient } from '@/components/PartnerClient';
 import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
@@ -33,6 +34,11 @@ export default async function PartnersPage() {
             <li><strong>Keep details fresh</strong><span>Confirm your details every 90 days so visitors can trust them.</span></li>
           </ul>
         </section>
+
+        <Link href="/owner" className="owner-try">
+          <span className="owner-try-copy"><strong><i className="live-dot" aria-hidden="true" /> Try the live owner panel</strong><span>Run a sample gym for a minute: who is in, when they came and how long they stayed.</span></span>
+          <IconArrow />
+        </Link>
 
         {user ? (
           <PartnerClient gyms={gyms as never} />

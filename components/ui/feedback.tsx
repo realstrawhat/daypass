@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { IconCheck, Spark } from '../Icons';
-import { feel, hapticsOn, installTapFeedback, justFelt } from './sensory';
+import { feel, hapticsOn, installCardPress, installTapFeedback, justFelt } from './sensory';
 
 // Taps are handled globally by installTapFeedback. This remains for async moments without a tap. A tap made while a
 // server-drawn screen is still waking up reaches its button's handler later, when React replays it, so a buzz within
@@ -62,6 +62,7 @@ export function FeedbackProvider({ children }: { children: React.ReactNode }) {
   );
 
   useEffect(() => installTapFeedback(), []);
+  useEffect(() => installCardPress(), []);
 
   useEffect(() => {
     const update = () => setOffline(!navigator.onLine);

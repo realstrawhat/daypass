@@ -3,6 +3,7 @@ import { networkArea } from '@/lib/where';
 import { createSession, destroySession, getCurrentUser, handle, hashPassword, HttpError, readJson, refreshSessionCookie, verifyPassword } from '@/lib/auth';
 import { addMessage, addSamplePastVisit, createDemoUser } from '@/lib/bookings';
 import { db } from '@/lib/db';
+import { MAX_STAY_HOURS } from '@/lib/hours';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -61,7 +62,7 @@ export const GET = handle(async (_req, ctx) => {
   if (!user) return Response.json({ user: null }, noStore);
   await refreshSessionCookie();
 
-  const [nextRows, rateRows, unread, saved] = await Promise.all([
+  const [nextRows, rateRows, unread, saved, insideRows] = await Promise.all([
     db()`
       SELECT b.id, b.code, b.starts_at, g.name AS gym_name, g.slug AS gym_slug, g.city AS gym_city, g.timezone AS gym_timezone, g.photos AS gym_photos
       FROM bookings b JOIN gyms g ON g.id = b.gym_id
@@ -75,6 +76,12 @@ export const GET = handle(async (_req, ctx) => {
       ORDER BY b.starts_at DESC LIMIT 1`,
     db()`SELECT count(*)::int AS n FROM messages WHERE user_id = ${user.id}::uuid AND read_at IS NULL`,
     db()`SELECT gym_id FROM saved_gyms WHERE user_id = ${user.id}::uuid`,
+    db()`
+      SELECT b.id, b.checked_in_at, g.name AS gym_name
+      FROM bookings b JOIN gyms g ON g.id = b.gym_id
+      WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND b.checked_out_at IS NULL
+        AND b.checked_in_at > now() - make_interval(hours => ${MAX_STAY_HOURS}::int)
+      ORDER BY b.checked_in_at DESC LIMIT 1`,
   ]);
 
   // The day-before reminder lands in the inbox the next time the app opens.
@@ -95,6 +102,7 @@ export const GET = handle(async (_req, ctx) => {
       user: { name: user.name, email: user.email, saved_card: user.saved_card, home_city: user.home_city, default_sort: user.default_sort, max_price_cents: user.max_price_cents, is_demo: user.is_demo },
       unread: unreadCount,
       next: next ?? null,
+      inGym: insideRows[0] ?? null,
       toRate: rateRows[0] ?? null,
       saved: saved.map((s) => s.gym_id as string),
     },

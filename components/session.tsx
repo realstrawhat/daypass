@@ -19,12 +19,14 @@ export type SessionUser = {
   is_demo: boolean;
 };
 
+export type InGym = { id: string; gym_name: string; checked_in_at: string };
 export type NextBooking = { id: string; code: string; starts_at: string; gym_name: string; gym_slug: string; gym_city: string; gym_timezone: string; gym_photos: string[] };
 
 type SessionData = {
   user: SessionUser | null;
   unread: number;
   next: NextBooking | null;
+  inGym: InGym | null;
   toRate: { id: string; gym_name: string } | null;
   saved: string[];
 };
@@ -38,7 +40,7 @@ type Ctx = SessionData & {
   markRead: () => void;
 };
 
-const EMPTY: SessionData = { user: null, unread: 0, next: null, toRate: null, saved: [] };
+const EMPTY: SessionData = { user: null, unread: 0, next: null, inGym: null, toRate: null, saved: [] };
 const KEY = 'daypass-session';
 
 const SessionContext = createContext<Ctx>({

@@ -1,7 +1,8 @@
 // Opening hours and next-slot wording, with fixed times so the result never depends on when this runs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysUntil, doorIsOpen, gymStatus, hoursUntil, ratingShares, refusalIsOpen, sameLocalDay } from '../lib/hours.ts';
+import { sampleGuests } from '../lib/door-guests.ts';
+import { daysUntil, doorIsOpen, gymStatus, hoursUntil, MAX_STAY_HOURS, ratingShares, refusalIsOpen, sameLocalDay, stayLabel, timerLabel, visitState } from '../lib/hours.ts';
 
 const gym = { id: 'g', timezone: 'Europe/Amsterdam', open_hour: 7, close_hour: 21, weekend_open_hour: 9, weekend_close_hour: 18 };
 
@@ -57,4 +58,41 @@ test('calendar days follow the gym\'s own clock, so tomorrow evening is one day 
   assert.equal(daysUntil('2026-11-04T23:30:00Z', tz, now), 1, 'past midnight in Berlin');
   assert.equal(sameLocalDay(new Date('2026-11-04T22:30:00Z'), new Date(now), tz), true);
   assert.equal(sameLocalDay(new Date('2026-11-04T23:30:00Z'), new Date(now), tz), false);
+});
+
+test('a visit is inside until it has an exit, and stops counting after the longest stay', () => {
+  const now = Date.parse('2026-11-04T18:00:00Z');
+  assert.equal(visitState(null, null, now), 'not_in');
+  assert.equal(visitState('2026-11-04T17:00:00Z', null, now), 'inside');
+  assert.equal(visitState('2026-11-04T17:00:00Z', '2026-11-04T17:40:00Z', now), 'left');
+  assert.equal(visitState(now - MAX_STAY_HOURS * 3600000, null, now), 'inside', 'right on the limit');
+  assert.equal(visitState(now - MAX_STAY_HOURS * 3600000 - 1000, null, now), 'no_exit');
+});
+
+test('times inside read naturally, and the timer never goes below zero', () => {
+  assert.equal(stayLabel(20000), '1 min');
+  assert.equal(stayLabel(48 * 60000), '48 min');
+  assert.equal(stayLabel(120 * 60000), '2 h');
+  assert.equal(stayLabel(72 * 60000), '1 h 12 min');
+  assert.equal(timerLabel(4331000), '01:12:11');
+  assert.equal(timerLabel(-5000), '00:00:00');
+});
+
+test('sample guests are the same for everyone, differ by gym and day, and always leave after they arrive', () => {
+  const start = Date.parse('2026-11-04T00:00:00Z');
+  const end = start + 24 * 3600000;
+  const a = sampleGuests('gym-a', '2026-11-04', start, end);
+  assert.deepEqual(a, sampleGuests('gym-a', '2026-11-04', start, end));
+  assert.notDeepEqual(a, sampleGuests('gym-b', '2026-11-04', start, end));
+  assert.notDeepEqual(a, sampleGuests('gym-a', '2026-11-05', start, end));
+  assert.ok(a.length > 60, `${a.length} guests in a day`);
+  for (const g of a) {
+    assert.ok(g.plannedIn >= start && g.plannedIn < end);
+    assert.ok(g.plannedOut > g.plannedIn);
+    assert.match(g.code, /^DP-[A-Z2-9]{5}$/);
+  }
+  // Busier after work than in the small hours, and never quiet for long, because the demo must work at any hour.
+  const between = (from, to) => a.filter((g) => g.plannedIn >= start + from * 3600000 && g.plannedIn < start + to * 3600000).length;
+  assert.ok(between(18, 20) > between(2, 4));
+  assert.ok(between(2, 4) > 0);
 });

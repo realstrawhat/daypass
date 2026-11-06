@@ -3,11 +3,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { IconScan } from './Icons';
 import { haptic } from './ui/feedback';
 
-type Result = { result: 'valid' | 'used' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown'; gym?: string; holder?: string; when?: string; code?: string; usedAt?: string };
+export type DeskResult = { result: 'valid' | 'used' | 'out' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown'; gym?: string; holder?: string; when?: string; code?: string; usedAt?: string; leftAt?: string; stay?: string; inside?: boolean };
+type Result = DeskResult;
 
-const COPY: Record<Result['result'], { title: string; tone: string; line: (r: Result) => string }> = {
+export const DESK_COPY: Record<Result['result'], { title: string; tone: string; line: (r: Result) => string }> = {
   valid: { title: 'Let them in', tone: 'is-valid', line: (r) => `${r.holder}, checked in for ${r.gym}.` },
-  used: { title: 'Already used', tone: 'is-bad', line: (r) => `This pass was checked in at ${r.usedAt}.` },
+  out: { title: 'Checked out', tone: 'is-valid', line: (r) => `${r.holder} left after ${r.stay}. In at ${r.usedAt}, out at ${r.leftAt}.` },
+  used: { title: 'Already used', tone: 'is-bad', line: (r) => (r.leftAt ? `This pass came in at ${r.usedAt} and left at ${r.leftAt}.` : `This pass was checked in at ${r.usedAt}.`) },
   expired: { title: 'Expired', tone: 'is-bad', line: (r) => `This pass was for ${r.when}.` },
   too_early: { title: 'Too early', tone: 'is-warn', line: (r) => `This pass opens one hour before ${r.when}.` },
   wrong_date: { title: 'Wrong date', tone: 'is-warn', line: (r) => `This pass is for ${r.when}.` },
@@ -107,7 +109,8 @@ export function StaffScanner() {
     }
   };
 
-  const copy = result ? COPY[result.result] : null;
+  // A second scan straight after the first is a double scan, not a problem at the door.
+  const copy = result?.inside ? { title: 'Already in', tone: 'is-warn', line: (r: Result) => `Checked in at ${r.usedAt}. Scan again when they leave.` } : result ? DESK_COPY[result.result] : null;
 
   return (
     <div className="staff-main">
@@ -137,7 +140,7 @@ export function StaffScanner() {
           {result.result !== 'unknown' && result.code ? <p><strong>{result.code}</strong></p> : null}
         </div>
       ) : null}
-      <p className="fine">Demo door scanner. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time, from any account. A real pass can only be scanned from its own account, so it says Not found anywhere else.</p>
+      <p className="fine">Demo door scanner. The first scan checks someone in, and a later scan checks them out. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time, from any account. A real pass can only be scanned from its own account, so it says Not found anywhere else.</p>
     </div>
   );
 }

@@ -83,6 +83,32 @@ export function ratingShares(rating: number | null) {
 export const hoursUntil = (iso: string, now = Date.now()) => (new Date(iso).getTime() - now) / 3600000;
 export const doorIsOpen = (hours: number) => hours <= 1 && hours >= -3;
 
+// Entry and exit. Someone who never checks out stops counting as inside after this long.
+export const MAX_STAY_HOURS = 6;
+// A second scan this soon is the same person at the door, not them leaving.
+export const SCAN_OUT_AFTER_MS = 60000;
+export const UNDO_EXIT_MS = 5 * 60000;
+
+export type VisitState = 'not_in' | 'inside' | 'left' | 'no_exit';
+
+export function visitState(inAt: string | number | null | undefined, outAt: string | number | null | undefined, now = Date.now()): VisitState {
+  if (!inAt) return 'not_in';
+  if (outAt) return 'left';
+  return now - new Date(inAt).getTime() > MAX_STAY_HOURS * 3600000 ? 'no_exit' : 'inside';
+}
+
+export function stayLabel(ms: number) {
+  const minutes = Math.max(1, Math.round(ms / 60000));
+  const h = Math.floor(minutes / 60);
+  const m = minutes % 60;
+  return h === 0 ? `${m} min` : m === 0 ? `${h} h` : `${h} h ${m} min`;
+}
+
+export function timerLabel(ms: number) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(two).join(':');
+}
+
 export function sameLocalDay(a: Date, b: Date, tz: string) {
   const x = localParts(a, tz);
   const y = localParts(b, tz);

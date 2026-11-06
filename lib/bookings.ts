@@ -3,7 +3,7 @@ import { db } from './db';
 import { hashPassword, HttpError, type User } from './auth';
 import { getAvailability, getGymById, getGymBySlug, isValidSlot, releaseExpiredHolds, type Gym, type GymFacts } from './gyms';
 import { dateLabel, isUuid, money, timeLabel } from './format';
-import { hoursUntil, refusalIsOpen, sameLocalDay } from './hours';
+import { hoursUntil, MAX_STAY_HOURS, refusalIsOpen, sameLocalDay, SCAN_OUT_AFTER_MS, stayLabel, UNDO_EXIT_MS } from './hours';
 import { charge, methodLabel, type PayMethod } from './payments';
 
 const HOLD_MINUTES = 10;
@@ -31,6 +31,7 @@ export type Booking = {
   refund_reason: string | null;
   is_sample: boolean;
   checked_in_at: string | null;
+  checked_out_at: string | null;
   wallet_added_at: string | null;
   updated_at: string;
   created_at: string;
@@ -307,12 +308,13 @@ export async function refuseEntryRefund(user: User, id: string, detail: string) 
   return done;
 }
 
-export type DeskResult = 'valid' | 'used' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown';
+export type DeskResult = 'valid' | 'used' | 'out' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown';
 
 // What reception sees. Valid only from an hour before the session until three hours after it starts.
 // This is a demo with no staff accounts, so a real person's pass can only be scanned from their own account.
 // Demo passes can be scanned from any account, so two phones can act out the door.
-export async function deskCheck(scanner: User, code: string, apply: boolean) {
+// The first scan lets someone in. A later scan lets them out, unless it comes so soon it must be a double scan.
+export async function deskCheck(scanner: { id: string | null }, code: string, apply: boolean) {
   const clean = code.trim().toUpperCase().replace(/^DAYPASS:/, '');
   const rows = await db()`
     SELECT b.*, g.name AS gym_name, g.timezone AS gym_timezone, u.name AS holder, u.is_demo AS holder_is_demo
@@ -320,9 +322,19 @@ export async function deskCheck(scanner: User, code: string, apply: boolean) {
     WHERE b.code = ${clean} AND b.status IN ('confirmed','cancelled')`;
   const b = rows[0] as (Booking & { gym_name: string; gym_timezone: string; holder: string; holder_is_demo: boolean }) | undefined;
   if (!b || (b.user_id !== scanner.id && !b.holder_is_demo)) return { result: 'unknown' as DeskResult };
-  const detail = { gym: b.gym_name, holder: b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
+  const detail = { gym: b.gym_name, gymId: b.gym_id, holder: b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
   if (b.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
-  if (b.checked_in_at) return { result: 'used' as DeskResult, ...detail, usedAt: timeLabel(b.checked_in_at, b.gym_timezone) };
+  if (b.checked_in_at) {
+    const usedAt = timeLabel(b.checked_in_at, b.gym_timezone);
+    if (b.checked_out_at) return { result: 'used' as DeskResult, ...detail, usedAt, leftAt: timeLabel(b.checked_out_at, b.gym_timezone) };
+    const inside = Date.now() - new Date(b.checked_in_at).getTime();
+    if (inside > MAX_STAY_HOURS * 3600000) return { result: 'used' as DeskResult, ...detail, usedAt };
+    if (apply && inside >= SCAN_OUT_AFTER_MS) {
+      const out = await markCheckedOut(b.id);
+      if (out) return { result: 'out' as DeskResult, ...detail, usedAt, leftAt: timeLabel(out, b.gym_timezone), stay: stayLabel(new Date(out).getTime() - new Date(b.checked_in_at).getTime()) };
+    }
+    return { result: 'used' as DeskResult, ...detail, usedAt, inside: true };
+  }
   // Demo passes skip the time window, so the door can be tried at any time.
   if (!b.holder_is_demo) {
     const hours = hoursUntil(b.starts_at);
@@ -334,7 +346,7 @@ export async function deskCheck(scanner: User, code: string, apply: boolean) {
     const [now] = await db()`SELECT status, checked_in_at FROM bookings WHERE id = ${b.id}::uuid`;
     if (!now) return { result: 'unknown' as DeskResult };
     if (now.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
-    return { result: 'used' as DeskResult, ...detail, usedAt: now.checked_in_at ? timeLabel(now.checked_in_at as string, b.gym_timezone) : undefined };
+    return { result: 'used' as DeskResult, ...detail, usedAt: now.checked_in_at ? timeLabel(now.checked_in_at as string, b.gym_timezone) : undefined, inside: true };
   }
   return { result: 'valid' as DeskResult, ...detail };
 }
@@ -346,6 +358,41 @@ async function markCheckedIn(id: string, userId: string) {
     await addMessage(userId, 'checkin', `Checked in at ${name}`, 'Enjoy your session. We will ask how it went afterwards.', id);
   }
   return !!rows[0];
+}
+
+// Only one exit counts, and only for someone who is inside. Returns the exit time, or null if nothing changed.
+export async function markCheckedOut(id: string) {
+  const rows = await db()`
+    UPDATE bookings SET checked_out_at = now(), updated_at = now()
+    WHERE id = ${id}::uuid AND status = 'confirmed' AND checked_in_at IS NOT NULL AND checked_out_at IS NULL
+      AND checked_in_at > now() - make_interval(hours => ${MAX_STAY_HOURS}::int)
+    RETURNING checked_out_at`;
+  return (rows[0]?.checked_out_at as string | undefined) ?? null;
+}
+
+// The person says they have left. Doing it twice gives the same answer as doing it once.
+export async function checkOut(userId: string, id: string) {
+  const b = await getOwned(userId, id);
+  if (b.checked_out_at) return b;
+  if (b.status !== 'confirmed') throw new HttpError(409, 'This pass is not active.', 'not_confirmed');
+  if (!b.checked_in_at) throw new HttpError(409, 'You have not checked in for this visit yet.', 'not_in');
+  if (!(await markCheckedOut(id))) {
+    const now = await getOwned(userId, id);
+    if (now.checked_out_at) return now;
+    throw new HttpError(409, 'This visit ended too long ago to check out.', 'too_late');
+  }
+  return getOwned(userId, id);
+}
+
+// For a slip of the finger, so it only works for a few minutes.
+export async function undoCheckOut(userId: string, id: string) {
+  if (!isUuid(id)) throw new HttpError(404, 'Booking not found.');
+  const rows = await db()`
+    UPDATE bookings SET checked_out_at = NULL, updated_at = now()
+    WHERE id = ${id}::uuid AND user_id = ${userId}::uuid AND status = 'confirmed'
+      AND checked_out_at > now() - make_interval(secs => ${UNDO_EXIT_MS / 1000}::int)
+    RETURNING id`;
+  if (!rows[0]) throw new HttpError(409, 'It is too late to undo this check-out.', 'too_late');
 }
 
 // The owner's own simulated desk scan. Demo accounts can try it any time. A real account can use it only
@@ -413,9 +460,9 @@ export async function getBookingView(userId: string, id: string) {
 // Gives a new account one finished visit, so past bookings and rating can be tried straight away.
 export async function addSamplePastVisit(userId: string, area: string | null = null) {
   await db()`
-    INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
+    INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at, checked_out_at)
     SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('hour', now()) - interval '9 days', g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int,
-      'confirmed', 'sample-past-visit', true, date_trunc('hour', now()) - interval '9 days'
+      'confirmed', 'sample-past-visit', true, date_trunc('hour', now()) - interval '9 days', date_trunc('hour', now()) - interval '9 days' + interval '65 minutes'
     FROM gyms g WHERE g.slug = coalesce((SELECT slug FROM gyms WHERE is_demo AND lower(city) = lower(${area}::text) ORDER BY name = 'Iron Gym' DESC LIMIT 1), 'iron-gym-amsterdam')
     ON CONFLICT DO NOTHING`;
 }
@@ -434,7 +481,7 @@ export async function addReview(user: User, bookingId: string, stars: number, bo
 }
 
 // Erases an account at once. Its future spots are freed first, then the account goes, and with it its bookings,
-// passes, payments, ratings, saved gyms, messages, passkeys and logins. A gym it listed stays listed, without an owner.
+// passes, payments, ratings, saved gyms, calendar notes, messages, passkeys and logins. A gym it listed stays listed, without an owner.
 export async function eraseUser(userId: string) {
   await db()`
     WITH live AS (
@@ -470,7 +517,9 @@ export async function createDemoUser(area: string | null = null) {
     RETURNING id`;
   const userId = user.id as string;
 
-  // A short training history across cities, for the visit grid and Passes.
+  // A short training history across cities, for the calendar, its notes and Passes.
+  const stays = [72, 48, 95, 60, 55, 80, 65, 40];
+  const notes: Record<number, string> = { 0: 'Legs felt strong. Added 5 kg on squats.', 3: 'Short on sleep, so kept it light. Try mornings next time.' };
   const history = [
     ['iron-gym-amsterdam', 6], ['iron-gym-berlin', 13], ['iron-gym-lisbon', 19], ['iron-gym-paris', 34],
     ['iron-gym-amsterdam', 41], ['iron-gym-prague', 58], ['iron-gym-barcelona', 77], ['iron-gym-vienna', 96],
@@ -479,11 +528,19 @@ export async function createDemoUser(area: string | null = null) {
     // Believable training times, mostly after work.
     const hour = [17, 7, 18, 16, 6, 17, 8, 18][i];
     await db()`
-      INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
+      INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at, checked_out_at)
       SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int),
         g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int, 'confirmed', ${`sample-${i}`}, true,
-        date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int)
+        date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int),
+        date_trunc('day', now()) + make_interval(hours => ${hour}::int, mins => ${stays[i]}::int) - make_interval(days => ${days}::int)
       FROM gyms g WHERE g.slug = ${slug}`;
+    if (notes[i]) {
+      await db()`
+        INSERT INTO day_notes (user_id, day, body)
+        SELECT b.user_id, (b.starts_at AT TIME ZONE g.timezone)::date, ${notes[i]}
+        FROM bookings b JOIN gyms g ON g.id = b.gym_id
+        WHERE b.user_id = ${userId}::uuid AND b.idempotency_key = ${`sample-${i}`}`;
+    }
   }
   await addMessage(userId, 'welcome', 'Welcome to Daypass', 'This is a demo account with sample visits. Payments, email, Face ID and Wallet are simulated, so try anything.');
 

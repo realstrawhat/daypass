@@ -534,17 +534,18 @@ test('the opening screen: words on the right, search in the middle, air between 
   for (const [width, height, mobile] of [[390, 844, true], [1440, 900, false]]) {
     const { page, done } = await visitor({ width, height, mobile });
     await open(page, '/home');
-    await page.waitForSelector('.home-search');
+    await page.waitForSelector('.home-login');
     await sleep(1000);
     const m = await page.evaluate(() => {
       const box = (s) => document.querySelector(s).getBoundingClientRect();
       const hero = box('.vhero');
       const title = box('.home-title');
       const search = box('.home-search');
-      return { heroCentre: (hero.left + hero.right) / 2, searchCentre: (search.left + search.right) / 2, gap: search.top - title.bottom, align: getComputedStyle(document.querySelector('.vhero-copy')).textAlign, frost: getComputedStyle(document.querySelector('.vhero-pause')).backdropFilter };
+      return { heroCentre: (hero.left + hero.right) / 2, searchCentre: (search.left + search.right) / 2, gap: search.top - title.bottom, align: getComputedStyle(document.querySelector('.vhero-copy')).textAlign, frost: getComputedStyle(document.querySelector('.home-login')).backdropFilter, pause: !!document.querySelector('.vhero-pause') };
     });
     assert.equal(m.align, 'right');
     assert.match(m.frost, /blur/, 'the frosted glass really renders in Chrome');
+    assert.equal(m.pause, false, 'the hero has no pause button');
     assert.ok(Math.abs(m.heroCentre - m.searchCentre) <= 2, `${width}px: search centre ${m.searchCentre}, hero centre ${m.heroCentre}`);
     assert.ok(m.gap >= 22, `${width}px: gap ${m.gap}`);
     await done();
@@ -846,8 +847,18 @@ test('the door scanner checks a pass once while it stays in view', needsChrome, 
   await page.evaluate(() => { window.inView = ''; });
   await sleep(3200);
   await page.evaluate((code) => { window.inView = `DAYPASS:${code}`; }, next.code);
-  await page.waitForFunction(() => /already used/i.test(document.querySelector('.staff-result')?.innerText ?? ''));
+  // Seconds later is still the same person at the door, so it doesn't count as them leaving.
+  await page.waitForFunction(() => /already in/i.test(document.querySelector('.staff-result')?.innerText ?? ''));
   assert.equal(checks, 2, 'shown again after leaving the camera, it is checked again');
+  if (sql) {
+    // A minute on, the same scan checks them out.
+    await page.evaluate(() => { window.inView = ''; });
+    await sql`UPDATE bookings SET checked_in_at = now() - interval '40 minutes' WHERE id = ${next.id}::uuid`;
+    await sleep(3200);
+    await page.evaluate((code) => { window.inView = `DAYPASS:${code}`; }, next.code);
+    await page.waitForFunction(() => /checked out/i.test(document.querySelector('.staff-result')?.innerText ?? ''));
+    assert.match(await text(page, '.staff-result'), /left after 40 min/);
+  }
   await done();
 });
 
@@ -1022,5 +1033,140 @@ test('the upcoming reminder stays calm: a small chip and a card that does not ta
   assert.ok(m.height <= 190, `the card is ${m.height}px tall`);
   assert.ok(m.number <= 70, `the number is ${m.number}px`);
   assert.match(m.words, /to go/);
+  await done();
+});
+
+test('pressing a card moves it, and a swipe from that press still scrolls the row without opening it', needsChrome, async () => {
+  const { page, done } = await visitor();
+  await open(page, '/home');
+  await page.waitForSelector('.featured-item .feature-card');
+  await ready(page, '.home-search button');
+  await sleep(800);
+  await page.$eval('.featured-track', (e) => e.scrollIntoView({ block: 'center', behavior: 'instant' }));
+  await sleep(500);
+  const rest = await (await page.$('.featured-item .feature-card')).boundingBox();
+  const x = rest.x + rest.width / 2;
+  const y = rest.y + rest.height / 2;
+  const cdp = await page.createCDPSession();
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x, y }] });
+  await sleep(300);
+  const pressed = await page.$eval('.featured-item .feature-card', (e) => ({ on: e.classList.contains('is-pressed'), width: e.getBoundingClientRect().width }));
+  assert.ok(pressed.on, 'the card knows it is pressed');
+  assert.ok(pressed.width < rest.width * 0.98, `the card moved: ${rest.width} to ${pressed.width}`);
+  for (let i = 1; i <= 14; i += 1) {
+    await cdp.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: x - (240 * i) / 14, y }] });
+    await sleep(16);
+  }
+  await cdp.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+  await sleep(800);
+  assert.ok((await page.$eval('.featured-track', (e) => e.scrollLeft)) > 100, 'the row swiped');
+  assert.equal(await exists(page, '.is-pressed'), false, 'the card let go');
+  assert.equal(await address(page), '/home', 'and nothing opened');
+  await done();
+});
+
+test('choosing a sort goes back to the top of the list', needsChrome, async () => {
+  const { page, done } = await visitor();
+  await open(page, '/gyms?city=Berlin');
+  await page.waitForSelector('a.gym-card');
+  await ready(page, '.filter-sort .chip');
+  await page.evaluate(() => window.scrollTo({ top: 2000, behavior: 'instant' }));
+  await sleep(300);
+  assert.ok((await page.evaluate(() => scrollY)) > 1000);
+  await page.evaluate(() => [...document.querySelectorAll('.filter-sort .chip')].find((c) => c.textContent.includes('Lowest')).click());
+  await page.waitForFunction(() => scrollY === 0);
+  assert.match(await address(page), /sort=price_asc/);
+  await done();
+});
+
+test('the calendar: a dot opens its day, a note is kept, and a ring opens its history', needsDb, async () => {
+  const { page, done } = await visitor();
+  await open(page, '/home');
+  await page.evaluate(() => fetch('/api/auth/demo', { method: 'POST' }));
+  await open(page, '/account');
+  await page.waitForSelector('.dot');
+  await ready(page, '.dot');
+  const notesBefore = await page.$$eval('.dot.has-note', (d) => d.length);
+  // A day with a visit shows its times.
+  await page.evaluate(() => document.querySelector('.dot.on').click());
+  await page.waitForSelector('.log-day .log-visit');
+  assert.match(await text(page, '.log-visit'), /In \d\d:\d\d, out \d\d:\d\d/);
+  await page.evaluate(() => document.querySelector('.sheet .round-sm').click());
+  await page.waitForFunction(() => !document.querySelector('.sheet'));
+  // A day with nothing on it can still hold a note, and closing the sheet saves it.
+  await page.evaluate(() => document.querySelector('.dot:not(.on):not(.is-booked):not(.has-note)').click());
+  await page.waitForSelector('#day-note');
+  assert.match(await text(page, '.log-day .sheet-sub'), /No visit/);
+  await page.type('#day-note', 'Rest day');
+  await page.evaluate(() => document.querySelector('.sheet .round-sm').click());
+  await page.waitForFunction((n) => document.querySelectorAll('.dot.has-note').length === n + 1, {}, notesBefore);
+  await open(page, '/account');
+  await page.waitForSelector('.dot');
+  assert.equal(await page.$$eval('.dot.has-note', (d) => d.length), notesBefore + 1, 'the note is still there after a reload');
+  // Ring, to a visit in its history, to that day, and back.
+  await ready(page, '.rings-list button');
+  await page.evaluate(() => document.querySelectorAll('.rings-list button')[1].click());
+  await page.waitForSelector('.log-ring .log-visit');
+  assert.match(await text(page, '#sheet-title'), /GYMS THIS YEAR/i);
+  await page.evaluate(() => document.querySelector('.log-ring .log-visit').click());
+  await page.waitForSelector('.log-day');
+  await page.evaluate(() => document.querySelector('.log-day .back-link').click());
+  await page.waitForSelector('.log-ring');
+  await done();
+});
+
+test('a pass runs a timer from check-in, Home shows it, and slide to check out stops it, with undo', needsDb, async () => {
+  const { page, done } = await visitor();
+  await open(page, '/home');
+  await page.evaluate(() => fetch('/api/auth/demo', { method: 'POST' }));
+  const next = await page.evaluate(async () => (await (await fetch('/api/auth/me')).json()).next);
+  await open(page, `/bookings/${next.id}`);
+  await ready(page, '.pass-show');
+  await page.evaluate(() => document.querySelector('.pass-show').click());
+  await page.waitForSelector('.desk-sim');
+  await page.evaluate(() => document.querySelector('.desk-sim').click());
+  await page.waitForSelector('.visit-clock.is-live');
+  const first = await text(page, '.visit-clock .stay-timer');
+  await sleep(2200);
+  assert.notEqual(await text(page, '.visit-clock .stay-timer'), first, 'the timer runs');
+  await open(page, '/home');
+  await page.waitForSelector('.vhero-next.is-live .stay-timer');
+  await open(page, `/bookings/${next.id}`);
+  await page.waitForSelector('.visit-clock .swipe-thumb');
+  await ready(page, '.visit-clock .swipe-thumb');
+  await page.focus('.visit-clock .swipe-thumb');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.visit-times');
+  assert.match(await text(page, '.visit-times'), /Time inside/);
+  await page.waitForSelector('.toast .toast-action');
+  await page.evaluate(() => document.querySelector('.toast .toast-action').click());
+  await page.waitForSelector('.visit-clock.is-live');
+  await done();
+});
+
+test('the owner panel asks for the password, then keeps itself up to date', needsChrome, async () => {
+  const { page, done } = await visitor();
+  await open(page, '/owner?gym=iron-gym-berlin');
+  await page.waitForSelector('#owner-password');
+  assert.equal(await exists(page, '.owner-stats'), false, 'nothing shows before the password');
+  assert.equal(await exists(page, '.tabbar a'), false, 'it is its own screen');
+  await ready(page, '.owner-gate button');
+  await page.type('#owner-password', 'wrong');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.owner-gate .form-error');
+  await page.$eval('#owner-password', (e) => e.select());
+  await page.type('#owner-password', 'uxdd');
+  await page.keyboard.press('Enter');
+  await page.waitForSelector('.owner-stats');
+  await ready(page, '.owner-btn');
+  let asked = 0;
+  page.on('response', (r) => { if (r.url().includes('/api/owner?') && r.ok()) asked += 1; });
+  const clock = await text(page, '.owner-clock');
+  await sleep(9000);
+  assert.ok(asked >= 2, `asked for fresh data ${asked} times`);
+  assert.notEqual(await text(page, '.owner-clock'), clock, 'the clock runs');
+  const arriving = await page.$eval('[aria-labelledby="owner-next"] .owner-btn', (b) => b.getAttribute('aria-label').replace('Check in ', ''));
+  await page.evaluate(() => document.querySelector('[aria-labelledby="owner-next"] .owner-btn').click());
+  await page.waitForFunction((name) => [...document.querySelectorAll('[aria-labelledby="owner-in"] .owner-row')].some((r) => r.textContent.includes(name)), {}, arriving);
   await done();
 });

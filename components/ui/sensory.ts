@@ -292,6 +292,69 @@ function passTapsToControls() {
 // One place for tap feedback, so every control responds the same way. It listens for finished taps, so
 // starting to scroll over a card stays silent. A control can opt out with data-feel="none" when it has
 // its own sound. The touch listener also switches on :active press states in iOS Safari.
+const CARDS = '.feature-card, .pick-card, .gym-card, .move, .city-card, .next-photo, .ticket';
+// Long enough for a quick tap to be seen.
+const PRESS_AT_LEAST_MS = 130;
+// More than a finger's wobble: this is the start of a swipe, so the card lets go.
+const PRESS_SLOP = 10;
+
+export function installCardPress() {
+  let card: HTMLElement | null = null;
+  let pointer = -1;
+  let startX = 0;
+  let startY = 0;
+  let pressedAt = 0;
+  const letGo = (now = false) => {
+    if (!card) return;
+    const el = card;
+    card = null;
+    const wait = now ? 0 : PRESS_AT_LEAST_MS - (performance.now() - pressedAt);
+    if (wait > 0) setTimeout(() => el.classList.remove('is-pressed'), wait);
+    else el.classList.remove('is-pressed');
+  };
+  const onDown = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    const target = e.target as Element | null;
+    if (!target?.closest || target.closest('.save')) return;
+    const el = target.closest<HTMLElement>(CARDS);
+    if (!el) return;
+    letGo(true);
+    const box = el.getBoundingClientRect();
+    // -1 to 1 across the card, so it leans towards the finger.
+    el.style.setProperty('--press-x', (((e.clientX - box.left) / box.width) * 2 - 1).toFixed(2));
+    el.style.setProperty('--press-y', (((e.clientY - box.top) / box.height) * 2 - 1).toFixed(2));
+    el.classList.add('is-pressed');
+    card = el;
+    pointer = e.pointerId;
+    startX = e.clientX;
+    startY = e.clientY;
+    pressedAt = performance.now();
+  };
+  const onMove = (e: PointerEvent) => {
+    if (card && e.pointerId === pointer && Math.hypot(e.clientX - startX, e.clientY - startY) > PRESS_SLOP) letGo(true);
+  };
+  const onUp = (e: PointerEvent) => {
+    if (e.pointerId === pointer) letGo();
+  };
+  const onCancel = () => letGo(true);
+  const quiet = { passive: true, capture: true };
+  window.addEventListener('pointerdown', onDown, quiet);
+  window.addEventListener('pointermove', onMove, quiet);
+  window.addEventListener('pointerup', onUp, quiet);
+  window.addEventListener('pointercancel', onCancel, quiet);
+  document.addEventListener('scroll', onCancel, quiet);
+  window.addEventListener('blur', onCancel);
+  return () => {
+    window.removeEventListener('pointerdown', onDown, quiet);
+    window.removeEventListener('pointermove', onMove, quiet);
+    window.removeEventListener('pointerup', onUp, quiet);
+    window.removeEventListener('pointercancel', onCancel, quiet);
+    document.removeEventListener('scroll', onCancel, quiet);
+    window.removeEventListener('blur', onCancel);
+    letGo(true);
+  };
+}
+
 export function installTapFeedback() {
   document.documentElement.classList.toggle('no-haptics', !hapticsOn());
   const onClick = (e: MouseEvent) => {

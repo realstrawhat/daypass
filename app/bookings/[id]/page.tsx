@@ -11,6 +11,7 @@ import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
 import { getBookingView } from '@/lib/bookings';
 import { canChange, dateLabel, directionsLinks, longDate, money, timeLabel } from '@/lib/format';
+import { stayLabel } from '@/lib/hours';
 
 export const metadata: Metadata = { title: 'Your day pass' };
 
@@ -39,13 +40,13 @@ export default async function BookingPage({ params, searchParams }: P) {
   const f = b.gym_facts ?? {};
   const facts = [f.stay, f.entry, f.towel, f.lock, f.shower, f.age].filter(Boolean) as string[];
   const pass = { gym: b.gym_name, city: b.gym_city, dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), code: b.code, holder: user.name, qrSvg, facts };
-  const title = cancelled ? 'Cancelled' : checkedIn && isOver ? 'Past visit' : checkedIn ? 'Checked in' : isOver ? 'Past visit' : 'You are booked';
+  const title = cancelled ? 'Cancelled' : isOver ? 'Past visit' : b.checked_out_at ? 'Visit done' : checkedIn ? 'Checked in' : 'You are booked';
 
   return (
     <Page>
       <main className="pass-page">
         {isNew && !cancelled ? <RevealIntro gym={b.gym_name} /> : null}
-        <SaveForOffline id={b.id} version={`${b.status}-${b.checked_in_at ?? ''}-${b.starts_at}-${b.confirmation_version}`} />
+        <SaveForOffline id={b.id} version={`${b.status}-${b.checked_in_at ?? ''}-${b.checked_out_at ?? ''}-${b.starts_at}-${b.confirmation_version}`} />
         <Link href="/bookings" transitionTypes={['nav-back']} className="round round-solid pass-back" aria-label="Back to Passes"><IconBack /></Link>
 
         <div className="pass-layout">
@@ -59,7 +60,7 @@ export default async function BookingPage({ params, searchParams }: P) {
               <PassView
                 booking={{
                   id: b.id, code: b.code, gym_id: b.gym_id, gym_name: b.gym_name, gym_city: b.gym_city, starts_at: b.starts_at, price_cents: b.price_cents, timezone: tz, lat: b.gym_lat, lng: b.gym_lng,
-                  dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), checked_in_at: b.checked_in_at, checkedInLabel: b.checked_in_at ? timeLabel(b.checked_in_at, tz) : null, in_wallet: !!b.wallet_added_at, version: b.confirmation_version,
+                  dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), checked_in_at: b.checked_in_at, checked_out_at: b.checked_out_at, checkedInLabel: b.checked_in_at ? timeLabel(b.checked_in_at, tz) : null, in_wallet: !!b.wallet_added_at, version: b.confirmation_version,
                 }}
                 pass={pass}
                 directions={directionsLinks(b.gym_lat, b.gym_lng, b.gym_name)}
@@ -91,6 +92,7 @@ export default async function BookingPage({ params, searchParams }: P) {
               <div><dt>Where</dt><dd><Link href={`/gyms/${b.gym_slug}`} transitionTypes={['nav-forward']}>{b.gym_name}</Link><br />{b.gym_address}</dd></div>
               <div><dt>Paid</dt><dd>{money(b.price_cents)} demo payment</dd></div>
               {checkedIn && b.checked_in_at ? <div><dt>Checked in</dt><dd>{dateLabel(b.checked_in_at, tz)}, {timeLabel(b.checked_in_at, tz)}</dd></div> : null}
+              {b.checked_in_at && b.checked_out_at ? <div><dt>Checked out</dt><dd>{timeLabel(b.checked_out_at, tz)}, after {stayLabel(new Date(b.checked_out_at).getTime() - new Date(b.checked_in_at).getTime())}</dd></div> : null}
               {b.refund_cents > 0 && !cancelled ? <div><dt>Refunded</dt><dd>{money(b.refund_cents)}</dd></div> : null}
               {b.previous_starts_at && !cancelled ? <div><dt>Moved from</dt><dd>{dateLabel(b.previous_starts_at, tz)}, {timeLabel(b.previous_starts_at, tz)}{b.previous_gym_name && b.previous_gym_id !== b.gym_id ? `, ${b.previous_gym_name}` : ''}</dd></div> : null}
               {b.is_sample ? <div><dt>Note</dt><dd>Sample visit, so you can try rating a gym. Your rating stays private.</dd></div> : null}

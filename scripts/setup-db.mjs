@@ -154,6 +154,22 @@ const statements = [
     created_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, gym_id)
   )`,
+  `ALTER TABLE bookings ADD COLUMN IF NOT EXISTS checked_out_at timestamptz`,
+  `CREATE TABLE IF NOT EXISTS day_notes (
+    user_id uuid NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    day date NOT NULL,
+    body text NOT NULL,
+    updated_at timestamptz NOT NULL DEFAULT now(),
+    PRIMARY KEY (user_id, day)
+  )`,
+  `CREATE TABLE IF NOT EXISTS door_guest_actions (
+    gym_id uuid NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
+    day date NOT NULL,
+    guest_no int NOT NULL,
+    in_at timestamptz,
+    out_at timestamptz,
+    PRIMARY KEY (gym_id, day, guest_no)
+  )`,
 ];
 
 for (const s of statements) await sql.query(s);
