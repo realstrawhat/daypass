@@ -1086,7 +1086,9 @@ test('the calendar: a dot opens its day, a note is kept, and a ring opens its hi
   await open(page, '/account');
   await page.waitForSelector('.dot');
   await ready(page, '.dot');
-  const notesBefore = await page.$$eval('.dot.has-note', (d) => d.length);
+  // While a page streams in, a hidden copy of the calendar can sit beside it, so only marks on show count.
+  const marks = () => page.$$eval('.dot.has-note', (d) => d.filter((e) => e.checkVisibility()).length);
+  const notesBefore = await marks();
   // A day with a visit shows its times.
   await page.evaluate(() => document.querySelector('.dot.on').click());
   await page.waitForSelector('.log-day .log-visit');
@@ -1099,10 +1101,11 @@ test('the calendar: a dot opens its day, a note is kept, and a ring opens its hi
   assert.match(await text(page, '.log-day .sheet-sub'), /No visit/);
   await page.type('#day-note', 'Rest day');
   await page.evaluate(() => document.querySelector('.sheet .round-sm').click());
-  await page.waitForFunction((n) => document.querySelectorAll('.dot.has-note').length === n + 1, {}, notesBefore);
+  await page.waitForFunction((n) => [...document.querySelectorAll('.dot.has-note')].filter((e) => e.checkVisibility()).length === n + 1, {}, notesBefore);
   await open(page, '/account');
   await page.waitForSelector('.dot');
-  assert.equal(await page.$$eval('.dot.has-note', (d) => d.length), notesBefore + 1, 'the note is still there after a reload');
+  await ready(page, '.rings-list button');
+  assert.equal(await marks(), notesBefore + 1, 'the note is still there after a reload');
   // Ring, to a visit in its history, to that day, and back.
   await ready(page, '.rings-list button');
   await page.evaluate(() => document.querySelectorAll('.rings-list button')[1].click());

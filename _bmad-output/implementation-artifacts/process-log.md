@@ -93,6 +93,7 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 | 67 | Calendar: the old three-month grid gave each day about 15 px, too small to tap by Apple's 44 pt or Google's 48 dp guidance. So the design changed more than the words asked for | One month at a time on a phone, swiped sideways, which keeps the dot grid. Each day is 54 px at 440 px wide and 42 px at 360 px, so the smallest phones are slightly under the guidance. Dots open that day with its visits, times and a note. Rings open their history. Notes save by themselves on close. Upcoming passes show as outlined dots | Tests: dot to day, note kept after a reload, ring to history to day and back |
 | 68 | Timing and the owner panel. Entry and exit are now stored, with a live timer on the pass and on Home. A second scan within 60 seconds is treated as a double scan. A later scan checks the person out. No exit after 6 hours stops the timer and says the exit was not recorded, so no stay is invented, and older visits read the same way. `/owner` opens with the admin password, stored as a hash, and shows who is inside, arrivals, entries by hour, the day's log and takings, updating every 4 seconds. It was built as a screen in the app, not a separate app, so it shares real check-ins and needs no second deploy | Sample guests are worked out from the gym and date. Real check-ins from demo accounts, or the viewer's own, appear as "Live pass". A real person's name or code never appears for anyone else | Tests: password refused and locked, a demo check-in on one account appears on the panel, the owner checks it out and the member sees it, a real account's code and name are absent |
 | 69 | Claude's own checks found faults. The live dot on Home swelled into a big lime circle, because the chip's styles also matched it, and only the screenshot showed this. An older scanner test failed because "Already used" is now "Already in" for a double scan. "Change booking" timed out once at low priority and passed when rerun. A rule test failed once when a database request failed ("fetch failed"), and passed on rerun | The dot was fixed. The scanner test was updated to the new wording and now also checks the later scan-out. The other two needed no change, because the server log and reruns pointed to timing and network, not code. Pass codes wrapping on a 360 px phone were also fixed | See Checks run |
+| 70 | The owner said "yes deploy bruh". Committed as `d59b3dd`, then the same script ran through the normal check, which allowed it this time, to the monamobile team's `daypass` project. On the live link, one calendar journey failed with "the note is still there after a reload". Claude reproduced it before deciding anything: the note stayed through three reloads, but during one reload the page briefly held 244 dots, not 122, because a hidden streamed copy sits beside the calendar while it loads. The fault was in Claude's new test, which counted hidden marks. The same hidden-copy trap is already recorded in row 55 | The test now counts only marks on show. No app change, and no redeploy, because tests aren't part of the live site | Read back as READY and live at https://daypass-six.vercel.app (deployment `dpl_6pKHVzWaSfZFsBmW3LeZbNaVxaQT`). See Checks run |
 | 28 | Owner feedback: the owner disliked the new full-screen Home (row 22) and said the previous and first versions were better | Restored the previous Home layout: headline, search, swipeable gym cards. Kept the separately requested changes: no ribbon, city marks, colour photos, location-aware gyms. The auto-sliding hero is gone | Checked in the test browser at 390 px, then on the live link |
 
 ## Second round: BMad process notes
@@ -110,7 +111,12 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 
 ## Checks run
 
-Latest, on a local production build of rows 63 to 69. Not committed or deployed yet:
+On the live site after the deploy in row 70:
+
+- `npm test`: 53 passed, 0 failed, 2 skipped because they only work locally.
+- `npm run test:ui`: 37 of 38 on the first run. The failure was the test fault in row 70. After that fix, the calendar journey was run again on its own and passed. The full suite was not repeated.
+
+Before that, on a local production build of rows 63 to 69:
 
 - `npm run typecheck`: no errors.
 - `npm test`: 55 of 55 pass against the real database.
@@ -118,7 +124,7 @@ Latest, on a local production build of rows 63 to 69. Not committed or deployed 
 - As an iPhone with tap covers: only the 5 new journeys were run, and all 5 pass. The full iPhone run was not repeated.
 - Screenshots reviewed at 360, 440 and 1280 px, with no sideways overflow at 360 px.
 - After those runs, only the pass code wrapping changed. Rebuilt, and the owner panel journey was run again.
-- Not tested: real phones, the Safari engine, and the live site. Haptics and press feel have not been felt on a device.
+- Not tested: real phones and the Safari engine. Haptics and press feel have not been felt on a device.
 - The four BMad reviewers were not run on this round. Claude reviewed the work itself and tested it, which is a deviation from the workflow.
 
 Latest, on a local production build of rows 58 to 61. Waiting for the owner's deploy:
