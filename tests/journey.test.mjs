@@ -938,7 +938,7 @@ test('iPhone: a tap reaches a hidden switch first, then the control, exactly onc
   await page.type('#auth-email', 'nobody@example.com');
   await page.type('#auth-password', 'not-the-password');
   await page.waitForSelector('button[type="submit"] > [data-tick]');
-  const asked = page.waitForResponse((r) => r.url().includes('/api/auth/'));
+  const asked = page.waitForResponse((r) => r.url().includes('/api/auth/login'));
   await tap(page, 'button[type="submit"]');
   assert.equal((await asked).request().method(), 'POST', 'the login form was really sent');
 

@@ -102,6 +102,7 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 | 76 | Claude's screen capture faults. Turning on software graphics for the whole browser, to draw street maps, made pages time out, and that run's clean-up failed, leaving one demo account with a scanned pass that would have shown on the live panel as "Sam D.". Claude identified it by its pattern, a deliberate Test decline then a scripted scan at Iron Gym Berlin, rather than guessing among the recent demo accounts, three of which it left alone. The street map still does not draw in the test browser | That one account was removed and spots recounted. Only the four map screens now use slow graphics. The README says these four screens have no streets and how to replace them. Exported pictures were also cropped to their own width after one came out mostly empty | Read back: account removed, 86 of 86 screens captured, and 86 of 86 appear in the map |
 | 77 | Owner decision on the conflict in row 75: "If the user has booked for one hour, then he has to one hour, maybe a grace period of 15 minutes", mentioned as a grace period, "before and after" | The door now opens 15 minutes before the start and closes 15 minutes after the hour ends. It used to open 1 hour before and close 3 hours after. The timer counts down the hour, then a labelled Grace period, then goes negative. "Stay up to 2 or 3 hours" no longer shows on any gym or pass, replaced by the same rule everywhere. Claude read "before and after" this way, and the hour still starts counting at entry | Tests updated for the new window and timer. See Checks run |
 | 78 | The unexplained failure in row 74 was found. The test tapped the gym page's back arrow during the page's slide animation, and the browser ignores taps then. In 20 repeats it missed 5 times, each with the animation still running. Each time the page stayed put, and a second tap worked and kept the filters | The test now waits for the animation to end. No app change. A very fast tap on that arrow can still need a second tap, which is left as it is | 5 of 20 misses, each confirmed to work on the second tap |
+| 79 | The owner said "deploy". Committed as `8653171`, and the same script ran through the normal check, which allowed it, to the monamobile team's `daypass` project. On the live link, two browser journeys failed. The iPhone journey's login check waited for any `/api/auth/` response and sometimes caught the app's routine session check, so that fault was in the test. The home city journey timed out. On four reruns, the home city journey passed all four and the iPhone journey passed three, its one failure a timeout during the same slow first run, where one test took 62 s. That points to a slow moment on the network or just after the deploy, but the cause was not proven | The login check now waits for the login request itself. No app change, and no redeploy, because tests aren't part of the live site | Read back as READY and live at https://daypass-six.vercel.app (deployment `dpl_6wPuoEidXq59wW371iiEvH6AmG39`). See Checks run |
 | 28 | Owner feedback: the owner disliked the new full-screen Home (row 22) and said the previous and first versions were better | Restored the previous Home layout: headline, search, swipeable gym cards. Kept the separately requested changes: no ribbon, city marks, colour photos, location-aware gyms. The auto-sliding hero is gone | Checked in the test browser at 390 px, then on the live link |
 
 ## Second round: BMad process notes
@@ -118,6 +119,14 @@ Scope note: the workshop asks for one story from the Unit 7 pack. The project ow
 - Performance on the video Home, same simulation on the live link, as first measured: main content visible in 1.13 s, layout shift 0, about 1.1 s of blocked processing, framework script 390 of 585 KB, 566 page elements. Blur was not rendering yet when this was taken, see row 38.
 
 ## Checks run
+
+On the live site after the deploy in row 79:
+
+- `npm test`: 53 passed, 0 failed, 2 skipped because they only work locally.
+- `npm run test:ui`: 38 of 40. The two failures are in row 79. The full suite was not repeated afterwards.
+- Real phones and the Safari engine were not tested. The camera scanner, two-device confirmation and countdown have not been seen working on a real phone.
+
+Before that:
 
 Latest, on a local production build of rows 75 and 77. Not committed or deployed yet:
 
