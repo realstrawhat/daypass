@@ -1,0 +1,656 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Daypass user flow map</title>
+<style>
+:root { --bg:#000; --s1:#121314; --s2:#1b1c1e; --line:#34373b; --text:#fff; --text2:#cfd0cb; --mute:#a0a29c; --volt:#d7ff3e; --blue:#9fd8ff; --pink:#ffc4e6; }
+*,*::before,*::after { box-sizing:border-box; }
+html { scroll-behavior:smooth; }
+body { margin:0; background:var(--bg); color:var(--text); font:500 15px/1.45 system-ui,-apple-system,'Segoe UI',Roboto,sans-serif; }
+h1,h2,.group-title { font-family:Impact,'Arial Narrow Bold','Haettenschweiler',sans-serif; font-weight:400; text-transform:uppercase; letter-spacing:.01em; }
+h1 { font-size:clamp(2.6rem,7vw,4.6rem); line-height:1.02; margin:0; } h1 em { color:var(--volt); font-style:normal; }
+h2 { font-size:clamp(1.7rem,3.4vw,2.4rem); line-height:1.08; margin:0; }
+a { color:var(--volt); } code { font:600 .8rem ui-monospace,Consolas,monospace; color:var(--text2); overflow-wrap:anywhere; }
+.top { padding:32px clamp(16px,3vw,40px) 12px; max-width:1500px; }
+.top > p { max-width:760px; color:var(--text2); margin:12px 0 0; }
+nav { position:sticky; top:0; z-index:5; display:flex; gap:6px; overflow-x:auto; padding:10px clamp(16px,3vw,40px); background:rgba(0,0,0,.92); border-bottom:1px solid var(--line); scrollbar-width:none; }
+nav a { flex:none; padding:7px 13px; border-radius:99px; background:var(--s2); color:#fff; text-decoration:none; font-size:.86rem; font-weight:700; white-space:nowrap; }
+nav a:hover,nav a:focus-visible { background:var(--volt); color:#000; }
+.legend { display:flex; flex-wrap:wrap; gap:8px 14px; margin:16px 0 0; padding:0; list-style:none; color:var(--text2); font-size:.86rem; }
+.tag { display:inline-block; padding:1px 9px; border-radius:99px; font-size:.72rem; font-weight:800; line-height:1.6; color:#000; }
+.is-pack { background:var(--volt); } .is-later { background:var(--blue); } .is-added { background:var(--pink); }
+.overview-wrap { padding:8px clamp(16px,3vw,40px) 24px; overflow-x:auto; }
+.overview { display:block; width:100%; min-width:1100px; max-width:1500px; background:var(--s1); border-radius:24px; }
+.node { fill:var(--s2); stroke:var(--line); stroke-width:1.5; } a:hover .node, a:focus .node { stroke:var(--volt); }
+.node.is-added { fill:#2a1f28; stroke:#a9799a; } .node.is-soft { stroke-dasharray:5 4; } .node.is-pack2 { fill:#1c2a2e; stroke:#6f9bb0; }
+.node.is-live { fill:var(--volt); stroke:var(--volt); }
+.node-text { fill:#fff; font:700 13.5px system-ui,sans-serif; text-anchor:middle; pointer-events:none; }
+.node.is-live ~ .node-text { fill:#000; }
+.edge { fill:none; stroke:#8d9089; stroke-width:1.8; } .edge.is-live { stroke:var(--volt); stroke-width:2.5; }
+.row-label { fill:var(--mute); font:800 13px system-ui,sans-serif; text-transform:uppercase; letter-spacing:.06em; }
+.journey,.doc { padding:30px clamp(16px,3vw,40px); border-top:1px solid var(--line); scroll-margin-top:50px; }
+.journey-head { display:flex; gap:14px; align-items:flex-start; max-width:900px; }
+.journey-head p { margin:4px 0 0; color:var(--text2); } .journey-meta { font-size:.84rem; color:var(--mute) !important; } .journey-meta b { color:var(--text2); }
+.journey-code { flex:none; margin:0 !important; width:58px; height:58px; display:grid; place-items:center; border-radius:50%; background:var(--volt); color:#000 !important; font:400 1.5rem Impact,sans-serif; }
+.lane { display:flex; gap:26px; overflow-x:auto; padding:18px 2px 14px; align-items:stretch; scrollbar-color:#555 transparent; }
+.lane:focus-visible { outline:2px solid var(--volt); outline-offset:2px; }
+.step { position:relative; flex:none; width:max-content; min-width:232px; max-width:760px; display:flex; flex-direction:column; gap:10px; padding:14px; border-radius:22px; background:var(--s1); }
+.step:not(:last-child)::after { content:'\2192'; position:absolute; right:-23px; top:26px; color:var(--volt); font:800 20px system-ui,sans-serif; }
+.step-head { width:0; min-width:100%; }
+.step-no { margin:0; color:var(--volt); font:400 1.3rem Impact,sans-serif; } .step h3 { margin:0 0 5px; font-size:1.02rem; line-height:1.25; }
+.step-task { margin:7px 0 2px; color:var(--text2); font-size:.86rem; line-height:1.35; } .step-route { margin:0; } .step-trace { margin:3px 0 0; color:var(--mute); font-size:.78rem; }
+.step-shots { display:flex; gap:8px; }
+.thumb { display:block; width:204px; flex:none; padding:0; border:0; background:none; color:var(--text2); font:600 .76rem/1.25 system-ui,sans-serif; text-align:left; cursor:zoom-in; }
+.thumb img { display:block; width:100%; height:auto; aspect-ratio:440/956; object-fit:cover; object-position:top; border-radius:16px; background:var(--s2); box-shadow:inset 0 0 0 1px var(--line); margin-bottom:5px; }
+.thumb:hover img,.thumb:focus-visible img { outline:2px solid var(--volt); outline-offset:1px; }
+.branches { display:flex; gap:8px; width:0; min-width:100%; flex-wrap:wrap; }
+.branch { flex:1 1 200px; display:flex; flex-direction:column; gap:3px; padding:9px; border-radius:15px; border:1.5px dashed #6d7068; font-size:.82rem; line-height:1.3; color:var(--text2); }
+.branch p { margin:0; } .branch-when { color:var(--volt); font-weight:800; }
+.thumb.is-small { width:104px; margin-top:6px; font-size:0; } .thumb.is-small img { border-radius:10px; margin:0; }
+.doc > p { max-width:780px; color:var(--text2); }
+.table-wrap { overflow-x:auto; border-radius:18px; background:var(--s1); }
+table { width:100%; min-width:760px; border-collapse:collapse; font-size:.88rem; }
+th,td { padding:9px 13px; text-align:left; vertical-align:top; border-bottom:1px solid #26282a; } th { color:var(--mute); font-size:.76rem; text-transform:uppercase; letter-spacing:.05em; }
+.is-met { color:var(--volt); } .is-open { color:#ffc9a8; }
+.link-thumb { padding:0; border:0; background:none; color:#fff; font:inherit; text-decoration:underline; text-underline-offset:2px; cursor:zoom-in; text-align:left; }
+.group-title { font-size:1.5rem; margin:26px 0 10px; } .group-title small { color:var(--mute); font:600 .9rem system-ui,sans-serif; }
+.grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:14px 10px; } .grid .thumb { width:auto; }
+.grid.is-wide { grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); } .grid.is-wide .thumb img { aspect-ratio:1280/860; }
+dialog { padding:0; border:0; background:transparent; max-width:96vw; max-height:96vh; color:#fff; } dialog::backdrop { background:rgba(0,0,0,.9); }
+dialog img { display:block; max-width:96vw; max-height:88vh; border-radius:18px; } dialog p { margin:8px 0 0; text-align:center; font-weight:700; }
+dialog button { position:fixed; top:14px; right:14px; width:44px; height:44px; border:0; border-radius:50%; background:var(--volt); color:#000; font:800 20px system-ui,sans-serif; cursor:pointer; }
+footer { padding:24px clamp(16px,3vw,40px) 48px; border-top:1px solid var(--line); color:var(--mute); font-size:.84rem; max-width:900px; }
+@media print { nav,dialog { display:none; } }
+</style></head><body>
+<header class="top">
+  <h1>Daypass <em>user flow map</em></h1>
+  <p>Every journey and every screen in the app, tied back to the Gym App Product Build Pack. Read each journey left to right, like the story maps in the PDF. Dashed boxes are the "what if" paths. Tap a screen to enlarge it.</p>
+  <ul class="legend">
+    <li><span class="tag is-pack">In the build pack</span></li>
+    <li><span class="tag is-later">Build pack, below the MVP line</span></li>
+    <li><span class="tag is-added">Added from owner feedback</span></li>
+  </ul>
+</header>
+<nav aria-label="Jump to">
+  <a href="#overview">Whole app</a>
+  <a href="#j1">J1 Find, book and visit a gym</a><a href="#j2">J2 Return to the app and reschedule</a><a href="#j3">J3 At the door: scan in, train, scan out</a><a href="#j4">J4 Run the front desk</a><a href="#j5">J5 List a gym</a><a href="#j6">J6 Track my training</a><a href="#j7">J7 Manage my account</a>
+  <a href="#story-map">Story map coverage</a><a href="#requirements">Requirements</a><a href="#screens">All screens</a>
+</nav>
+<div class="overview-wrap" id="overview"><svg class="overview" viewBox="0 0 1500 640" role="img" aria-label="Map of the whole app. A member goes from Home through Find, a gym page, picking a time, logging in and paying to a pass. They show it at the door, where a scan confirms on both devices, a one hour countdown runs, and a later scan checks them out. Anyone with the admin password runs the front desk.">
+  <defs>
+    <marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#8d9089"/></marker>
+    <marker id="head-live" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 10 5 0 10z" fill="#d7ff3e"/></marker>
+  </defs>
+  <text class="row-label" x="20" y="102">Member</text>
+  <text class="row-label" x="20" y="242">At the door</text>
+  <text class="row-label" x="20" y="402">Front desk</text>
+  <text class="row-label" x="20" y="562">Also</text>
+  <a href="#j1"><rect class="node " x="170" y="70" width="120" height="54" rx="14"/><text class="node-text" x="230" y="102">Home</text></a><a href="#j1"><rect class="node " x="312" y="70" width="120" height="54" rx="14"/><text class="node-text" x="372" y="93.5">Find</text><text class="node-text" x="372" y="110.5">list and map</text></a><a href="#j1"><rect class="node " x="454" y="70" width="120" height="54" rx="14"/><text class="node-text" x="514" y="102">Gym page</text></a><a href="#j1"><rect class="node " x="596" y="70" width="120" height="54" rx="14"/><text class="node-text" x="656" y="102">Pick a time</text></a><a href="#j1"><rect class="node is-soft" x="738" y="70" width="120" height="54" rx="14"/><text class="node-text" x="798" y="93.5">Log in</text><text class="node-text" x="798" y="110.5">only now</text></a><a href="#j1"><rect class="node " x="880" y="70" width="120" height="54" rx="14"/><text class="node-text" x="940" y="102">Pay</text></a><a href="#j1"><rect class="node " x="1022" y="70" width="120" height="54" rx="14"/><text class="node-text" x="1082" y="102">Your pass</text></a>
+  <path class="edge " d="M290 97H310" marker-end="url(#head)"/><path class="edge " d="M432 97H452" marker-end="url(#head)"/><path class="edge " d="M574 97H594" marker-end="url(#head)"/><path class="edge " d="M716 97H736" marker-end="url(#head)"/><path class="edge " d="M858 97H878" marker-end="url(#head)"/><path class="edge " d="M1000 97H1020" marker-end="url(#head)"/>
+  <a href="#j1"><rect class="node " x="1164" y="70" width="150" height="54" rx="14"/><text class="node-text" x="1239" y="93.5">Directions, calendar</text><text class="node-text" x="1239" y="110.5">Wallet</text></a>
+  <path class="edge " d="M1142 97H1162" marker-end="url(#head)"/>
+  <a href="#j2"><rect class="node is-pack2" x="1336" y="70" width="150" height="54" rx="14"/><text class="node-text" x="1411" y="93.5">Change or cancel</text><text class="node-text" x="1411" y="110.5">24-hour rule</text></a>
+  <path class="edge " d="M1314 97H1334" marker-end="url(#head)"/>
+  <path class="edge " d="M1082 124V208" marker-end="url(#head)"/>
+  <a href="#j3"><rect class="node is-added" x="1022" y="210" width="120" height="54" rx="14"/><text class="node-text" x="1082" y="233.5">Show at</text><text class="node-text" x="1082" y="250.5">the desk</text></a>
+  <a href="#j3"><rect class="node is-live" x="678" y="210" width="200" height="54" rx="14"/><text class="node-text" x="778" y="233.5">CHECKED IN</text><text class="node-text" x="778" y="250.5">on both devices</text></a>
+  <path class="edge " d="M1022 237H880" marker-end="url(#head)"/>
+  <a href="#j3"><rect class="node is-added" x="414" y="210" width="170" height="54" rx="14"/><text class="node-text" x="499" y="233.5">Time left</text><text class="node-text" x="499" y="250.5">1:00:00 counting down</text></a>
+  <path class="edge " d="M678 237H586" marker-end="url(#head)"/>
+  <a href="#j3"><rect class="node is-live" x="190" y="210" width="150" height="54" rx="14"/><text class="node-text" x="265" y="233.5">CHECKED OUT</text><text class="node-text" x="265" y="250.5">time inside saved</text></a>
+  <path class="edge " d="M414 237H342" marker-end="url(#head)"/>
+  <a href="#j1"><rect class="node" x="1336" y="210" width="150" height="54" rx="14"/><text class="node-text" x="1411" y="242">Rate the gym</text></a>
+  <path class="edge " d="M265 264V302H1411V266" marker-end="url(#head)"/>
+  <a href="#j4"><rect class="node is-added" x="170" y="370" width="150" height="54" rx="14"/><text class="node-text" x="245" y="393.5">Admin password</text><text class="node-text" x="245" y="410.5">anyone</text></a>
+  <a href="#j4"><rect class="node is-added" x="352" y="370" width="170" height="54" rx="14"/><text class="node-text" x="437" y="393.5">Panel: all gyms</text><text class="node-text" x="437" y="410.5">zero until a scan</text></a>
+  <path class="edge " d="M320 397H350" marker-end="url(#head)"/>
+  <a href="#j3"><rect class="node is-added" x="698" y="370" width="160" height="54" rx="14"/><text class="node-text" x="778" y="393.5">Door scanner</text><text class="node-text" x="778" y="410.5">camera or typed code</text></a>
+  <path class="edge " d="M522 397H696" marker-end="url(#head)"/>
+  <path class="edge is-live" d="M778 370V266" marker-end="url(#head-live)"/>
+  <a href="#j4"><rect class="node is-added" x="1012" y="370" width="200" height="54" rx="14"/><text class="node-text" x="1112" y="393.5">Who is in, time left</text><text class="node-text" x="1112" y="410.5">today's log, updates live</text></a>
+  <path class="edge is-live" d="M858 397H1010" marker-end="url(#head-live)"/>
+  <a href="#j6"><rect class="node is-added" x="170" y="530" width="180" height="54" rx="14"/><text class="node-text" x="260" y="562">Calendar, rings, notes</text></a>
+  <a href="#j7"><rect class="node " x="382" y="530" width="170" height="54" rx="14"/><text class="node-text" x="467" y="562">Settings, saved gyms</text></a>
+  <a href="#j7"><rect class="node " x="626" y="530" width="160" height="54" rx="14"/><text class="node-text" x="706" y="562">Inbox, reminders</text></a>
+  <a href="#j5"><rect class="node " x="808" y="530" width="200" height="54" rx="14"/><text class="node-text" x="908" y="562">List a gym, 15% per booking</text></a>
+  </svg></div>
+
+<section class="journey" id="j1">
+  <header class="journey-head">
+    <p class="journey-code">J1</p>
+    <div><h2>Find, book and visit a gym</h2><p>A traveler finds a gym nearby, books and pays for a visit, and gets there. Stories 1, 2, 3 and 5.</p><p class="journey-meta"><b>Who:</b> Member &nbsp; <b>From:</b> Build pack, Journey 1</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="Find, book and visit a gym, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Search or select location</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Give location permission and choose my location</p>
+        <p class="step-route"><code>/home, /gyms</code></p>
+        <p class="step-trace">Story 1, FR1, NFR6</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/home-01-hero.jpg" data-name="Hero"><img src="screens/home-01-hero.jpg" alt="Hero screen" loading="lazy"><span>Hero</span></button><button type="button" class="thumb " data-full="screens/find-02-location-ask.jpg" data-name="Location ask"><img src="screens/find-02-location-ask.jpg" alt="Location ask screen" loading="lazy"><span>Location ask</span></button><button type="button" class="thumb " data-full="screens/find-01-search-city.jpg" data-name="Search city"><img src="screens/find-01-search-city.jpg" alt="Search city screen" loading="lazy"><span>Search city</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Location denied</p><p>Type a city instead (Story 1, AC2)</p><button type="button" class="thumb is-small" data-full="screens/find-01-search-city.jpg" data-name="Search city"><img src="screens/find-01-search-city.jpg" alt="Search city screen" loading="lazy"><span>Search city</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>See gyms on the list and map</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">View gyms on the list and map, 20 per page</p>
+        <p class="step-route"><code>/gyms?city=</code></p>
+        <p class="step-trace">Story 1, FR1, NFR1</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/find-03-list-and-map.jpg" data-name="List and map"><img src="screens/find-03-list-and-map.jpg" alt="List and map screen" loading="lazy"><span>List and map</span></button><button type="button" class="thumb " data-full="screens/find-04-gym-cards.jpg" data-name="Gym cards"><img src="screens/find-04-gym-cards.jpg" alt="Gym cards screen" loading="lazy"><span>Gym cards</span></button><button type="button" class="thumb " data-full="screens/find-06-full-map.jpg" data-name="Full map"><img src="screens/find-06-full-map.jpg" alt="Full map screen" loading="lazy"><span>Full map</span></button><button type="button" class="thumb " data-full="screens/find-07-map-pin.jpg" data-name="Map pin"><img src="screens/find-07-map-pin.jpg" alt="Map pin screen" loading="lazy"><span>Map pin</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Sort or filter (later)</p><p>Results change and the page returns to the top</p><button type="button" class="thumb is-small" data-full="screens/find-05-filters.jpg" data-name="Filters"><img src="screens/find-05-filters.jpg" alt="Filters screen" loading="lazy"><span>Filters</span></button></div><div class="branch"><p class="branch-when">If: Nothing matches</p><p>Told so, and offered Clear filters</p><button type="button" class="thumb is-small" data-full="screens/find-08-no-results.jpg" data-name="No results"><img src="screens/find-08-no-results.jpg" alt="No results screen" loading="lazy"><span>No results</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>View gym details</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Open a gym and view its details</p>
+        <p class="step-route"><code>/gyms/[gym]</code></p>
+        <p class="step-trace">Story 2, FR2, NFR8</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/gym-01-photos.jpg" data-name="Photos"><img src="screens/gym-01-photos.jpg" alt="Photos screen" loading="lazy"><span>Photos</span></button><button type="button" class="thumb " data-full="screens/gym-04-what-is-included.jpg" data-name="What is included"><img src="screens/gym-04-what-is-included.jpg" alt="What is included screen" loading="lazy"><span>What is included</span></button><button type="button" class="thumb " data-full="screens/gym-05-hours-and-equipment.jpg" data-name="Hours and equipment"><img src="screens/gym-05-hours-and-equipment.jpg" alt="Hours and equipment screen" loading="lazy"><span>Hours and equipment</span></button><button type="button" class="thumb " data-full="screens/gym-06-location.jpg" data-name="Location"><img src="screens/gym-06-location.jpg" alt="Location screen" loading="lazy"><span>Location</span></button><button type="button" class="thumb " data-full="screens/gym-07-reviews.jpg" data-name="Reviews"><img src="screens/gym-07-reviews.jpg" alt="Reviews screen" loading="lazy"><span>Reviews</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Gym has no photos</p><p>All details still show, with a placeholder (Story 2, AC2)</p><button type="button" class="thumb is-small" data-full="screens/gym-08-no-photos.jpg" data-name="No photos"><img src="screens/gym-08-no-photos.jpg" alt="No photos screen" loading="lazy"><span>No photos</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Book an appointment</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Choose date and time</p>
+        <p class="step-route"><code>/gyms/[gym]</code></p>
+        <p class="step-trace">Story 3, FR4</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/gym-02-pick-a-time.jpg" data-name="Pick a time"><img src="screens/gym-02-pick-a-time.jpg" alt="Pick a time screen" loading="lazy"><span>Pick a time</span></button><button type="button" class="thumb " data-full="screens/gym-03-time-chosen.jpg" data-name="Time chosen"><img src="screens/gym-03-time-chosen.jpg" alt="Time chosen screen" loading="lazy"><span>Time chosen</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">5</p>
+        <h3>Sign up or log in</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Enter user details. Only appears when booking</p>
+        <p class="step-route"><code>Sheet, or /login</code></p>
+        <p class="step-trace">Story 3, FR5, NFR5</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/book-01-login-when-booking.jpg" data-name="Login when booking"><img src="screens/book-01-login-when-booking.jpg" alt="Login when booking screen" loading="lazy"><span>Login when booking</span></button><button type="button" class="thumb " data-full="screens/login-01-log-in.jpg" data-name="Log in"><img src="screens/login-01-log-in.jpg" alt="Log in screen" loading="lazy"><span>Log in</span></button><button type="button" class="thumb " data-full="screens/login-02-create-account.jpg" data-name="Create account"><img src="screens/login-02-create-account.jpg" alt="Create account screen" loading="lazy"><span>Create account</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">6</p>
+        <h3>Make payment</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Choose payment type and pay</p>
+        <p class="step-route"><code>Sheet</code></p>
+        <p class="step-trace">Story 3, FR6, NFR7</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/book-02-pay.jpg" data-name="Pay"><img src="screens/book-02-pay.jpg" alt="Pay screen" loading="lazy"><span>Pay</span></button><button type="button" class="thumb " data-full="screens/book-04-paid.jpg" data-name="Paid"><img src="screens/book-04-paid.jpg" alt="Paid screen" loading="lazy"><span>Paid</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Payment fails</p><p>No booking is made and nothing is charged (Story 3, AC2)</p><button type="button" class="thumb is-small" data-full="screens/book-03-payment-declined.jpg" data-name="Payment declined"><img src="screens/book-03-payment-declined.jpg" alt="Payment declined screen" loading="lazy"><span>Payment declined</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">7</p>
+        <h3>Get the pass</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Booking is confirmed and shows in My bookings</p>
+        <p class="step-route"><code>/bookings/[id]</code></p>
+        <p class="step-trace">Story 3 AC1, FR7</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/book-05-pass-ready.jpg" data-name="Pass ready"><img src="screens/book-05-pass-ready.jpg" alt="Pass ready screen" loading="lazy"><span>Pass ready</span></button><button type="button" class="thumb " data-full="screens/pass-01-front.jpg" data-name="Front"><img src="screens/pass-01-front.jpg" alt="Front screen" loading="lazy"><span>Front</span></button><button type="button" class="thumb " data-full="screens/pass-02-what-is-included.jpg" data-name="What is included"><img src="screens/pass-02-what-is-included.jpg" alt="What is included screen" loading="lazy"><span>What is included</span></button><button type="button" class="thumb " data-full="screens/pass-03-actions.jpg" data-name="Actions"><img src="screens/pass-03-actions.jpg" alt="Actions screen" loading="lazy"><span>Actions</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">8</p>
+        <h3>Get directions</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Navigate to the gym</p>
+        <p class="step-route"><code>Sheet on the pass</code></p>
+        <p class="step-trace">Story 5, FR9</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/pass-05-directions.jpg" data-name="Directions"><img src="screens/pass-05-directions.jpg" alt="Directions screen" loading="lazy"><span>Directions</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: No maps app</p><p>The route opens in the browser (Story 5, AC2)</p><button type="button" class="thumb is-small" data-full="screens/pass-05-directions.jpg" data-name="Directions"><img src="screens/pass-05-directions.jpg" alt="Directions screen" loading="lazy"><span>Directions</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">9</p>
+        <h3>Keep it handy</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Calendar from the build pack, Wallet preview added</p>
+        <p class="step-route"><code>Sheets, /wallet</code></p>
+        <p class="step-trace">FR10</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/pass-06-add-to-calendar.jpg" data-name="Add to calendar"><img src="screens/pass-06-add-to-calendar.jpg" alt="Add to calendar screen" loading="lazy"><span>Add to calendar</span></button><button type="button" class="thumb " data-full="screens/pass-07-add-to-wallet.jpg" data-name="Add to wallet"><img src="screens/pass-07-add-to-wallet.jpg" alt="Add to wallet screen" loading="lazy"><span>Add to wallet</span></button><button type="button" class="thumb " data-full="screens/pass-08-wallet.jpg" data-name="Wallet"><img src="screens/pass-08-wallet.jpg" alt="Wallet screen" loading="lazy"><span>Wallet</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">10</p>
+        <h3>Rate the gym</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Rate my experience out of 5, with an optional review</p>
+        <p class="step-route"><code>/bookings/[id]</code></p>
+        <p class="step-trace">Journey 1, last column</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-12-rate-the-gym.jpg" data-name="Rate the gym"><img src="screens/door-12-rate-the-gym.jpg" alt="Rate the gym screen" loading="lazy"><span>Rate the gym</span></button><button type="button" class="thumb " data-full="screens/door-13-rated.jpg" data-name="Rated"><img src="screens/door-13-rated.jpg" alt="Rated screen" loading="lazy"><span>Rated</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j2">
+  <header class="journey-head">
+    <p class="journey-code">J2</p>
+    <div><h2>Return to the app and reschedule</h2><p>A traveler with a booking comes back and moves it to a new time. Story 4.</p><p class="journey-meta"><b>Who:</b> Member &nbsp; <b>From:</b> Build pack, Journey 2</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="Return to the app and reschedule, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Return to the app</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Open the app and stay logged in</p>
+        <p class="step-route"><code>/home</code></p>
+        <p class="step-trace">NFR5: session lasts 30 days unused</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-06-time-left-on-home.jpg" data-name="Time left on home"><img src="screens/door-06-time-left-on-home.jpg" alt="Time left on home screen" loading="lazy"><span>Time left on home</span></button><button type="button" class="thumb " data-full="screens/other-01-inbox.jpg" data-name="Inbox"><img src="screens/other-01-inbox.jpg" alt="Inbox screen" loading="lazy"><span>Inbox</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Day before (later)</p><p>A reminder lands in the Inbox</p><button type="button" class="thumb is-small" data-full="screens/other-01-inbox.jpg" data-name="Inbox"><img src="screens/other-01-inbox.jpg" alt="Inbox screen" loading="lazy"><span>Inbox</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>Find my booking</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Open My bookings</p>
+        <p class="step-route"><code>/bookings</code></p>
+        <p class="step-trace">Story 4, FR7</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/passes-01-list.jpg" data-name="List"><img src="screens/passes-01-list.jpg" alt="List screen" loading="lazy"><span>List</span></button><button type="button" class="thumb " data-full="screens/passes-02-past-visit.jpg" data-name="Past visit"><img src="screens/passes-02-past-visit.jpg" alt="Past visit screen" loading="lazy"><span>Past visit</span></button><button type="button" class="thumb " data-full="screens/pass-03-actions.jpg" data-name="Actions"><img src="screens/pass-03-actions.jpg" alt="Actions screen" loading="lazy"><span>Actions</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>Reschedule</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Pick a new date and time</p>
+        <p class="step-route"><code>Sheet on the pass</code></p>
+        <p class="step-trace">Story 4, FR8</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/change-01-new-time.jpg" data-name="New time"><img src="screens/change-01-new-time.jpg" alt="New time screen" loading="lazy"><span>New time</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Another gym (later)</p><p>Move the booking, paying or getting back the difference</p><button type="button" class="thumb is-small" data-full="screens/change-02-another-gym.jpg" data-name="Another gym"><img src="screens/change-02-another-gym.jpg" alt="Another gym screen" loading="lazy"><span>Another gym</span></button></div><div class="branch"><p class="branch-when">If: Plans fell through</p><p>Cancel and get refunded</p><button type="button" class="thumb is-small" data-full="screens/change-05-cancel.jpg" data-name="Cancel"><img src="screens/change-05-cancel.jpg" alt="Cancel screen" loading="lazy"><span>Cancel</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Confirm the change</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">See the old and new slot, and confirm</p>
+        <p class="step-route"><code>Sheet on the pass</code></p>
+        <p class="step-trace">Story 4 AC1, FR8</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/change-03-old-and-new.jpg" data-name="Old and new"><img src="screens/change-03-old-and-new.jpg" alt="Old and new screen" loading="lazy"><span>Old and new</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Less than 24 hours away</p><p>Told changes are no longer possible (Story 4, AC2)</p><button type="button" class="thumb is-small" data-full="screens/change-06-too-late.jpg" data-name="Too late"><img src="screens/change-06-too-late.jpg" alt="Too late screen" loading="lazy"><span>Too late</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">5</p>
+        <h3>Get updated details</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Receive confirmation, directions and calendar</p>
+        <p class="step-route"><code>/bookings/[id]</code></p>
+        <p class="step-trace">Story 4 AC1, FR9, FR10</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/change-04-updated.jpg" data-name="Updated"><img src="screens/change-04-updated.jpg" alt="Updated screen" loading="lazy"><span>Updated</span></button><button type="button" class="thumb " data-full="screens/pass-05-directions.jpg" data-name="Directions"><img src="screens/pass-05-directions.jpg" alt="Directions screen" loading="lazy"><span>Directions</span></button><button type="button" class="thumb " data-full="screens/pass-06-add-to-calendar.jpg" data-name="Add to calendar"><img src="screens/pass-06-add-to-calendar.jpg" alt="Add to calendar screen" loading="lazy"><span>Add to calendar</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j3">
+  <header class="journey-head">
+    <p class="journey-code">J3</p>
+    <div><h2>At the door: scan in, train, scan out</h2><p>One scan confirms on both devices within about 2 seconds, then a 1-hour countdown runs, with a 15-minute grace period before and after. A later scan checks the person out.</p><p class="journey-meta"><b>Who:</b> Member and front desk &nbsp; <b>From:</b> Added: owner feedback, not in the build pack</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="At the door: scan in, train, scan out, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Show the pass</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Member opens the QR code at the desk</p>
+        <p class="step-route"><code>Full screen on the pass</code></p>
+        <p class="step-trace">Member</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-01-show-at-desk.jpg" data-name="Show at desk"><img src="screens/door-01-show-at-desk.jpg" alt="Show at desk screen" loading="lazy"><span>Show at desk</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>Desk scans</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Front desk scans, or types the code</p>
+        <p class="step-route"><code>/staff</code></p>
+        <p class="step-trace">Front desk</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-02-scanner.jpg" data-name="Scanner"><img src="screens/door-02-scanner.jpg" alt="Scanner screen" loading="lazy"><span>Scanner</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Unknown code</p><p>Not found</p><button type="button" class="thumb is-small" data-full="screens/door-15-scan-not-found.jpg" data-name="Scan not found"><img src="screens/door-15-scan-not-found.jpg" alt="Scan not found screen" loading="lazy"><span>Scan not found</span></button></div><div class="branch"><p class="branch-when">If: More than 15 minutes early</p><p>Says too early. The door opens 15 minutes before the start</p></div><div class="branch"><p class="branch-when">If: Old or used pass</p><p>Refused, and says which day</p><button type="button" class="thumb is-small" data-full="screens/door-14-scan-already-used.jpg" data-name="Scan already used"><img src="screens/door-14-scan-already-used.jpg" alt="Scan already used screen" loading="lazy"><span>Scan already used</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>Both devices confirm</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Desk says Checked in, and the phone says it by itself</p>
+        <p class="step-route"><code>/staff and the pass</code></p>
+        <p class="step-trace">Both devices</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-03-desk-says-checked-in.jpg" data-name="Desk says checked in"><img src="screens/door-03-desk-says-checked-in.jpg" alt="Desk says checked in screen" loading="lazy"><span>Desk says checked in</span></button><button type="button" class="thumb " data-full="screens/door-04-phone-says-checked-in.jpg" data-name="Phone says checked in"><img src="screens/door-04-phone-says-checked-in.jpg" alt="Phone says checked in screen" loading="lazy"><span>Phone says checked in</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Scanned twice within 60 seconds</p><p>Says Already in, and the visit carries on</p></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Time left runs</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Counts down the booked hour, on the pass and on Home</p>
+        <p class="step-route"><code>/bookings/[id], /home</code></p>
+        <p class="step-trace">Member</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-05-time-left.jpg" data-name="Time left"><img src="screens/door-05-time-left.jpg" alt="Time left screen" loading="lazy"><span>Time left</span></button><button type="button" class="thumb " data-full="screens/door-06-time-left-on-home.jpg" data-name="Time left on home"><img src="screens/door-06-time-left-on-home.jpg" alt="Time left on home screen" loading="lazy"><span>Time left on home</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: The hour ends</p><p>A labelled 15-minute grace period counts down</p><button type="button" class="thumb is-small" data-full="screens/door-16-grace-period.jpg" data-name="Grace period"><img src="screens/door-16-grace-period.jpg" alt="Grace period screen" loading="lazy"><span>Grace period</span></button></div><div class="branch"><p class="branch-when">If: Grace runs out</p><p>Timer goes negative and red</p><button type="button" class="thumb is-small" data-full="screens/door-07-over-time.jpg" data-name="Over time"><img src="screens/door-07-over-time.jpg" alt="Over time screen" loading="lazy"><span>Over time</span></button></div><div class="branch"><p class="branch-when">If: Gym refuses entry</p><p>Claim a full refund</p><button type="button" class="thumb is-small" data-full="screens/door-09-cant-get-in.jpg" data-name="Cant get in"><img src="screens/door-09-cant-get-in.jpg" alt="Cant get in screen" loading="lazy"><span>Cant get in</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">5</p>
+        <h3>Scan out</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">A later scan, a slide on the pass, or Out on the panel</p>
+        <p class="step-route"><code>/staff and the pass</code></p>
+        <p class="step-trace">Both devices</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-08-desk-says-checked-out.jpg" data-name="Desk says checked out"><img src="screens/door-08-desk-says-checked-out.jpg" alt="Desk says checked out screen" loading="lazy"><span>Desk says checked out</span></button><button type="button" class="thumb " data-full="screens/door-10-phone-says-checked-out.jpg" data-name="Phone says checked out"><img src="screens/door-10-phone-says-checked-out.jpg" alt="Phone says checked out screen" loading="lazy"><span>Phone says checked out</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Never scanned out</p><p>After 6 hours the timer stops, and the exit shows as not recorded</p><button type="button" class="thumb is-small" data-full="screens/passes-02-past-visit.jpg" data-name="Past visit"><img src="screens/passes-02-past-visit.jpg" alt="Past visit screen" loading="lazy"><span>Past visit</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">6</p>
+        <h3>Visit done</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Entry, exit and time inside are kept, then rate the gym</p>
+        <p class="step-route"><code>/bookings/[id]</code></p>
+        <p class="step-trace">Leads to Rate the gym in J1</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-11-visit-done.jpg" data-name="Visit done"><img src="screens/door-11-visit-done.jpg" alt="Visit done screen" loading="lazy"><span>Visit done</span></button><button type="button" class="thumb " data-full="screens/door-12-rate-the-gym.jpg" data-name="Rate the gym"><img src="screens/door-12-rate-the-gym.jpg" alt="Rate the gym screen" loading="lazy"><span>Rate the gym</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j4">
+  <header class="journey-head">
+    <p class="journey-code">J4</p>
+    <div><h2>Run the front desk</h2><p>Real bookings and real scans only, so it shows zero until someone is scanned. Works across all gyms.</p><p class="journey-meta"><b>Who:</b> Admin: anyone with the password &nbsp; <b>From:</b> Added: owner feedback, not in the build pack</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="Run the front desk, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Enter the password</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">No account needed</p>
+        <p class="step-route"><code>/owner</code></p>
+        <p class="step-trace">Admin</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/desk-01-password.jpg" data-name="Password"><img src="screens/desk-01-password.jpg" alt="Password screen" loading="lazy"><span>Password</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>See the day</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">All zero until someone is scanned</p>
+        <p class="step-route"><code>/owner</code></p>
+        <p class="step-trace">Real data only</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/desk-02-panel-zero.jpg" data-name="Panel zero"><img src="screens/desk-02-panel-zero.jpg" alt="Panel zero screen" loading="lazy"><span>Panel zero</span></button></div>
+      <div class="branches"><div class="branch"><p class="branch-when">If: Choose one gym</p><p>Filters the panel to that gym</p><button type="button" class="thumb is-small" data-full="screens/desk-04-one-gym.jpg" data-name="One gym"><img src="screens/desk-04-one-gym.jpg" alt="One gym screen" loading="lazy"><span>One gym</span></button></div></div>
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>Scan people in and out</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Links to the door journey, J3</p>
+        <p class="step-route"><code>/staff</code></p>
+        <p class="step-trace">See J3</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/door-02-scanner.jpg" data-name="Scanner"><img src="screens/door-02-scanner.jpg" alt="Scanner screen" loading="lazy"><span>Scanner</span></button><button type="button" class="thumb " data-full="screens/door-03-desk-says-checked-in.jpg" data-name="Desk says checked in"><img src="screens/door-03-desk-says-checked-in.jpg" alt="Desk says checked in screen" loading="lazy"><span>Desk says checked in</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Watch who is in</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Time left for each person, updating every 4 seconds</p>
+        <p class="step-route"><code>/owner</code></p>
+        <p class="step-trace">Live</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/desk-03-panel-someone-in.jpg" data-name="Panel someone in"><img src="screens/desk-03-panel-someone-in.jpg" alt="Panel someone in screen" loading="lazy"><span>Panel someone in</span></button><button type="button" class="thumb " data-full="screens/desk-05-panel-over-time.jpg" data-name="Panel over time"><img src="screens/desk-05-panel-over-time.jpg" alt="Panel over time screen" loading="lazy"><span>Panel over time</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">5</p>
+        <h3>Read the log</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Who came in and left today, and for how long</p>
+        <p class="step-route"><code>/owner</code></p>
+        <p class="step-trace">Live</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/desk-06-todays-log.jpg" data-name="Todays log"><img src="screens/desk-06-todays-log.jpg" alt="Todays log screen" loading="lazy"><span>Todays log</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j5">
+  <header class="journey-head">
+    <p class="journey-code">J5</p>
+    <div><h2>List a gym</h2><p>A gym lists itself for free, sets its price, pays 15% per booking and confirms its details every 90 days.</p><p class="journey-meta"><b>Who:</b> Gym owner &nbsp; <b>From:</b> Build pack: &quot;Gyms list themselves and set their own day pass price&quot;, NFR8</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="List a gym, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Find the offer</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Tap Own a gym on Home</p>
+        <p class="step-route"><code>/home</code></p>
+        <p class="step-trace">Assumptions, section 1</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/home-05-own-a-gym.jpg" data-name="Own a gym"><img src="screens/home-05-own-a-gym.jpg" alt="Own a gym screen" loading="lazy"><span>Own a gym</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>Read the deal</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Your own price, 15% only when booked</p>
+        <p class="step-route"><code>/partners</code></p>
+        <p class="step-trace">Assumptions, section 1</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/gymowner-01-sell-quiet-hours.jpg" data-name="Sell quiet hours"><img src="screens/gymowner-01-sell-quiet-hours.jpg" alt="Sell quiet hours screen" loading="lazy"><span>Sell quiet hours</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>List the gym</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Log in and fill in the details</p>
+        <p class="step-route"><code>/partners</code></p>
+        <p class="step-trace">NFR8: confirm details every 90 days</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/gymowner-02-list-a-gym.jpg" data-name="List a gym"><img src="screens/gymowner-02-list-a-gym.jpg" alt="List a gym screen" loading="lazy"><span>List a gym</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j6">
+  <header class="journey-head">
+    <p class="journey-code">J6</p>
+    <div><h2>Track my training</h2><p>A calendar of real visits, with rings, history and notes.</p><p class="journey-meta"><b>Who:</b> Member &nbsp; <b>From:</b> Added: owner feedback, not in the build pack</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="Track my training, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Open my profile</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Visits, cities and spend</p>
+        <p class="step-route"><code>/account</code></p>
+        <p class="step-trace">Reuses FR7 data</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/account-01-profile.jpg" data-name="Profile"><img src="screens/account-01-profile.jpg" alt="Profile screen" loading="lazy"><span>Profile</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>Read rings and calendar</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Swipe between months</p>
+        <p class="step-route"><code>/account</code></p>
+        
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/account-02-rings-and-calendar.jpg" data-name="Rings and calendar"><img src="screens/account-02-rings-and-calendar.jpg" alt="Rings and calendar screen" loading="lazy"><span>Rings and calendar</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>Open a day</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Times, time inside and a note that saves</p>
+        <p class="step-route"><code>Sheet</code></p>
+        
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/account-03-day-and-note.jpg" data-name="Day and note"><img src="screens/account-03-day-and-note.jpg" alt="Day and note screen" loading="lazy"><span>Day and note</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Open a ring</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">History for that goal, and each row opens its day</p>
+        <p class="step-route"><code>Sheet</code></p>
+        
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/account-04-ring-history.jpg" data-name="Ring history"><img src="screens/account-04-ring-history.jpg" alt="Ring history screen" loading="lazy"><span>Ring history</span></button></div>
+      
+    </article>
+  </div>
+</section>
+<section class="journey" id="j7">
+  <header class="journey-head">
+    <p class="journey-code">J7</p>
+    <div><h2>Manage my account</h2><p>Preferences, saved payment, Face ID, reminders, saved gyms, privacy and deletion.</p><p class="journey-meta"><b>Who:</b> Member &nbsp; <b>From:</b> Build pack stories below the MVP line, NFR5, NFR6</p></div>
+  </header>
+  <div class="lane" tabindex="0" role="group" aria-label="Manage my account, steps from left to right">
+    <article class="step">
+      <header class="step-head">
+        <p class="step-no">1</p>
+        <h3>Open settings</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Every setting in one list</p>
+        <p class="step-route"><code>/account</code></p>
+        
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/settings-06-menu.jpg" data-name="Menu"><img src="screens/settings-06-menu.jpg" alt="Menu screen" loading="lazy"><span>Menu</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">2</p>
+        <h3>Search preferences</h3>
+        <span class="tag is-later">Build pack, below the MVP line</span>
+        <p class="step-task">Save my preferences</p>
+        <p class="step-route"><code>Sheet</code></p>
+        <p class="step-trace">J1, below the MVP line</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/settings-01-search-preferences.jpg" data-name="Search preferences"><img src="screens/settings-01-search-preferences.jpg" alt="Search preferences screen" loading="lazy"><span>Search preferences</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">3</p>
+        <h3>Saved payment</h3>
+        <span class="tag is-later">Build pack, below the MVP line</span>
+        <p class="step-task">Save my card for next time</p>
+        <p class="step-route"><code>Sheet</code></p>
+        <p class="step-trace">J1, below the MVP line</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/settings-02-saved-payment.jpg" data-name="Saved payment"><img src="screens/settings-02-saved-payment.jpg" alt="Saved payment screen" loading="lazy"><span>Saved payment</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">4</p>
+        <h3>Face ID</h3>
+        <span class="tag is-later">Build pack, below the MVP line</span>
+        <p class="step-task">Log in with Face ID</p>
+        <p class="step-route"><code>Sheet</code></p>
+        <p class="step-trace">J2, below the MVP line</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/settings-03-face-id.jpg" data-name="Face id"><img src="screens/settings-03-face-id.jpg" alt="Face id screen" loading="lazy"><span>Face id</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">5</p>
+        <h3>Reminders</h3>
+        <span class="tag is-later">Build pack, below the MVP line</span>
+        <p class="step-task">Get a reminder the day before</p>
+        <p class="step-route"><code>Sheet, /inbox</code></p>
+        <p class="step-trace">J2, below the MVP line</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/settings-04-reminders.jpg" data-name="Reminders"><img src="screens/settings-04-reminders.jpg" alt="Reminders screen" loading="lazy"><span>Reminders</span></button><button type="button" class="thumb " data-full="screens/other-01-inbox.jpg" data-name="Inbox"><img src="screens/other-01-inbox.jpg" alt="Inbox screen" loading="lazy"><span>Inbox</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">6</p>
+        <h3>Saved gyms</h3>
+        <span class="tag is-added">Added from owner feedback</span>
+        <p class="step-task">Gyms I tapped the heart on</p>
+        <p class="step-route"><code>/saved</code></p>
+        
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/other-02-saved.jpg" data-name="Saved"><img src="screens/other-02-saved.jpg" alt="Saved screen" loading="lazy"><span>Saved</span></button></div>
+      
+    </article><article class="step">
+      <header class="step-head">
+        <p class="step-no">7</p>
+        <h3>Privacy and deletion</h3>
+        <span class="tag is-pack">In the build pack</span>
+        <p class="step-task">Read the notice and erase my account</p>
+        <p class="step-route"><code>/privacy, sheet</code></p>
+        <p class="step-trace">NFR6: GDPR</p>
+      </header>
+      <div class="step-shots"><button type="button" class="thumb " data-full="screens/other-03-privacy.jpg" data-name="Privacy"><img src="screens/other-03-privacy.jpg" alt="Privacy screen" loading="lazy"><span>Privacy</span></button><button type="button" class="thumb " data-full="screens/settings-05-delete-account.jpg" data-name="Delete account"><img src="screens/settings-05-delete-account.jpg" alt="Delete account screen" loading="lazy"><span>Delete account</span></button></div>
+      
+    </article>
+  </div>
+</section>
+
+<section class="doc" id="story-map">
+  <h2>Build pack story map coverage</h2>
+  <p>Every card from the PDF's two story maps (section 4), and the screen where it lives. The originals are in <a href="pdf/journey-1-story-map.png">journey-1-story-map.png</a> and <a href="pdf/journey-2-story-map.png">journey-2-story-map.png</a>.</p>
+  <div class="table-wrap"><table><thead><tr><th>Map</th><th>Line</th><th>Story card</th><th>Screen</th><th>Status</th></tr></thead><tbody>
+  <tr><td>J1</td><td>MVP</td><td>Ask for location permission</td><td><button type="button" class="link-thumb" data-full="screens/find-02-location-ask.jpg" data-name="Location ask">Location ask</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Show nearby gyms from my current location</td><td><button type="button" class="link-thumb" data-full="screens/find-03-list-and-map.jpg" data-name="List and map">List and map</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Show gym pins on the map and in a list</td><td><button type="button" class="link-thumb" data-full="screens/find-06-full-map.jpg" data-name="Full map">Full map</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>See photos, details, location and a Book button</td><td><button type="button" class="link-thumb" data-full="screens/gym-01-photos.jpg" data-name="Photos">Photos</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>View and select free dates and slots</td><td><button type="button" class="link-thumb" data-full="screens/gym-02-pick-a-time.jpg" data-name="Pick a time">Pick a time</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Confirm my selection</td><td><button type="button" class="link-thumb" data-full="screens/gym-03-time-chosen.jpg" data-name="Time chosen">Time chosen</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Log in with my existing account</td><td><button type="button" class="link-thumb" data-full="screens/login-01-log-in.jpg" data-name="Log in">Log in</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Register a new account</td><td><button type="button" class="link-thumb" data-full="screens/login-02-create-account.jpg" data-name="Create account">Create account</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Choose payment type and pay</td><td><button type="button" class="link-thumb" data-full="screens/book-02-pay.jpg" data-name="Pay">Pay</button></td><td>Simulated: no outside provider</td></tr><tr><td>J1</td><td>MVP</td><td>View booked and previous appointments</td><td><button type="button" class="link-thumb" data-full="screens/passes-01-list.jpg" data-name="List">List</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Cancel an appointment</td><td><button type="button" class="link-thumb" data-full="screens/change-05-cancel.jpg" data-name="Cancel">Cancel</button></td><td>Built</td></tr><tr><td>J1</td><td>MVP</td><td>Open directions in my maps app</td><td><button type="button" class="link-thumb" data-full="screens/pass-05-directions.jpg" data-name="Directions">Directions</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Type a city instead</td><td><button type="button" class="link-thumb" data-full="screens/find-01-search-city.jpg" data-name="Search city">Search city</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Recommend top gyms by rating, location and price</td><td><button type="button" class="link-thumb" data-full="screens/find-04-gym-cards.jpg" data-name="Gym cards">Gym cards</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Filter gyms by map zoom level</td><td><button type="button" class="link-thumb" data-full="screens/find-06-full-map.jpg" data-name="Full map">Full map</button></td><td>Built: search this area</td></tr><tr><td>J1</td><td>Later</td><td>Sort gyms by price and rating</td><td><button type="button" class="link-thumb" data-full="screens/find-05-filters.jpg" data-name="Filters">Filters</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Read reviews</td><td><button type="button" class="link-thumb" data-full="screens/gym-07-reviews.jpg" data-name="Reviews">Reviews</button></td><td>Built, with sample reviews</td></tr><tr><td>J1</td><td>Later</td><td>Save my preferences</td><td><button type="button" class="link-thumb" data-full="screens/settings-01-search-preferences.jpg" data-name="Search preferences">Search preferences</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Save my card for next time</td><td><button type="button" class="link-thumb" data-full="screens/settings-02-saved-payment.jpg" data-name="Saved payment">Saved payment</button></td><td>Built, simulated</td></tr><tr><td>J1</td><td>Later</td><td>Get a prompt to rate the gym</td><td><button type="button" class="link-thumb" data-full="screens/door-12-rate-the-gym.jpg" data-name="Rate the gym">Rate the gym</button></td><td>Built</td></tr><tr><td>J1</td><td>Later</td><td>Add a text review</td><td><button type="button" class="link-thumb" data-full="screens/door-12-rate-the-gym.jpg" data-name="Rate the gym">Rate the gym</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Stay logged in when I return</td><td><button type="button" class="link-thumb" data-full="screens/door-06-time-left-on-home.jpg" data-name="Time left on home">Time left on home</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>See my upcoming bookings</td><td><button type="button" class="link-thumb" data-full="screens/passes-01-list.jpg" data-name="List">List</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Open the booking I want to change</td><td><button type="button" class="link-thumb" data-full="screens/pass-03-actions.jpg" data-name="Actions">Actions</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>See free slots at the same gym</td><td><button type="button" class="link-thumb" data-full="screens/change-01-new-time.jpg" data-name="New time">New time</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Select a new slot</td><td><button type="button" class="link-thumb" data-full="screens/change-01-new-time.jpg" data-name="New time">New time</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>See old vs new slot and confirm</td><td><button type="button" class="link-thumb" data-full="screens/change-03-old-and-new.jpg" data-name="Old and new">Old and new</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Get blocked if less than 24 h before</td><td><button type="button" class="link-thumb" data-full="screens/change-06-too-late.jpg" data-name="Too late">Too late</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Get an updated confirmation</td><td><button type="button" class="link-thumb" data-full="screens/change-04-updated.jpg" data-name="Updated">Updated</button></td><td>Built</td></tr><tr><td>J2</td><td>MVP</td><td>Open directions to the gym</td><td><button type="button" class="link-thumb" data-full="screens/pass-05-directions.jpg" data-name="Directions">Directions</button></td><td>Built</td></tr><tr><td>J2</td><td>Later</td><td>Log in with Face ID</td><td><button type="button" class="link-thumb" data-full="screens/settings-03-face-id.jpg" data-name="Face id">Face id</button></td><td>Built, not proven on a real device</td></tr><tr><td>J2</td><td>Later</td><td>Get a reminder the day before</td><td><button type="button" class="link-thumb" data-full="screens/other-01-inbox.jpg" data-name="Inbox">Inbox</button></td><td>In-app only: no email or push</td></tr><tr><td>J2</td><td>Later</td><td>Move the booking to another gym</td><td><button type="button" class="link-thumb" data-full="screens/change-02-another-gym.jpg" data-name="Another gym">Another gym</button></td><td>Built</td></tr><tr><td>J2</td><td>Later</td><td>Pay a price difference or get a refund</td><td><button type="button" class="link-thumb" data-full="screens/change-02-another-gym.jpg" data-name="Another gym">Another gym</button></td><td>Built, simulated</td></tr><tr><td>J2</td><td>Later</td><td>Add the new time to my calendar</td><td><button type="button" class="link-thumb" data-full="screens/pass-06-add-to-calendar.jpg" data-name="Add to calendar">Add to calendar</button></td><td>Built</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="doc" id="requirements">
+  <h2>Requirements from the build pack</h2>
+  <p>Sections 2 and 3 of the PDF. The status comes from "Limits to state honestly" in <code>process-log.md</code>, so anything not met is stated, not hidden.</p>
+  <div class="table-wrap"><table><thead><tr><th>ID</th><th>What it asks</th><th>Where to see it</th><th>Status</th></tr></thead><tbody>
+  <tr><td><b>FR1</b></td><td>Show gyms near the user on a list and a map, at least 20 per page</td><td><button type="button" class="link-thumb" data-full="screens/find-03-list-and-map.jpg" data-name="List and map">List and map</button></td><td class="is-met">Met</td></tr><tr><td><b>FR2</b></td><td>Show photos, opening hours, equipment, price and location</td><td><button type="button" class="link-thumb" data-full="screens/gym-01-photos.jpg" data-name="Photos">Photos</button></td><td class="is-met">Met</td></tr><tr><td><b>FR3</b></td><td>Sort and filter gyms by rating and price</td><td><button type="button" class="link-thumb" data-full="screens/find-05-filters.jpg" data-name="Filters">Filters</button></td><td class="is-met">Met</td></tr><tr><td><b>FR4</b></td><td>Show free dates and slots, and book without contacting the gym</td><td><button type="button" class="link-thumb" data-full="screens/gym-02-pick-a-time.jpg" data-name="Pick a time">Pick a time</button></td><td class="is-met">Met</td></tr><tr><td><b>FR5</b></td><td>Sign up and log in so bookings are saved</td><td><button type="button" class="link-thumb" data-full="screens/login-01-log-in.jpg" data-name="Log in">Log in</button></td><td class="is-met">Met</td></tr><tr><td><b>FR6</b></td><td>Take payment through an external provider</td><td><button type="button" class="link-thumb" data-full="screens/book-02-pay.jpg" data-name="Pay">Pay</button></td><td class="is-open">Partly: the flow works, but payment is simulated at the owner's request</td></tr><tr><td><b>FR7</b></td><td>Show upcoming and past bookings</td><td><button type="button" class="link-thumb" data-full="screens/passes-01-list.jpg" data-name="List">List</button></td><td class="is-met">Met</td></tr><tr><td><b>FR8</b></td><td>Reschedule or cancel until 24 hours before</td><td><button type="button" class="link-thumb" data-full="screens/change-03-old-and-new.jpg" data-name="Old and new">Old and new</button></td><td class="is-met">Met</td></tr><tr><td><b>FR9</b></td><td>Open directions in the user's maps app</td><td><button type="button" class="link-thumb" data-full="screens/pass-05-directions.jpg" data-name="Directions">Directions</button></td><td class="is-met">Met</td></tr><tr><td><b>FR10</b></td><td>Add a session to the personal calendar</td><td><button type="button" class="link-thumb" data-full="screens/pass-06-add-to-calendar.jpg" data-name="Add to calendar">Add to calendar</button></td><td class="is-met">Met</td></tr><tr><td><b>NFR1</b></td><td>Map and list load within 2 s on a mid-range phone on 4G</td><td><button type="button" class="link-thumb" data-full="screens/find-03-list-and-map.jpg" data-name="List and map">List and map</button></td><td class="is-open">Partly: list and pins about 1.4 s in simulation, full street map about 6 to 7 s</td></tr><tr><td><b>NFR2</b></td><td>No sideways scrolling from 360 px to desktop</td><td><button type="button" class="link-thumb" data-full="screens/desktop-02-find.jpg" data-name="Find">Find</button></td><td class="is-open">Partly: tested in Chrome, only partly in the Safari engine, not in Firefox</td></tr><tr><td><b>NFR3</b></td><td>4 of 5 first-time users book within 3 minutes unaided</td><td><button type="button" class="link-thumb" data-full="screens/gym-02-pick-a-time.jpg" data-name="Pick a time">Pick a time</button></td><td class="is-open">Not measured: needs five real test users</td></tr><tr><td><b>NFR4</b></td><td>WCAG 2.2 AA, text resizable to 200%</td><td><button type="button" class="link-thumb" data-full="screens/home-01-hero.jpg" data-name="Hero">Hero</button></td><td class="is-open">Not audited: designed for it. Removing the Home pause button goes against 2.2.2</td></tr><tr><td><b>NFR5</b></td><td>HTTPS, hashed passwords, session ends after 30 days unused</td><td><button type="button" class="link-thumb" data-full="screens/login-01-log-in.jpg" data-name="Log in">Log in</button></td><td class="is-met">Met</td></tr><tr><td><b>NFR6</b></td><td>GDPR, EU hosting, location not stored, deletion within 30 days</td><td><button type="button" class="link-thumb" data-full="screens/settings-05-delete-account.jpg" data-name="Delete account">Delete account</button></td><td class="is-met">Met, with one thing to note: the front desk shows first name and last initial to anyone with the password</td></tr><tr><td><b>NFR7</b></td><td>Booking only after payment succeeds, no double charges</td><td><button type="button" class="link-thumb" data-full="screens/book-03-payment-declined.jpg" data-name="Payment declined">Payment declined</button></td><td class="is-met">Met, tested</td></tr><tr><td><b>NFR8</b></td><td>Pin within 50 m of the entrance, details confirmed every 90 days</td><td><button type="button" class="link-thumb" data-full="screens/gym-06-location.jpg" data-name="Location">Location</button></td><td class="is-open">Partly: gyms are sample data, so the 50 m cannot be shown</td></tr><tr><td><b>NFR9</b></td><td>Results within 2 s with 500 gyms and 1,000 users</td><td><button type="button" class="link-thumb" data-full="screens/find-04-gym-cards.jpg" data-name="Gym cards">Gym cards</button></td><td class="is-open">Not measured under load</td></tr><tr><td><b>NFR10</b></td><td>At least 99.5% uptime</td><td><button type="button" class="link-thumb" data-full="screens/home-01-hero.jpg" data-name="Hero">Hero</button></td><td class="is-open">Not measurable yet: needs time</td></tr>
+  </tbody></table></div>
+</section>
+
+<section class="doc" id="screens">
+  <h2>All 87 screens</h2>
+  <p>Taken from the real app at iPhone 16 Pro Max width, with a throwaway demo account. Tap any screen to enlarge it.</p>
+  <h3 class="group-title">Home <small>5</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/home-01-hero.jpg" data-name="Hero"><img src="screens/home-01-hero.jpg" alt="Hero screen" loading="lazy"><span>Hero</span></button><button type="button" class="thumb " data-full="screens/home-02-gyms.jpg" data-name="Gyms"><img src="screens/home-02-gyms.jpg" alt="Gyms screen" loading="lazy"><span>Gyms</span></button><button type="button" class="thumb " data-full="screens/home-03-categories.jpg" data-name="Categories"><img src="screens/home-03-categories.jpg" alt="Categories screen" loading="lazy"><span>Categories</span></button><button type="button" class="thumb " data-full="screens/home-04-cities.jpg" data-name="Cities"><img src="screens/home-04-cities.jpg" alt="Cities screen" loading="lazy"><span>Cities</span></button><button type="button" class="thumb " data-full="screens/home-05-own-a-gym.jpg" data-name="Own a gym"><img src="screens/home-05-own-a-gym.jpg" alt="Own a gym screen" loading="lazy"><span>Own a gym</span></button></div><h3 class="group-title">Find <small>8</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/find-01-search-city.jpg" data-name="Search city"><img src="screens/find-01-search-city.jpg" alt="Search city screen" loading="lazy"><span>Search city</span></button><button type="button" class="thumb " data-full="screens/find-02-location-ask.jpg" data-name="Location ask"><img src="screens/find-02-location-ask.jpg" alt="Location ask screen" loading="lazy"><span>Location ask</span></button><button type="button" class="thumb " data-full="screens/find-03-list-and-map.jpg" data-name="List and map"><img src="screens/find-03-list-and-map.jpg" alt="List and map screen" loading="lazy"><span>List and map</span></button><button type="button" class="thumb " data-full="screens/find-04-gym-cards.jpg" data-name="Gym cards"><img src="screens/find-04-gym-cards.jpg" alt="Gym cards screen" loading="lazy"><span>Gym cards</span></button><button type="button" class="thumb " data-full="screens/find-05-filters.jpg" data-name="Filters"><img src="screens/find-05-filters.jpg" alt="Filters screen" loading="lazy"><span>Filters</span></button><button type="button" class="thumb " data-full="screens/find-06-full-map.jpg" data-name="Full map"><img src="screens/find-06-full-map.jpg" alt="Full map screen" loading="lazy"><span>Full map</span></button><button type="button" class="thumb " data-full="screens/find-07-map-pin.jpg" data-name="Map pin"><img src="screens/find-07-map-pin.jpg" alt="Map pin screen" loading="lazy"><span>Map pin</span></button><button type="button" class="thumb " data-full="screens/find-08-no-results.jpg" data-name="No results"><img src="screens/find-08-no-results.jpg" alt="No results screen" loading="lazy"><span>No results</span></button></div><h3 class="group-title">Gym page <small>8</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/gym-01-photos.jpg" data-name="Photos"><img src="screens/gym-01-photos.jpg" alt="Photos screen" loading="lazy"><span>Photos</span></button><button type="button" class="thumb " data-full="screens/gym-02-pick-a-time.jpg" data-name="Pick a time"><img src="screens/gym-02-pick-a-time.jpg" alt="Pick a time screen" loading="lazy"><span>Pick a time</span></button><button type="button" class="thumb " data-full="screens/gym-03-time-chosen.jpg" data-name="Time chosen"><img src="screens/gym-03-time-chosen.jpg" alt="Time chosen screen" loading="lazy"><span>Time chosen</span></button><button type="button" class="thumb " data-full="screens/gym-04-what-is-included.jpg" data-name="What is included"><img src="screens/gym-04-what-is-included.jpg" alt="What is included screen" loading="lazy"><span>What is included</span></button><button type="button" class="thumb " data-full="screens/gym-05-hours-and-equipment.jpg" data-name="Hours and equipment"><img src="screens/gym-05-hours-and-equipment.jpg" alt="Hours and equipment screen" loading="lazy"><span>Hours and equipment</span></button><button type="button" class="thumb " data-full="screens/gym-06-location.jpg" data-name="Location"><img src="screens/gym-06-location.jpg" alt="Location screen" loading="lazy"><span>Location</span></button><button type="button" class="thumb " data-full="screens/gym-07-reviews.jpg" data-name="Reviews"><img src="screens/gym-07-reviews.jpg" alt="Reviews screen" loading="lazy"><span>Reviews</span></button><button type="button" class="thumb " data-full="screens/gym-08-no-photos.jpg" data-name="No photos"><img src="screens/gym-08-no-photos.jpg" alt="No photos screen" loading="lazy"><span>No photos</span></button></div><h3 class="group-title">Log in <small>2</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/login-01-log-in.jpg" data-name="Log in"><img src="screens/login-01-log-in.jpg" alt="Log in screen" loading="lazy"><span>Log in</span></button><button type="button" class="thumb " data-full="screens/login-02-create-account.jpg" data-name="Create account"><img src="screens/login-02-create-account.jpg" alt="Create account screen" loading="lazy"><span>Create account</span></button></div><h3 class="group-title">Book and pay <small>5</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/book-01-login-when-booking.jpg" data-name="Login when booking"><img src="screens/book-01-login-when-booking.jpg" alt="Login when booking screen" loading="lazy"><span>Login when booking</span></button><button type="button" class="thumb " data-full="screens/book-02-pay.jpg" data-name="Pay"><img src="screens/book-02-pay.jpg" alt="Pay screen" loading="lazy"><span>Pay</span></button><button type="button" class="thumb " data-full="screens/book-03-payment-declined.jpg" data-name="Payment declined"><img src="screens/book-03-payment-declined.jpg" alt="Payment declined screen" loading="lazy"><span>Payment declined</span></button><button type="button" class="thumb " data-full="screens/book-04-paid.jpg" data-name="Paid"><img src="screens/book-04-paid.jpg" alt="Paid screen" loading="lazy"><span>Paid</span></button><button type="button" class="thumb " data-full="screens/book-05-pass-ready.jpg" data-name="Pass ready"><img src="screens/book-05-pass-ready.jpg" alt="Pass ready screen" loading="lazy"><span>Pass ready</span></button></div><h3 class="group-title">Passes <small>2</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/passes-01-list.jpg" data-name="List"><img src="screens/passes-01-list.jpg" alt="List screen" loading="lazy"><span>List</span></button><button type="button" class="thumb " data-full="screens/passes-02-past-visit.jpg" data-name="Past visit"><img src="screens/passes-02-past-visit.jpg" alt="Past visit screen" loading="lazy"><span>Past visit</span></button></div><h3 class="group-title">A pass <small>8</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/pass-01-front.jpg" data-name="Front"><img src="screens/pass-01-front.jpg" alt="Front screen" loading="lazy"><span>Front</span></button><button type="button" class="thumb " data-full="screens/pass-02-what-is-included.jpg" data-name="What is included"><img src="screens/pass-02-what-is-included.jpg" alt="What is included screen" loading="lazy"><span>What is included</span></button><button type="button" class="thumb " data-full="screens/pass-03-actions.jpg" data-name="Actions"><img src="screens/pass-03-actions.jpg" alt="Actions screen" loading="lazy"><span>Actions</span></button><button type="button" class="thumb " data-full="screens/pass-04-details.jpg" data-name="Details"><img src="screens/pass-04-details.jpg" alt="Details screen" loading="lazy"><span>Details</span></button><button type="button" class="thumb " data-full="screens/pass-05-directions.jpg" data-name="Directions"><img src="screens/pass-05-directions.jpg" alt="Directions screen" loading="lazy"><span>Directions</span></button><button type="button" class="thumb " data-full="screens/pass-06-add-to-calendar.jpg" data-name="Add to calendar"><img src="screens/pass-06-add-to-calendar.jpg" alt="Add to calendar screen" loading="lazy"><span>Add to calendar</span></button><button type="button" class="thumb " data-full="screens/pass-07-add-to-wallet.jpg" data-name="Add to wallet"><img src="screens/pass-07-add-to-wallet.jpg" alt="Add to wallet screen" loading="lazy"><span>Add to wallet</span></button><button type="button" class="thumb " data-full="screens/pass-08-wallet.jpg" data-name="Wallet"><img src="screens/pass-08-wallet.jpg" alt="Wallet screen" loading="lazy"><span>Wallet</span></button></div><h3 class="group-title">Change or cancel <small>6</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/change-01-new-time.jpg" data-name="New time"><img src="screens/change-01-new-time.jpg" alt="New time screen" loading="lazy"><span>New time</span></button><button type="button" class="thumb " data-full="screens/change-02-another-gym.jpg" data-name="Another gym"><img src="screens/change-02-another-gym.jpg" alt="Another gym screen" loading="lazy"><span>Another gym</span></button><button type="button" class="thumb " data-full="screens/change-03-old-and-new.jpg" data-name="Old and new"><img src="screens/change-03-old-and-new.jpg" alt="Old and new screen" loading="lazy"><span>Old and new</span></button><button type="button" class="thumb " data-full="screens/change-04-updated.jpg" data-name="Updated"><img src="screens/change-04-updated.jpg" alt="Updated screen" loading="lazy"><span>Updated</span></button><button type="button" class="thumb " data-full="screens/change-05-cancel.jpg" data-name="Cancel"><img src="screens/change-05-cancel.jpg" alt="Cancel screen" loading="lazy"><span>Cancel</span></button><button type="button" class="thumb " data-full="screens/change-06-too-late.jpg" data-name="Too late"><img src="screens/change-06-too-late.jpg" alt="Too late screen" loading="lazy"><span>Too late</span></button></div><h3 class="group-title">At the door <small>16</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/door-01-show-at-desk.jpg" data-name="Show at desk"><img src="screens/door-01-show-at-desk.jpg" alt="Show at desk screen" loading="lazy"><span>Show at desk</span></button><button type="button" class="thumb " data-full="screens/door-02-scanner.jpg" data-name="Scanner"><img src="screens/door-02-scanner.jpg" alt="Scanner screen" loading="lazy"><span>Scanner</span></button><button type="button" class="thumb " data-full="screens/door-03-desk-says-checked-in.jpg" data-name="Desk says checked in"><img src="screens/door-03-desk-says-checked-in.jpg" alt="Desk says checked in screen" loading="lazy"><span>Desk says checked in</span></button><button type="button" class="thumb " data-full="screens/door-04-phone-says-checked-in.jpg" data-name="Phone says checked in"><img src="screens/door-04-phone-says-checked-in.jpg" alt="Phone says checked in screen" loading="lazy"><span>Phone says checked in</span></button><button type="button" class="thumb " data-full="screens/door-05-time-left.jpg" data-name="Time left"><img src="screens/door-05-time-left.jpg" alt="Time left screen" loading="lazy"><span>Time left</span></button><button type="button" class="thumb " data-full="screens/door-06-time-left-on-home.jpg" data-name="Time left on home"><img src="screens/door-06-time-left-on-home.jpg" alt="Time left on home screen" loading="lazy"><span>Time left on home</span></button><button type="button" class="thumb " data-full="screens/door-07-over-time.jpg" data-name="Over time"><img src="screens/door-07-over-time.jpg" alt="Over time screen" loading="lazy"><span>Over time</span></button><button type="button" class="thumb " data-full="screens/door-08-desk-says-checked-out.jpg" data-name="Desk says checked out"><img src="screens/door-08-desk-says-checked-out.jpg" alt="Desk says checked out screen" loading="lazy"><span>Desk says checked out</span></button><button type="button" class="thumb " data-full="screens/door-09-cant-get-in.jpg" data-name="Cant get in"><img src="screens/door-09-cant-get-in.jpg" alt="Cant get in screen" loading="lazy"><span>Cant get in</span></button><button type="button" class="thumb " data-full="screens/door-10-phone-says-checked-out.jpg" data-name="Phone says checked out"><img src="screens/door-10-phone-says-checked-out.jpg" alt="Phone says checked out screen" loading="lazy"><span>Phone says checked out</span></button><button type="button" class="thumb " data-full="screens/door-11-visit-done.jpg" data-name="Visit done"><img src="screens/door-11-visit-done.jpg" alt="Visit done screen" loading="lazy"><span>Visit done</span></button><button type="button" class="thumb " data-full="screens/door-12-rate-the-gym.jpg" data-name="Rate the gym"><img src="screens/door-12-rate-the-gym.jpg" alt="Rate the gym screen" loading="lazy"><span>Rate the gym</span></button><button type="button" class="thumb " data-full="screens/door-13-rated.jpg" data-name="Rated"><img src="screens/door-13-rated.jpg" alt="Rated screen" loading="lazy"><span>Rated</span></button><button type="button" class="thumb " data-full="screens/door-14-scan-already-used.jpg" data-name="Scan already used"><img src="screens/door-14-scan-already-used.jpg" alt="Scan already used screen" loading="lazy"><span>Scan already used</span></button><button type="button" class="thumb " data-full="screens/door-15-scan-not-found.jpg" data-name="Scan not found"><img src="screens/door-15-scan-not-found.jpg" alt="Scan not found screen" loading="lazy"><span>Scan not found</span></button><button type="button" class="thumb " data-full="screens/door-16-grace-period.jpg" data-name="Grace period"><img src="screens/door-16-grace-period.jpg" alt="Grace period screen" loading="lazy"><span>Grace period</span></button></div><h3 class="group-title">Front desk panel <small>6</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/desk-01-password.jpg" data-name="Password"><img src="screens/desk-01-password.jpg" alt="Password screen" loading="lazy"><span>Password</span></button><button type="button" class="thumb " data-full="screens/desk-02-panel-zero.jpg" data-name="Panel zero"><img src="screens/desk-02-panel-zero.jpg" alt="Panel zero screen" loading="lazy"><span>Panel zero</span></button><button type="button" class="thumb " data-full="screens/desk-03-panel-someone-in.jpg" data-name="Panel someone in"><img src="screens/desk-03-panel-someone-in.jpg" alt="Panel someone in screen" loading="lazy"><span>Panel someone in</span></button><button type="button" class="thumb " data-full="screens/desk-04-one-gym.jpg" data-name="One gym"><img src="screens/desk-04-one-gym.jpg" alt="One gym screen" loading="lazy"><span>One gym</span></button><button type="button" class="thumb " data-full="screens/desk-05-panel-over-time.jpg" data-name="Panel over time"><img src="screens/desk-05-panel-over-time.jpg" alt="Panel over time screen" loading="lazy"><span>Panel over time</span></button><button type="button" class="thumb " data-full="screens/desk-06-todays-log.jpg" data-name="Todays log"><img src="screens/desk-06-todays-log.jpg" alt="Todays log screen" loading="lazy"><span>Todays log</span></button></div><h3 class="group-title">Gym owners <small>2</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/gymowner-01-sell-quiet-hours.jpg" data-name="Sell quiet hours"><img src="screens/gymowner-01-sell-quiet-hours.jpg" alt="Sell quiet hours screen" loading="lazy"><span>Sell quiet hours</span></button><button type="button" class="thumb " data-full="screens/gymowner-02-list-a-gym.jpg" data-name="List a gym"><img src="screens/gymowner-02-list-a-gym.jpg" alt="List a gym screen" loading="lazy"><span>List a gym</span></button></div><h3 class="group-title">Profile and calendar <small>4</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/account-01-profile.jpg" data-name="Profile"><img src="screens/account-01-profile.jpg" alt="Profile screen" loading="lazy"><span>Profile</span></button><button type="button" class="thumb " data-full="screens/account-02-rings-and-calendar.jpg" data-name="Rings and calendar"><img src="screens/account-02-rings-and-calendar.jpg" alt="Rings and calendar screen" loading="lazy"><span>Rings and calendar</span></button><button type="button" class="thumb " data-full="screens/account-03-day-and-note.jpg" data-name="Day and note"><img src="screens/account-03-day-and-note.jpg" alt="Day and note screen" loading="lazy"><span>Day and note</span></button><button type="button" class="thumb " data-full="screens/account-04-ring-history.jpg" data-name="Ring history"><img src="screens/account-04-ring-history.jpg" alt="Ring history screen" loading="lazy"><span>Ring history</span></button></div><h3 class="group-title">Settings <small>6</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/settings-01-search-preferences.jpg" data-name="Search preferences"><img src="screens/settings-01-search-preferences.jpg" alt="Search preferences screen" loading="lazy"><span>Search preferences</span></button><button type="button" class="thumb " data-full="screens/settings-02-saved-payment.jpg" data-name="Saved payment"><img src="screens/settings-02-saved-payment.jpg" alt="Saved payment screen" loading="lazy"><span>Saved payment</span></button><button type="button" class="thumb " data-full="screens/settings-03-face-id.jpg" data-name="Face id"><img src="screens/settings-03-face-id.jpg" alt="Face id screen" loading="lazy"><span>Face id</span></button><button type="button" class="thumb " data-full="screens/settings-04-reminders.jpg" data-name="Reminders"><img src="screens/settings-04-reminders.jpg" alt="Reminders screen" loading="lazy"><span>Reminders</span></button><button type="button" class="thumb " data-full="screens/settings-05-delete-account.jpg" data-name="Delete account"><img src="screens/settings-05-delete-account.jpg" alt="Delete account screen" loading="lazy"><span>Delete account</span></button><button type="button" class="thumb " data-full="screens/settings-06-menu.jpg" data-name="Menu"><img src="screens/settings-06-menu.jpg" alt="Menu screen" loading="lazy"><span>Menu</span></button></div><h3 class="group-title">Other screens <small>6</small></h3><div class="grid "><button type="button" class="thumb " data-full="screens/other-01-inbox.jpg" data-name="Inbox"><img src="screens/other-01-inbox.jpg" alt="Inbox screen" loading="lazy"><span>Inbox</span></button><button type="button" class="thumb " data-full="screens/other-02-saved.jpg" data-name="Saved"><img src="screens/other-02-saved.jpg" alt="Saved screen" loading="lazy"><span>Saved</span></button><button type="button" class="thumb " data-full="screens/other-03-privacy.jpg" data-name="Privacy"><img src="screens/other-03-privacy.jpg" alt="Privacy screen" loading="lazy"><span>Privacy</span></button><button type="button" class="thumb " data-full="screens/other-04-credits.jpg" data-name="Credits"><img src="screens/other-04-credits.jpg" alt="Credits screen" loading="lazy"><span>Credits</span></button><button type="button" class="thumb " data-full="screens/other-05-not-found.jpg" data-name="Not found"><img src="screens/other-05-not-found.jpg" alt="Not found screen" loading="lazy"><span>Not found</span></button><button type="button" class="thumb " data-full="screens/other-06-offline.jpg" data-name="Offline"><img src="screens/other-06-offline.jpg" alt="Offline screen" loading="lazy"><span>Offline</span></button></div><h3 class="group-title">Desktop <small>3</small></h3><div class="grid is-wide"><button type="button" class="thumb " data-full="screens/desktop-01-home.jpg" data-name="Home"><img src="screens/desktop-01-home.jpg" alt="Home screen" loading="lazy"><span>Home</span></button><button type="button" class="thumb " data-full="screens/desktop-02-find.jpg" data-name="Find"><img src="screens/desktop-02-find.jpg" alt="Find screen" loading="lazy"><span>Find</span></button><button type="button" class="thumb " data-full="screens/desktop-03-gym.jpg" data-name="Gym"><img src="screens/desktop-03-gym.jpg" alt="Gym screen" loading="lazy"><span>Gym</span></button></div>
+</section>
+<footer>Student project. Gyms are sample listings and payments are simulated, while bookings, scans and times are real records. Rebuild this page with <code>node userflow/build-map.mjs</code>.</footer>
+<dialog id="big"><button type="button" aria-label="Close" id="big-close">&times;</button><img id="big-img" alt=""><p id="big-name"></p></dialog>
+<script>
+const big = document.getElementById('big');
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-full]');
+  if (t) {
+    document.getElementById('big-img').src = t.dataset.full;
+    document.getElementById('big-img').alt = t.dataset.name + ' screen';
+    document.getElementById('big-name').textContent = t.dataset.name;
+    big.showModal();
+  } else if (e.target === big || e.target.id === 'big-close') big.close();
+});
+</script>
+</body></html>

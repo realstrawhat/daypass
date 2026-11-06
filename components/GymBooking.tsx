@@ -2,6 +2,7 @@
 import { useRouter } from 'next/navigation';
 import { useEffect, useRef, useState } from 'react';
 import { dateLabel, money, timeLabel } from '@/lib/format';
+import { SESSION_RULE } from '@/lib/hours';
 import type { SlotDay } from '@/lib/gyms';
 import type { PayMethod } from '@/lib/payments';
 import { useSession } from './session';
@@ -134,7 +135,7 @@ export function GymBooking({ gym }: Props) {
             <span key={selected ?? 'none'} className="book-cta-label">{busy ? 'Holding your spot' : 'Pick a time'}</span>
           </button>
         )}
-        <p className="fine">Free to change or cancel until 24 hours before. Refunded if the gym can't let you in.</p>
+        <p className="fine">{SESSION_RULE}. Free to change or cancel until 24 hours before. Refunded if the gym can't let you in.</p>
       </section>
 
       <div className={`book-bar${pickerVisible ? ' is-hidden' : ''}`} aria-hidden={pickerVisible}>

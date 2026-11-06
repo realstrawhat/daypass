@@ -3,7 +3,7 @@ import { networkArea } from '@/lib/where';
 import { createSession, destroySession, getCurrentUser, handle, hashPassword, HttpError, readJson, refreshSessionCookie, verifyPassword } from '@/lib/auth';
 import { addMessage, addSamplePastVisit, createDemoUser } from '@/lib/bookings';
 import { db } from '@/lib/db';
-import { MAX_STAY_HOURS } from '@/lib/hours';
+import { DOOR_CLOSES_HOURS, MAX_STAY_HOURS } from '@/lib/hours';
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -66,13 +66,13 @@ export const GET = handle(async (_req, ctx) => {
     db()`
       SELECT b.id, b.code, b.starts_at, g.name AS gym_name, g.slug AS gym_slug, g.city AS gym_city, g.timezone AS gym_timezone, g.photos AS gym_photos
       FROM bookings b JOIN gyms g ON g.id = b.gym_id
-      WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND b.checked_in_at IS NULL AND b.starts_at > now() - interval '3 hours'
+      WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND b.checked_in_at IS NULL AND b.starts_at > now() - make_interval(mins => ${DOOR_CLOSES_HOURS * 60}::int)
       ORDER BY b.starts_at ASC LIMIT 1`,
     db()`
       SELECT b.id, g.name AS gym_name
       FROM bookings b JOIN gyms g ON g.id = b.gym_id LEFT JOIN reviews r ON r.booking_id = b.id
       WHERE b.user_id = ${user.id}::uuid AND b.status = 'confirmed' AND r.id IS NULL
-        AND (b.checked_in_at IS NOT NULL OR b.starts_at < now() - interval '3 hours')
+        AND (b.checked_in_at IS NOT NULL OR b.starts_at < now() - make_interval(mins => ${DOOR_CLOSES_HOURS * 60}::int))
       ORDER BY b.starts_at DESC LIMIT 1`,
     db()`SELECT count(*)::int AS n FROM messages WHERE user_id = ${user.id}::uuid AND read_at IS NULL`,
     db()`SELECT gym_id FROM saved_gyms WHERE user_id = ${user.id}::uuid`,

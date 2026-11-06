@@ -1,7 +1,7 @@
 // Opening hours and next-slot wording, with fixed times so the result never depends on when this runs.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { daysUntil, doorIsOpen, gymStatus, hoursUntil, MAX_STAY_HOURS, ratingShares, refusalIsOpen, sameLocalDay, stayLabel, timerLabel, visitState } from '../lib/hours.ts';
+import { daysUntil, doorIsOpen, gymStatus, hoursUntil, MAX_STAY_HOURS, ratingShares, refusalIsOpen, sameLocalDay, stayLabel, timeLeft, timerLabel, visitState } from '../lib/hours.ts';
 
 const gym = { id: 'g', timezone: 'Europe/Amsterdam', open_hour: 7, close_hour: 21, weekend_open_hour: 9, weekend_close_hour: 18 };
 
@@ -32,11 +32,12 @@ test('rating bars cover five bands and follow the average', () => {
   assert.ok(high[0] > low[0], 'a higher average puts more in the top band');
 });
 
-test('the door is open from an hour before until three hours after the start', () => {
-  assert.equal(doorIsOpen(1.5), false);
-  assert.equal(doorIsOpen(1), true);
-  assert.equal(doorIsOpen(-3), true);
-  assert.equal(doorIsOpen(-3.1), false);
+test('the door is open from 15 minutes before the start until 15 minutes after the hour ends', () => {
+  assert.equal(doorIsOpen(0.3), false);
+  assert.equal(doorIsOpen(0.25), true);
+  assert.equal(doorIsOpen(0), true);
+  assert.equal(doorIsOpen(-1.25), true);
+  assert.equal(doorIsOpen(-1.3), false);
   assert.equal(hoursUntil('2026-11-04T12:00:00Z', Date.parse('2026-11-04T10:00:00Z')), 2);
 });
 
@@ -75,4 +76,16 @@ test('times inside read naturally, and the timer never goes below zero', () => {
   assert.equal(stayLabel(72 * 60000), '1 h 12 min');
   assert.equal(timerLabel(4331000), '01:12:11');
   assert.equal(timerLabel(-5000), '00:00:00');
+});
+
+test('the timer counts down a one-hour session from entry, then the grace period, then goes negative', () => {
+  const inAt = Date.parse('2026-11-04T17:00:00Z');
+  assert.deepEqual(timeLeft(inAt, inAt), { stage: 'session', over: false, label: '01:00:00' }, 'starts at the full hour');
+  assert.equal(timeLeft(inAt, inAt + 1000).label, '00:59:59');
+  assert.equal(timeLeft(inAt, inAt + 1500).label, '00:59:59', 'never skips a second');
+  assert.equal(timeLeft(inAt, inAt + 40 * 60000).label, '00:20:00');
+  assert.deepEqual(timeLeft(inAt, inAt + 3600000), { stage: 'session', over: false, label: '00:00:00' }, 'zero is not over yet');
+  assert.deepEqual(timeLeft(inAt, inAt + 3600000 + 5 * 60000), { stage: 'grace', over: false, label: '00:10:00' }, 'then 15 minutes of grace');
+  assert.deepEqual(timeLeft(inAt, inAt + 3600000 + 15 * 60000), { stage: 'grace', over: false, label: '00:00:00' }, 'the last moment of grace');
+  assert.deepEqual(timeLeft(inAt, inAt + 3600000 + 20 * 60000), { stage: 'over', over: true, label: '\u221200:05:00' }, 'five minutes past the grace');
 });

@@ -9,7 +9,7 @@ import { IconBack, IconScan } from './Icons';
 import { DESK_COPY, type DeskResult } from './StaffScanner';
 import { useFeedback } from './ui/feedback';
 import { feel } from './ui/sensory';
-import { StayTimer, useNow } from './ui/StayTimer';
+import { TimeLeft, useNow } from './ui/StayTimer';
 
 const REFRESH_MS = 4000;
 type Visit = OwnerSnapshot['inside'][number];
@@ -184,6 +184,7 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
       <div className="owner-columns">
         <section className="owner-card" aria-labelledby="owner-in">
           <h2 id="owner-in" className="section-title">In the gym <small>{inside.length}</small></h2>
+          {inside.length ? <p className="fine">The timer shows what's left of their 1-hour session, then 15 minutes' grace, then goes negative.</p> : null}
           {inside.length === 0 ? <p className="note">Nobody is checked in right now. Scan a pass and they appear here.</p> : (
             <ul className="owner-list">
               {inside.map((v) => (
@@ -194,7 +195,7 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
                     <small>In at {timeLabel(new Date(v.in as number), v.tz)}, <span className="owner-code">{v.code}</span></small>
                     {gym ? null : <small>{v.gym}</small>}
                   </span>
-                  <StayTimer from={v.in as number} skew={skew} />
+                  <TimeLeft from={v.in as number} skew={skew} />
                   <button type="button" className="btn btn-ghost owner-btn" disabled={busy === v.id} aria-label={`Check out ${v.name}`} onClick={() => door(v, 'out')}>Out</button>
                 </li>
               ))}

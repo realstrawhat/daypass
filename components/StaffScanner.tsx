@@ -1,17 +1,18 @@
 'use client';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { IconScan } from './Icons';
+import { IconCheck, IconScan } from './Icons';
 import { haptic } from './ui/feedback';
+import { feel } from './ui/sensory';
 
 export type DeskResult = { result: 'valid' | 'used' | 'out' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown'; gym?: string; holder?: string; when?: string; code?: string; usedAt?: string; leftAt?: string; stay?: string; inside?: boolean };
 type Result = DeskResult;
 
 export const DESK_COPY: Record<Result['result'], { title: string; tone: string; line: (r: Result) => string }> = {
-  valid: { title: 'Let them in', tone: 'is-valid', line: (r) => `${r.holder}, checked in for ${r.gym}.` },
+  valid: { title: 'Checked in', tone: 'is-valid', line: (r) => `Let them in: ${r.holder}, ${r.gym}. They have 1 hour, plus 15 minutes' grace.` },
   out: { title: 'Checked out', tone: 'is-valid', line: (r) => `${r.holder} left after ${r.stay}. In at ${r.usedAt}, out at ${r.leftAt}.` },
   used: { title: 'Already used', tone: 'is-bad', line: (r) => (r.leftAt ? `This pass came in at ${r.usedAt} and left at ${r.leftAt}.` : `This pass was checked in at ${r.usedAt}.`) },
   expired: { title: 'Expired', tone: 'is-bad', line: (r) => `This pass was for ${r.when}.` },
-  too_early: { title: 'Too early', tone: 'is-warn', line: (r) => `This pass opens one hour before ${r.when}.` },
+  too_early: { title: 'Too early', tone: 'is-warn', line: (r) => `This pass opens 15 minutes before ${r.when}.` },
   wrong_date: { title: 'Wrong date', tone: 'is-warn', line: (r) => `This pass is for ${r.when}.` },
   cancelled: { title: 'Cancelled', tone: 'is-bad', line: () => 'This booking was cancelled and refunded.' },
   unknown: { title: 'Not found', tone: 'is-bad', line: () => 'Check the code, or ask for the pass on their phone.' },
@@ -67,7 +68,8 @@ export function StaffScanner({ admin = false }: { admin?: boolean }) {
       if (!res.ok) throw new Error(data.error);
       setResult(data);
       setCode('');
-      haptic(data.result === 'valid' ? 20 : 40);
+      if (data.result === 'valid' || data.result === 'out') feel('success');
+      else haptic(40);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'That check did not finish. Try again.');
       lastScan.current = '';
@@ -163,12 +165,12 @@ export function StaffScanner({ admin = false }: { admin?: boolean }) {
 
       {result && copy ? (
         <div key={`${result.code}-${result.result}`} className={`staff-result ${copy.tone}`} role="status">
-          <h2>{copy.title}</h2>
+          <h2>{result.result === 'valid' || result.result === 'out' ? <IconCheck width={38} height={38} aria-hidden="true" /> : null} {copy.title}</h2>
           <p>{copy.line(result)}</p>
           {result.result !== 'unknown' && result.code ? <p><strong>{result.code}</strong></p> : null}
         </div>
       ) : null}
-      <p className="fine">The first scan checks someone in, and a later scan checks them out. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time. {admin ? 'You have the admin password, so every pass works here.' : 'A real pass can only be scanned from its own account, or by an admin, so it says Not found anywhere else.'}</p>
+      <p className="fine">The first scan checks someone in, and a later scan checks them out. A session is 1 hour, with 15 minutes' grace before and after, so a pass works from 15 minutes before its start until 15 minutes after its hour ends. Demo passes work at any time. {admin ? 'You have the admin password, so every pass works here.' : 'A real pass can only be scanned from its own account, or by an admin, so it says Not found anywhere else.'}</p>
     </div>
   );
 }

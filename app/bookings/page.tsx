@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DOOR_CLOSES_HOURS, daysUntil, hoursUntil } from '@/lib/hours';
 import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
 import { GymPhoto } from '@/components/GymPhoto';
@@ -7,7 +8,6 @@ import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
 import { inWalletNow, listBookings, type BookingView } from '@/lib/bookings';
 import { dateLabel, money, timeLabel } from '@/lib/format';
-import { daysUntil, hoursUntil } from '@/lib/hours';
 
 export const metadata: Metadata = { title: 'Passes' };
 
@@ -45,7 +45,7 @@ export default async function BookingsPage() {
   if (!user) redirect('/login?next=/bookings');
   const all = await listBookings(user.id);
   const now = Date.now();
-  const isCurrent = (b: BookingView) => b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > now;
+  const isCurrent = (b: BookingView) => b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + DOOR_CLOSES_HOURS * 3600000 > now;
   const upcoming = all.filter(isCurrent).reverse();
   const past = all.filter((b) => !isCurrent(b));
   const hasWallet = all.some((b) => inWalletNow(b));

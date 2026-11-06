@@ -13,7 +13,7 @@ import { generalArea, locate, locationAllowed, nearestCity, setResolvedCity } fr
 import { useSession, type NextBooking } from './session';
 import { useFeedback } from './ui/feedback';
 import { ScrollArrows } from './ui/Rail';
-import { StayTimer } from './ui/StayTimer';
+import { TimeLeft } from './ui/StayTimer';
 
 const SearchOverlay = dynamic(() => import('./SearchOverlay').then((m) => m.SearchOverlay), { ssr: false });
 
@@ -295,7 +295,7 @@ export function HomeClient({ picks }: { picks: CardGym[] }) {
           {ready && inGym ? (
             <Link href={`/bookings/${inGym.id}`} transitionTypes={['nav-forward']} className="vhero-next is-live">
               <b className="live-dot" aria-hidden="true" />
-              <span>{inGym.gym_name} <StayTimer from={inGym.checked_in_at} /></span>
+              <span>{inGym.gym_name} <TimeLeft from={inGym.checked_in_at} /></span>
               <i aria-hidden="true"><IconArrow width={16} height={16} /></i>
             </Link>
           ) : null}

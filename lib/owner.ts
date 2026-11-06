@@ -5,7 +5,7 @@ import { deskCheck, markCheckedOut } from './bookings';
 import { db } from './db';
 import { isUuid, shortName } from './format';
 import { getGymBySlug } from './gyms';
-import { MAX_STAY_HOURS, visitState } from './hours';
+import { DOOR_CLOSES_HOURS, MAX_STAY_HOURS, visitState } from './hours';
 
 // The admin password for the front desk panel, as a hash like every other password here.
 // To change it, make a new hash with hashPassword in lib/auth.ts and paste it in.
@@ -41,8 +41,6 @@ const ms = (v: unknown) => (v ? new Date(v as string).getTime() : null);
 const HOUR = 3600000;
 const SHOW_LOG = 40;
 const SHOW_ARRIVING = 8;
-// A pass stops being valid at the door this long after its session starts.
-const DOOR_CLOSES_HOURS = 3;
 
 // Real bookings and real scans only, for one gym or all of them. Nothing is made up, so a gym with no scans shows
 // zero. "Today" follows each gym's own clock, and someone still inside after midnight still counts as inside.

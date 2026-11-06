@@ -7,7 +7,7 @@ import { IconArrow, IconChevron } from './Icons';
 import { useFeedback } from './ui/feedback';
 import { ScrollArrows } from './ui/Rail';
 import { afterSheetClosed, Sheet } from './ui/Sheet';
-import { StayTimer } from './ui/StayTimer';
+import { TimeLeft } from './ui/StayTimer';
 
 export type CalVisit = {
   id: string;
@@ -213,7 +213,7 @@ export function VisitCalendar({ visits, rings, notes: initialNotes, thisMonth }:
                       <span className="log-visit-copy">
                         <strong>{v.gym}</strong>
                         <span>{v.city}</span>
-                        {v.state === 'inside' && v.inIso ? <span className="log-visit-live"><i className="live-dot" aria-hidden="true" /> In the gym <StayTimer from={v.inIso} /></span> : <span>{visitLine(v)}</span>}
+                        {v.state === 'inside' && v.inIso ? <span className="log-visit-live"><i className="live-dot" aria-hidden="true" /> Time left <TimeLeft from={v.inIso} /></span> : <span>{visitLine(v)}</span>}
                       </span>
                       <IconArrow />
                     </Link>

@@ -11,7 +11,7 @@ import { Page } from '@/components/ui/Page';
 import { getCurrentUser } from '@/lib/auth';
 import { getBookingView } from '@/lib/bookings';
 import { canChange, dateLabel, directionsLinks, longDate, money, timeLabel } from '@/lib/format';
-import { stayLabel } from '@/lib/hours';
+import { DOOR_CLOSES_HOURS, SESSION_RULE, stayLabel } from '@/lib/hours';
 
 export const metadata: Metadata = { title: 'Your day pass' };
 
@@ -31,14 +31,14 @@ export default async function BookingPage({ params, searchParams }: P) {
   const start = new Date(b.starts_at);
   const cancelled = b.status === 'cancelled';
   // A session stays current through its visit, rather than turning "past" the moment it starts.
-  const isOver = start.getTime() + 3 * 3600000 <= Date.now();
+  const isOver = start.getTime() + DOOR_CLOSES_HOURS * 3600000 <= Date.now();
   const checkedIn = !!b.checked_in_at;
   const changeable = !cancelled && !isOver && !checkedIn && canChange(b.starts_at);
   const qrSvg = await QRCode.toString(`DAYPASS:${b.code}`, { type: 'svg', margin: 0, errorCorrectionLevel: 'M', color: { dark: '#000000', light: '#ffffff' } });
   const end = new Date(start.getTime() + 3600000);
   const googleCal = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Gym session at ${b.gym_name}`)}&dates=${calStamp(start)}/${calStamp(end)}&location=${encodeURIComponent(b.gym_address)}&details=${encodeURIComponent(`Day pass code ${b.code}`)}`;
   const f = b.gym_facts ?? {};
-  const facts = [f.stay, f.entry, f.towel, f.lock, f.shower, f.age].filter(Boolean) as string[];
+  const facts = [SESSION_RULE, f.entry, f.towel, f.lock, f.shower, f.age].filter(Boolean) as string[];
   const pass = { gym: b.gym_name, city: b.gym_city, dateLabel: dateLabel(b.starts_at, tz), timeLabel: timeLabel(b.starts_at, tz), code: b.code, holder: user.name, qrSvg, facts };
   const title = cancelled ? 'Cancelled' : isOver ? 'Past visit' : b.checked_out_at ? 'Visit done' : checkedIn ? 'Checked in' : 'You are booked';
 

@@ -41,6 +41,8 @@ The paste held an image placeholder just before the timing request. No image rea
 | Scan again after 60 seconds | Checked out, with the time inside |
 | Scan after checking out | "Already used", with both times |
 | Slide to check out by mistake | Undo for 5 minutes |
+| One hour passes | The countdown reaches zero, then goes negative and red. Nobody is locked out |
+| The desk scans a pass on another device | Both devices confirm within about 2 seconds, with no reload |
 | Nobody checks out for 6 hours | The timer stops and the visit says the exit wasn't recorded |
 | Visit from before this change | Same: exit not recorded. No time is invented |
 | Tap a day with no visit | The sheet opens, and a note can still be written |
@@ -82,6 +84,8 @@ The paste held an image placeholder just before the timing request. No image rea
 - 6 November: written before the code. The password request arrived while Claude was reading the code, and is included above.
 - 6 November: "category" was read as Find's sort chips and filters, because Home's tiles already landed at the top when measured. The panel was built inside the app rather than as a separate app.
 - 6 November: owner feedback removed all made-up data from the panel and made it universal: all gyms, any admin with the password. See row 71 of the process log.
+- 6 November: the timer became a countdown of the booked hour, and a scan now confirms on both devices. A user flow map was added in `userflow/`. See row 75.
+- 6 November: a session is 1 hour, with 15 minutes' grace before and after. The door opens 15 minutes before the start and closes 15 minutes after the hour ends. See row 77.
 
 ## Design Notes
 

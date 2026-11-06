@@ -1,6 +1,13 @@
 import { handle, HttpError, readJson, requireUser } from '@/lib/auth';
-import { cancelBooking, changeBooking } from '@/lib/bookings';
+import { cancelBooking, changeBooking, visitStatus } from '@/lib/bookings';
 import { PAY_METHODS, type PayMethod } from '@/lib/payments';
+
+// Whether this pass has been scanned in or out.
+export const GET = handle(async (_req, ctx) => {
+  const user = await requireUser();
+  const { id } = await ctx.params;
+  return Response.json(await visitStatus(user.id, id), { headers: { 'Cache-Control': 'private, no-store' } });
+});
 
 // Change a booking: new time, and optionally a different gym.
 export const PATCH = handle(async (req, ctx) => {

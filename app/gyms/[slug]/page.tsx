@@ -7,7 +7,7 @@ import { IconAccess, IconClock, IconDrop, IconIdCard, IconKey, IconScan, IconSta
 import { Page } from '@/components/ui/Page';
 import { hourLabel, money, ratingLabel } from '@/lib/format';
 import { getGymBySlug, getReviews, type GymFacts } from '@/lib/gyms';
-import { ratingShares } from '@/lib/hours';
+import { ratingShares, SESSION_RULE } from '@/lib/hours';
 
 type P = { params: Promise<{ slug: string }> };
 
@@ -74,7 +74,7 @@ export default async function GymPage({ params }: P) {
               <section className="gym-section" aria-labelledby="facts">
                 <h2 id="facts">What your pass includes</h2>
                 <ul className="facts">
-                  {FACT_ROWS.map(({ key, icon }) => (gym.facts?.[key] ? <li key={key}><i>{icon}</i><span>{String(gym.facts[key])}</span></li> : null))}
+                  {FACT_ROWS.map(({ key, icon }) => (key === 'stay' ? <li key={key}><i>{icon}</i><span>{SESSION_RULE}</span></li> : gym.facts?.[key] ? <li key={key}><i>{icon}</i><span>{String(gym.facts[key])}</span></li> : null))}
                   {gym.facts?.staffedUntil ? <li><i><IconUser /></i><span>Staffed until {hourLabel(gym.facts.staffedUntil)}</span></li> : null}
                 </ul>
               </section>

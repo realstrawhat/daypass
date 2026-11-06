@@ -265,7 +265,8 @@ test('search and back: results, filters and place in the list all come back', ne
 
   await tapCardOnScreen(page);
   await page.waitForSelector('.gym-bar a');
-  await sleep(400);
+  // A tap during the page's slide animation is ignored by the browser, so a person would simply tap again.
+  await page.waitForFunction(() => !document.getAnimations().some((x) => String(x.effect?.pseudoElement ?? '').includes('view-transition')));
   await page.click('.gym-bar a');
   await page.waitForSelector('.applied');
   await sleep(500);
@@ -754,7 +755,7 @@ test('a real account: no made-up history, and the door buttons follow the sessio
   await page.waitForSelector('.desk');
   assert.equal(await exists(page, '.desk-sim'), false, 'no check-in days ahead');
 
-  await moveBooking(id, 0.5);
+  await moveBooking(id, 0.1);
   await open(page, `/bookings/${id}`);
   await page.waitForSelector('.pass-show');
   await page.click('.pass-show');
@@ -1132,8 +1133,9 @@ test('a pass runs a timer from check-in, Home shows it, and slide to check out s
   await page.evaluate(() => document.querySelector('.desk-sim').click());
   await page.waitForSelector('.visit-clock.is-live');
   const first = await text(page, '.visit-clock .stay-timer');
+  assert.match(first, /^(01:00:00|00:59:\d\d)$/, 'it starts from the booked hour');
   await sleep(2200);
-  assert.notEqual(await text(page, '.visit-clock .stay-timer'), first, 'the timer runs');
+  assert.ok((await text(page, '.visit-clock .stay-timer')) < first, 'and counts down');
   await open(page, '/home');
   await page.waitForSelector('.vhero-next.is-live .stay-timer');
   await open(page, `/bookings/${next.id}`);
@@ -1210,4 +1212,39 @@ test('the camera scanner reads a real QR code on a browser with no QR reader of 
   await page.evaluate((code) => { window.shownCode = code; }, { size: modules.size, bits: Array.from(modules.data) });
   await page.waitForFunction(() => /let them in/i.test(document.querySelector('.staff-result')?.innerText ?? ''));
   await done();
+});
+
+test('scanning at the desk confirms on both devices at the same time', needsChrome, async () => {
+  const member = await visitor();
+  const { next } = await demoSession(member.page);
+  await open(member.page, `/bookings/${next.id}`);
+  await ready(member.page, '.pass-show');
+  await member.page.evaluate(() => document.querySelector('.pass-show').click());
+  await member.page.waitForSelector('.desk-qr');
+
+  // The desk is someone else, with only the admin password and no account.
+  const desk = await visitor();
+  await open(desk.page, '/owner');
+  await desk.page.waitForSelector('#owner-password');
+  await ready(desk.page, '.owner-gate button');
+  await desk.page.type('#owner-password', 'uxdd');
+  await desk.page.keyboard.press('Enter');
+  await desk.page.waitForSelector('.owner-stats');
+  await open(desk.page, '/staff');
+  await desk.page.waitForSelector('#staff-code');
+  await ready(desk.page, '#staff-code');
+  await desk.page.type('#staff-code', next.code);
+  await desk.page.keyboard.press('Enter');
+
+  await desk.page.waitForFunction(() => /checked in/i.test(document.querySelector('.staff-result.is-valid')?.innerText ?? ''));
+  const said = Date.now();
+  await member.page.waitForFunction(() => /checked in/i.test(document.querySelector('.desk-done')?.innerText ?? ''));
+  const gap = Date.now() - said;
+  assert.ok(gap < 4000, `the member's phone said so ${gap} ms later`);
+  assert.match(await text(member.page, '.desk-done'), /1 hour/);
+  // It clears itself, and the countdown is there underneath.
+  await member.page.waitForFunction(() => !document.querySelector('.desk-done'), { timeout: 8000 });
+  await member.page.waitForSelector('.visit-clock.is-live');
+  await desk.done();
+  await member.done();
 });

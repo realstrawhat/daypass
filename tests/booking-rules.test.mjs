@@ -378,7 +378,7 @@ test('the door: valid once, then used, with the QR prefix, and expired or cancel
   await moveTo(a.id, 1.5);
   const [{ same_day: sameDay }] = await sql`SELECT (b.starts_at AT TIME ZONE g.timezone)::date = (now() AT TIME ZONE g.timezone)::date AS same_day FROM bookings b JOIN gyms g ON g.id = b.gym_id WHERE b.id = ${a.id}::uuid`;
   assert.equal((await call('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, sameDay ? 'too_early' : 'wrong_date', 'later today is too early, not the wrong date');
-  await moveTo(a.id, 0.5);
+  await moveTo(a.id, 0.1);
   assert.equal((await call('/api/staff', { method: 'POST', body: { code: `DAYPASS:${a.code}` } })).data.result, 'valid');
   const [row] = await sql`SELECT checked_in_at FROM bookings WHERE id = ${a.id}::uuid`;
   assert.ok(row.checked_in_at, 'a valid scan checks the pass in');
@@ -397,7 +397,7 @@ test('the door: valid once, then used, with the QR prefix, and expired or cancel
 test('two scans at once let one person in', needsDb, async () => {
   const call = await client();
   const a = await booked(call);
-  await moveTo(a.id, 0.5);
+  await moveTo(a.id, 0.1);
   const scans = await Promise.all([1, 2].map(() => call('/api/staff', { method: 'POST', body: { code: a.code } })));
   assert.deepEqual(scans.map((s) => s.data.result).sort(), ['used', 'valid']);
 });
@@ -416,7 +416,7 @@ test('another account cannot read, use or change a real person\'s pass', needsDb
   const stranger = await client();
   const demo = await demoClient();
   const a = await booked(owner);
-  await moveTo(a.id, 0.5);
+  await moveTo(a.id, 0.1);
   for (const other of [stranger, demo]) {
     const seen = await other('/api/staff', { method: 'POST', body: { code: a.code } });
     assert.equal(seen.data.result, 'unknown');
@@ -439,7 +439,7 @@ test('a real account can only check in and claim refused entry around its sessio
   assert.equal(refund.status, 200);
   assert.equal(refund.data.refund_cents, a.price, 'the full price comes back');
   const b = await booked(call);
-  await moveTo(b.id, 0.5);
+  await moveTo(b.id, 0.1);
   assert.ok((await call(`/api/bookings/${b.id}/checkin`, { method: 'POST', body: {} })).data.checked_in_at);
 
   const late = await booked(call);
@@ -593,7 +593,7 @@ test('a city search arrives with its first gyms and their map pins already in th
 test('entry and exit: a double scan stays in, a later scan lets them out, and the times are kept', needsDb, async () => {
   const call = await client();
   const a = await booked(call);
-  await moveTo(a.id, 0.5);
+  await moveTo(a.id, 0.1);
   const scan = () => call('/api/staff', { method: 'POST', body: { code: a.code } }).then((r) => r.data);
   assert.equal((await scan()).result, 'valid');
   assert.equal((await call('/api/auth/me')).data.inGym.id, a.id, 'Home knows they are in the gym');
@@ -620,7 +620,7 @@ test('checking out from the pass: only once inside, only your own, can be undone
   const a = await booked(call);
   const exit = (c = call) => c(`/api/bookings/${a.id}/exit`, { method: 'POST', body: {} });
   assert.equal((await exit()).data.code, 'not_in', 'nobody can leave before they arrive');
-  await moveTo(a.id, 0.5);
+  await moveTo(a.id, 0.1);
   await call(`/api/bookings/${a.id}/checkin`, { method: 'POST', body: {} });
   assert.equal((await exit(stranger)).status, 404, "someone else's pass");
   const first = await exit();
@@ -750,4 +750,21 @@ test('the door scanner works for anyone with the admin password, and the door ru
   assert.equal((await owner('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'valid');
   const page = await fetch(`${BASE}/staff`, { redirect: 'manual' });
   assert.equal(page.status, 307, 'the scanner page still needs one or the other');
+});
+
+test('a pass can see when it has been scanned, and nobody else can', needsDb, async () => {
+  const call = await client();
+  const stranger = await client();
+  const owner = await ownerClient();
+  await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
+  const a = await booked(call);
+  await moveTo(a.id, 0.1);
+  const status = () => call(`/api/bookings/${a.id}`);
+  assert.deepEqual((await status()).data, { status: 'confirmed', checked_in_at: null, checked_out_at: null });
+  assert.equal((await stranger(`/api/bookings/${a.id}`)).status, 404);
+  assert.equal((await fetch(`${BASE}/api/bookings/${a.id}`)).status, 401);
+  await owner('/api/staff', { method: 'POST', body: { code: a.code } });
+  assert.ok((await status()).data.checked_in_at, 'the scan shows up on the pass');
+  await owner('/api/owner', { method: 'POST', body: { id: a.id, action: 'out' } });
+  assert.ok((await status()).data.checked_out_at, 'and so does leaving');
 });

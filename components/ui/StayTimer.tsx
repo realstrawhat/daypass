@@ -1,6 +1,6 @@
 'use client';
 import { useLayoutEffect, useState } from 'react';
-import { timerLabel } from '@/lib/hours';
+import { timeLeft } from '@/lib/hours';
 
 // The clock, once a second. Empty on the server and set before the first paint, so nothing flashes.
 export function useNow(skew = 0) {
@@ -14,8 +14,10 @@ export function useNow(skew = 0) {
   return now;
 }
 
-// A running hh:mm:ss since someone came in. Worked out from the entry time, so it stays right offline or after a sleep.
-export function StayTimer({ from, skew = 0, className = '' }: { from: string | number; skew?: number; className?: string }) {
+// Counts down the booked session from the moment someone is let in, then the grace period, then goes negative.
+// Worked out from the entry time, so it stays right offline or after the phone sleeps.
+export function TimeLeft({ from, skew = 0, className = '' }: { from: string | number; skew?: number; className?: string }) {
   const now = useNow(skew);
-  return <span className={`stay-timer ${className}`} role="timer">{now === null ? '--:--:--' : timerLabel(now - new Date(from).getTime())}</span>;
+  const left = now === null ? null : timeLeft(from, now);
+  return <span className={`stay-timer${left?.over ? ' is-over' : ''}${left?.stage === 'grace' ? ' is-grace' : ''} ${className}`} role="timer">{left?.stage === 'grace' ? <small>Grace </small> : null}{left?.label ?? '--:--:--'}</span>;
 }

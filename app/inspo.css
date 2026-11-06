@@ -290,6 +290,9 @@
 
 /* Timers: digits keep their width, so a running clock doesn't wobble. */
 .stay-timer, .owner-clock { font-variant-numeric: tabular-nums; }
+.stay-timer.is-over { color: var(--alert) !important; }
+.stay-timer.is-grace { color: #ffc04d !important; }
+.stay-timer small { font-size: .55em; font-weight: 800; letter-spacing: 0; }
 .live-dot { display: inline-block; flex: none; width: 8px; height: 8px; margin-right: 2px; border-radius: 50%; background: var(--volt); vertical-align: 1px; animation: live-pulse 1.800s ease-out infinite; }
 @keyframes live-pulse { 0% { box-shadow: 0 0 0 0 rgba(215,255,62,.5); } 70%, 100% { box-shadow: 0 0 0 7px rgba(215,255,62,0); } }
 .vhero-next.is-live .stay-timer { font-weight: 800; color: var(--volt); margin-left: 4px; }

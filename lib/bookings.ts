@@ -3,7 +3,7 @@ import { db } from './db';
 import { hashPassword, HttpError, type User } from './auth';
 import { getAvailability, getGymById, getGymBySlug, isValidSlot, releaseExpiredHolds, type Gym, type GymFacts } from './gyms';
 import { dateLabel, isUuid, money, shortName, timeLabel } from './format';
-import { hoursUntil, MAX_STAY_HOURS, refusalIsOpen, sameLocalDay, SCAN_OUT_AFTER_MS, stayLabel, UNDO_EXIT_MS } from './hours';
+import { DOOR_CLOSES_HOURS, DOOR_OPENS_HOURS, GRACE_MINUTES, hoursUntil, MAX_STAY_HOURS, refusalIsOpen, sameLocalDay, SCAN_OUT_AFTER_MS, stayLabel, UNDO_EXIT_MS } from './hours';
 import { charge, methodLabel, type PayMethod } from './payments';
 
 const HOLD_MINUTES = 10;
@@ -310,7 +310,7 @@ export async function refuseEntryRefund(user: User, id: string, detail: string) 
 
 export type DeskResult = 'valid' | 'used' | 'out' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown';
 
-// What reception sees. Valid only from an hour before the session until three hours after it starts.
+// What reception sees. Valid from 15 minutes before the session until 15 minutes after its hour ends.
 // An admin, who has the front desk password, can check any pass. Without it, a real person's pass can only be scanned
 // from their own account, and demo passes from any account, so two phones can act out the door.
 // The first scan lets someone in. A later scan lets them out, unless it comes so soon it must be a double scan.
@@ -340,8 +340,8 @@ export async function deskCheck(scanner: { id: string | null; admin?: boolean },
   // Demo passes skip the time window, so the door can be tried at any time.
   if (!b.holder_is_demo) {
     const hours = hoursUntil(b.starts_at);
-    if (hours > 1) return { result: (sameLocalDay(new Date(b.starts_at), new Date(), b.gym_timezone) ? 'too_early' : 'wrong_date') as DeskResult, ...detail };
-    if (hours < -3) return { result: 'expired' as DeskResult, ...detail };
+    if (hours > DOOR_OPENS_HOURS) return { result: (sameLocalDay(new Date(b.starts_at), new Date(), b.gym_timezone) ? 'too_early' : 'wrong_date') as DeskResult, ...detail };
+    if (hours < -DOOR_CLOSES_HOURS) return { result: 'expired' as DeskResult, ...detail };
   }
   // Two scans at once, or a cancel in between: only one can win, and the other is told what happened.
   if (apply && !(await markCheckedIn(b.id, b.user_id))) {
@@ -370,6 +370,12 @@ export async function markCheckedOut(id: string) {
       AND checked_in_at > now() - make_interval(hours => ${MAX_STAY_HOURS}::int)
     RETURNING checked_out_at`;
   return (rows[0]?.checked_out_at as string | undefined) ?? null;
+}
+
+// A pass on screen checks this every couple of seconds, so it knows the moment the desk has scanned it.
+export async function visitStatus(userId: string, id: string) {
+  const b = await getOwned(userId, id);
+  return { status: b.status, checked_in_at: b.checked_in_at, checked_out_at: b.checked_out_at };
 }
 
 // The person says they have left. Doing it twice gives the same answer as doing it once.
@@ -404,8 +410,8 @@ export async function simulateCheckIn(user: User, id: string) {
   if (b.status !== 'confirmed') throw new HttpError(409, 'This pass is not active.', 'not_confirmed');
   if (!user.is_demo && !b.checked_in_at) {
     const hours = hoursUntil(b.starts_at);
-    if (hours > 1) throw new HttpError(409, 'Check-in opens one hour before your session.', 'too_early');
-    if (hours < -3) throw new HttpError(409, 'This session has ended, so the pass can no longer be checked in.', 'too_late');
+    if (hours > DOOR_OPENS_HOURS) throw new HttpError(409, `Check-in opens ${GRACE_MINUTES} minutes before your session.`, 'too_early');
+    if (hours < -DOOR_CLOSES_HOURS) throw new HttpError(409, 'This session has ended, so the pass can no longer be checked in.', 'too_late');
   }
   // A cancel can land in between. The person must not be told they are checked in.
   if (!b.checked_in_at && !(await markCheckedIn(id, user.id))) {
@@ -423,7 +429,7 @@ export async function addToWallet(userId: string, id: string) {
 
 // Whether a pass can still get someone in, which is what the Wallet holds.
 export const inWalletNow = (b: { wallet_added_at?: string | null; status: string; checked_in_at: string | null; starts_at: string }, now = Date.now()) =>
-  !!b.wallet_added_at && b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + 3 * 3600000 > now;
+  !!b.wallet_added_at && b.status === 'confirmed' && !b.checked_in_at && new Date(b.starts_at).getTime() + DOOR_CLOSES_HOURS * 3600000 > now;
 
 export type BookingView = Booking & {
   gym_name: string;

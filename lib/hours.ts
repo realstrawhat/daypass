@@ -81,7 +81,13 @@ export function ratingShares(rating: number | null) {
 
 // The door rules, in one place for the screens and the server. Hours are counted to the session's start.
 export const hoursUntil = (iso: string, now = Date.now()) => (new Date(iso).getTime() - now) / 3600000;
-export const doorIsOpen = (hours: number) => hours <= 1 && hours >= -3;
+// A session is one hour, with 15 minutes' grace before and after. So the door opens 15 minutes before the start
+// and closes 15 minutes after the hour ends.
+export const GRACE_MINUTES = 15;
+export const DOOR_OPENS_HOURS = GRACE_MINUTES / 60;
+export const DOOR_CLOSES_HOURS = 1 + GRACE_MINUTES / 60;
+export const SESSION_RULE = `1-hour session, with ${GRACE_MINUTES} minutes' grace before and after`;
+export const doorIsOpen = (hours: number) => hours <= DOOR_OPENS_HOURS && hours >= -DOOR_CLOSES_HOURS;
 
 // Entry and exit. Someone who never checks out stops counting as inside after this long.
 export const MAX_STAY_HOURS = 6;
@@ -107,6 +113,19 @@ export function stayLabel(ms: number) {
 export function timerLabel(ms: number) {
   const s = Math.max(0, Math.floor(ms / 1000));
   return [Math.floor(s / 3600), Math.floor(s / 60) % 60, s % 60].map(two).join(':');
+}
+
+// Every booking is a one-hour session, and it starts counting when the person is let in.
+export const SESSION_MS = 3600000;
+const GRACE_MS = GRACE_MINUTES * 60000;
+
+// The hour counts down, then the grace period does, then it goes negative. Nobody is locked out: staff can see who has run over.
+export function timeLeft(inAt: string | number, now = Date.now()) {
+  const left = new Date(inAt).getTime() + SESSION_MS - now;
+  if (left >= 0) return { stage: 'session' as const, over: false, label: timerLabel(Math.ceil(left / 1000) * 1000) };
+  const grace = left + GRACE_MS;
+  if (grace >= 0) return { stage: 'grace' as const, over: false, label: timerLabel(Math.ceil(grace / 1000) * 1000) };
+  return { stage: 'over' as const, over: true, label: `\u2212${timerLabel(-grace)}` };
 }
 
 export function sameLocalDay(a: Date, b: Date, tz: string) {
