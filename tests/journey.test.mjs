@@ -245,6 +245,8 @@ test('search and back: results, filters and place in the list all come back', ne
   await open(page, '/gyms?city=Berlin&minRating=4.5&sort=price_asc');
   await page.waitForSelector('a.gym-card');
   await page.waitForSelector('.applied');
+  // While the page streams in, it can still be too short to scroll, so this waits for the app to have started.
+  await ready(page, '.filter-sort .chip');
   await page.evaluate(() => window.scrollTo(0, 500));
   await sleep(350);
   const place = await page.evaluate(() => Math.round(window.scrollY));
