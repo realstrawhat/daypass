@@ -162,14 +162,6 @@ const statements = [
     updated_at timestamptz NOT NULL DEFAULT now(),
     PRIMARY KEY (user_id, day)
   )`,
-  `CREATE TABLE IF NOT EXISTS door_guest_actions (
-    gym_id uuid NOT NULL REFERENCES gyms(id) ON DELETE CASCADE,
-    day date NOT NULL,
-    guest_no int NOT NULL,
-    in_at timestamptz,
-    out_at timestamptz,
-    PRIMARY KEY (gym_id, day, guest_no)
-  )`,
 ];
 
 for (const s of statements) await sql.query(s);

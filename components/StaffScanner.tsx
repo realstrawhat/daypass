@@ -17,8 +17,34 @@ export const DESK_COPY: Record<Result['result'], { title: string; tone: string; 
   unknown: { title: 'Not found', tone: 'is-bad', line: () => 'Check the code, or ask for the pass on their phone.' },
 };
 
-// What reception uses: no software to install, and a typed code when a browser can't scan.
-export function StaffScanner() {
+type NativeReader = { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> };
+type NativeReaderClass = { new (o: { formats: string[] }): NativeReader; getSupportedFormats?: () => Promise<string[]> };
+
+// Uses the browser's own QR reader where it has one, such as Chrome on Android. iPhones and most laptops don't,
+// so a small reader in the app does the job there, and only loads when someone starts scanning.
+async function makeReader(): Promise<(v: HTMLVideoElement) => Promise<string | undefined>> {
+  const Native = (window as unknown as { BarcodeDetector?: NativeReaderClass }).BarcodeDetector;
+  const formats = Native ? await Native.getSupportedFormats?.().catch(() => null) : null;
+  if (Native && (!formats || formats.includes('qr_code'))) {
+    const reader = new Native({ formats: ['qr_code'] });
+    return async (v) => (await reader.detect(v).catch(() => []))[0]?.rawValue;
+  }
+  const { default: jsQR } = await import('jsqr');
+  const canvas = document.createElement('canvas');
+  const paint = canvas.getContext('2d', { willReadFrequently: true });
+  return async (v) => {
+    if (!paint || !v.videoWidth) return undefined;
+    // A smaller picture is read faster, and a pass held up to the camera is still plenty big enough.
+    const scale = Math.min(1, 720 / Math.max(v.videoWidth, v.videoHeight));
+    canvas.width = Math.round(v.videoWidth * scale);
+    canvas.height = Math.round(v.videoHeight * scale);
+    paint.drawImage(v, 0, 0, canvas.width, canvas.height);
+    return jsQR(paint.getImageData(0, 0, canvas.width, canvas.height).data, canvas.width, canvas.height, { inversionAttempts: 'dontInvert' })?.data;
+  };
+}
+
+// What reception uses: no software to install, and a typed code if the camera can't be used.
+export function StaffScanner({ admin = false }: { admin?: boolean }) {
   const [code, setCode] = useState('');
   const [result, setResult] = useState<Result | null>(null);
   const [busy, setBusy] = useState(false);
@@ -65,13 +91,23 @@ export function StaffScanner() {
     };
   }, [stop]);
 
+  // The picture joins the video once the video is on screen. Waiting for a camera permission or the reader to load
+  // means that moment can't be guessed from when the camera started. iPhones also need muted set before it can play.
+  useEffect(() => {
+    const v = video.current;
+    if (camera !== 'on' || !v || !stream.current) return;
+    v.muted = true;
+    v.srcObject = stream.current;
+    v.play().catch(() => {});
+  }, [camera]);
+
   const startCamera = async () => {
-    const Detector = (window as unknown as { BarcodeDetector?: new (o: { formats: string[] }) => { detect: (v: HTMLVideoElement) => Promise<{ rawValue: string }[]> } }).BarcodeDetector;
-    if (!Detector || !navigator.mediaDevices) {
+    if (!navigator.mediaDevices) {
       setCamera('none');
       return;
     }
     try {
+      const read = await makeReader();
       const s = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
       // The person may have left, or tapped twice, while the camera was starting.
       if (!alive.current) {
@@ -81,17 +117,9 @@ export function StaffScanner() {
       stop();
       stream.current = s;
       setCamera('on');
-      requestAnimationFrame(() => {
-        if (video.current) {
-          video.current.srcObject = s;
-          video.current.play().catch(() => {});
-        }
-      });
-      const detector = new Detector({ formats: ['qr_code'] });
       timer.current = setInterval(async () => {
         if (!video.current || video.current.readyState < 2) return;
-        const found = await detector.detect(video.current).catch(() => []);
-        const value = found[0]?.rawValue;
+        const value = await read(video.current);
         // Ready for the same pass again only once it has left the camera for a moment.
         if (!value) {
           if (Date.now() - lastSeen.current > 2500) lastScan.current = '';
@@ -121,7 +149,7 @@ export function StaffScanner() {
             <i className="staff-frame" aria-hidden="true" />
           </>
         ) : camera === 'none' ? (
-          <p className="note">This browser can't scan with the camera. Type the code below instead.</p>
+          <p className="note">The camera didn't start. Allow camera access for this site and try again, or type the code below.</p>
         ) : (
           <button type="button" className="btn btn-volt" onClick={startCamera}><IconScan /> Start scanning</button>
         )}
@@ -140,7 +168,7 @@ export function StaffScanner() {
           {result.result !== 'unknown' && result.code ? <p><strong>{result.code}</strong></p> : null}
         </div>
       ) : null}
-      <p className="fine">Demo door scanner. The first scan checks someone in, and a later scan checks them out. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time, from any account. A real pass can only be scanned from its own account, so it says Not found anywhere else.</p>
+      <p className="fine">The first scan checks someone in, and a later scan checks them out. A pass is valid from one hour before its session until three hours after it starts. Demo passes work at any time. {admin ? 'You have the admin password, so every pass works here.' : 'A real pass can only be scanned from its own account, or by an admin, so it says Not found anywhere else.'}</p>
     </div>
   );
 }

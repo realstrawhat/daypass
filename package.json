@@ -18,6 +18,7 @@
     "@neondatabase/serverless": "latest",
     "@simplewebauthn/browser": "^14.0.0",
     "@simplewebauthn/server": "^14.0.3",
+    "jsqr": "1.4.0",
     "maplibre-gl": "5.24.0",
     "next": "latest",
     "qrcode": "latest",

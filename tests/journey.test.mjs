@@ -1092,7 +1092,7 @@ test('the calendar: a dot opens its day, a note is kept, and a ring opens its hi
   // A day with a visit shows its times.
   await page.evaluate(() => document.querySelector('.dot.on').click());
   await page.waitForSelector('.log-day .log-visit');
-  assert.match(await text(page, '.log-visit'), /In \d\d:\d\d, out \d\d:\d\d/);
+  assert.match(await text(page, '.log-visit'), /In \d\d:\d\d, exit not recorded/);
   await page.evaluate(() => document.querySelector('.sheet .round-sm').click());
   await page.waitForFunction(() => !document.querySelector('.sheet'));
   // A day with nothing on it can still hold a note, and closing the sheet saves it.
@@ -1147,9 +1147,10 @@ test('a pass runs a timer from check-in, Home shows it, and slide to check out s
   await done();
 });
 
-test('the owner panel asks for the password, then keeps itself up to date', needsChrome, async () => {
+test('the panel asks for the password, opens on all gyms, and a real check-in appears by itself', needsDb, async () => {
   const { page, done } = await visitor();
-  await open(page, '/owner?gym=iron-gym-berlin');
+  const { next } = await demoSession(page);
+  await open(page, '/owner');
   await page.waitForSelector('#owner-password');
   assert.equal(await exists(page, '.owner-stats'), false, 'nothing shows before the password');
   assert.equal(await exists(page, '.tabbar a'), false, 'it is its own screen');
@@ -1161,15 +1162,50 @@ test('the owner panel asks for the password, then keeps itself up to date', need
   await page.type('#owner-password', 'uxdd');
   await page.keyboard.press('Enter');
   await page.waitForSelector('.owner-stats');
-  await ready(page, '.owner-btn');
-  let asked = 0;
-  page.on('response', (r) => { if (r.url().includes('/api/owner?') && r.ok()) asked += 1; });
+  await ready(page, '#owner-gym');
+  assert.equal(await page.$eval('#owner-gym', (s) => s.value), '', 'all gyms');
   const clock = await text(page, '.owner-clock');
-  await sleep(9000);
-  assert.ok(asked >= 2, `asked for fresh data ${asked} times`);
+  // Checked in somewhere else. Nobody touches the panel, and it shows up.
+  await page.evaluate((id) => fetch(`/api/bookings/${id}/checkin`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' }), next.id);
+  await page.waitForFunction((code) => [...document.querySelectorAll('[aria-labelledby="owner-in"] .owner-row')].some((r) => r.textContent.includes(code)), {}, next.code);
   assert.notEqual(await text(page, '.owner-clock'), clock, 'the clock runs');
-  const arriving = await page.$eval('[aria-labelledby="owner-next"] .owner-btn', (b) => b.getAttribute('aria-label').replace('Check in ', ''));
-  await page.evaluate(() => document.querySelector('[aria-labelledby="owner-next"] .owner-btn').click());
-  await page.waitForFunction((name) => [...document.querySelectorAll('[aria-labelledby="owner-in"] .owner-row')].some((r) => r.textContent.includes(name)), {}, arriving);
+  await page.evaluate((code) => [...document.querySelectorAll('[aria-labelledby="owner-in"] .owner-row')].find((r) => r.textContent.includes(code)).querySelector('.owner-btn').click(), next.code);
+  await page.waitForFunction((code) => [...document.querySelectorAll('.owner-event')].some((r) => r.textContent.includes(code) && r.textContent.includes('left after')), {}, next.code);
+  // The scanner opens from here, and comes back here.
+  await open(page, '/staff');
+  await page.waitForSelector('.staff-camera');
+  assert.equal(await page.$eval('.staff-top a', (a) => a.getAttribute('href')), '/owner');
+  await done();
+});
+
+test('the camera scanner reads a real QR code on a browser with no QR reader of its own, like an iPhone', needsChrome, async () => {
+  const { page, done } = await visitor();
+  await page.evaluateOnNewDocument(() => {
+    window.BarcodeDetector = undefined;
+    const canvas = document.createElement('canvas');
+    canvas.width = 480;
+    canvas.height = 480;
+    const paint = canvas.getContext('2d');
+    setInterval(() => {
+      paint.fillStyle = '#fff';
+      paint.fillRect(0, 0, 480, 480);
+      const code = window.shownCode;
+      if (!code) return;
+      const cell = Math.floor(360 / code.size);
+      paint.fillStyle = '#000';
+      code.bits.forEach((on, i) => {
+        if (on) paint.fillRect(60 + (i % code.size) * cell, 60 + Math.floor(i / code.size) * cell, cell, cell);
+      });
+    }, 100);
+    navigator.mediaDevices.getUserMedia = async () => canvas.captureStream(10);
+  });
+  const { next } = await demoSession(page);
+  await open(page, '/staff');
+  await tapText(page, 'Start scanning');
+  await page.waitForFunction(() => document.querySelector('video')?.readyState >= 2);
+  const QRCode = (await import('qrcode')).default;
+  const { modules } = QRCode.create(`DAYPASS:${next.code}`, { errorCorrectionLevel: 'M' });
+  await page.evaluate((code) => { window.shownCode = code; }, { size: modules.size, bits: Array.from(modules.data) });
+  await page.waitForFunction(() => /let them in/i.test(document.querySelector('.staff-result')?.innerText ?? ''));
   await done();
 });

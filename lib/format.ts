@@ -16,6 +16,12 @@ export const distanceLabel = (km: number | null | undefined) =>
 // A gym with no ratings yet is new, not rated zero.
 export const ratingLabel = (rating: number | null | undefined) => (rating == null ? 'New' : Number(rating).toFixed(1));
 
+// What a front desk sees: enough to greet someone, without their full name.
+export const shortName = (name: string) => {
+  const parts = name.trim().split(/\s+/);
+  return parts.length > 1 ? `${parts[0]} ${parts[parts.length - 1].charAt(0).toUpperCase()}.` : parts[0];
+};
+
 export const hourLabel =(h: number) => `${String(h).padStart(2, '0')}:00`;
 
 export const CANCEL_WINDOW_MS = 24 * 60 * 60 * 1000;

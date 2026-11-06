@@ -2,7 +2,7 @@ import { randomBytes, randomUUID } from 'node:crypto';
 import { db } from './db';
 import { hashPassword, HttpError, type User } from './auth';
 import { getAvailability, getGymById, getGymBySlug, isValidSlot, releaseExpiredHolds, type Gym, type GymFacts } from './gyms';
-import { dateLabel, isUuid, money, timeLabel } from './format';
+import { dateLabel, isUuid, money, shortName, timeLabel } from './format';
 import { hoursUntil, MAX_STAY_HOURS, refusalIsOpen, sameLocalDay, SCAN_OUT_AFTER_MS, stayLabel, UNDO_EXIT_MS } from './hours';
 import { charge, methodLabel, type PayMethod } from './payments';
 
@@ -311,24 +311,26 @@ export async function refuseEntryRefund(user: User, id: string, detail: string) 
 export type DeskResult = 'valid' | 'used' | 'out' | 'expired' | 'too_early' | 'wrong_date' | 'cancelled' | 'unknown';
 
 // What reception sees. Valid only from an hour before the session until three hours after it starts.
-// This is a demo with no staff accounts, so a real person's pass can only be scanned from their own account.
-// Demo passes can be scanned from any account, so two phones can act out the door.
+// An admin, who has the front desk password, can check any pass. Without it, a real person's pass can only be scanned
+// from their own account, and demo passes from any account, so two phones can act out the door.
 // The first scan lets someone in. A later scan lets them out, unless it comes so soon it must be a double scan.
-export async function deskCheck(scanner: { id: string | null }, code: string, apply: boolean) {
+export async function deskCheck(scanner: { id: string | null; admin?: boolean }, code: string, apply: boolean) {
   const clean = code.trim().toUpperCase().replace(/^DAYPASS:/, '');
   const rows = await db()`
     SELECT b.*, g.name AS gym_name, g.timezone AS gym_timezone, u.name AS holder, u.is_demo AS holder_is_demo
     FROM bookings b JOIN gyms g ON g.id = b.gym_id JOIN users u ON u.id = b.user_id
     WHERE b.code = ${clean} AND b.status IN ('confirmed','cancelled')`;
   const b = rows[0] as (Booking & { gym_name: string; gym_timezone: string; holder: string; holder_is_demo: boolean }) | undefined;
-  if (!b || (b.user_id !== scanner.id && !b.holder_is_demo)) return { result: 'unknown' as DeskResult };
-  const detail = { gym: b.gym_name, gymId: b.gym_id, holder: b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
+  if (!b || (!scanner.admin && b.user_id !== scanner.id && !b.holder_is_demo)) return { result: 'unknown' as DeskResult };
+  const detail = { gym: b.gym_name, gymId: b.gym_id, holder: scanner.admin ? shortName(b.holder) : b.holder, when: `${dateLabel(b.starts_at, b.gym_timezone)}, ${timeLabel(b.starts_at, b.gym_timezone)}`, code: b.code };
   if (b.status === 'cancelled') return { result: 'cancelled' as DeskResult, ...detail };
   if (b.checked_in_at) {
     const usedAt = timeLabel(b.checked_in_at, b.gym_timezone);
-    if (b.checked_out_at) return { result: 'used' as DeskResult, ...detail, usedAt, leftAt: timeLabel(b.checked_out_at, b.gym_timezone) };
+    // A pass from another day says which day, so it can't be mistaken for today.
+    const usedOn = sameLocalDay(new Date(b.checked_in_at), new Date(), b.gym_timezone) ? usedAt : `${dateLabel(b.checked_in_at, b.gym_timezone)}, ${usedAt}`;
+    if (b.checked_out_at) return { result: 'used' as DeskResult, ...detail, usedAt: usedOn, leftAt: timeLabel(b.checked_out_at, b.gym_timezone) };
     const inside = Date.now() - new Date(b.checked_in_at).getTime();
-    if (inside > MAX_STAY_HOURS * 3600000) return { result: 'used' as DeskResult, ...detail, usedAt };
+    if (inside > MAX_STAY_HOURS * 3600000) return { result: 'used' as DeskResult, ...detail, usedAt: usedOn };
     if (apply && inside >= SCAN_OUT_AFTER_MS) {
       const out = await markCheckedOut(b.id);
       if (out) return { result: 'out' as DeskResult, ...detail, usedAt, leftAt: timeLabel(out, b.gym_timezone), stay: stayLabel(new Date(out).getTime() - new Date(b.checked_in_at).getTime()) };
@@ -460,9 +462,9 @@ export async function getBookingView(userId: string, id: string) {
 // Gives a new account one finished visit, so past bookings and rating can be tried straight away.
 export async function addSamplePastVisit(userId: string, area: string | null = null) {
   await db()`
-    INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at, checked_out_at)
+    INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
     SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('hour', now()) - interval '9 days', g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int,
-      'confirmed', 'sample-past-visit', true, date_trunc('hour', now()) - interval '9 days', date_trunc('hour', now()) - interval '9 days' + interval '65 minutes'
+      'confirmed', 'sample-past-visit', true, date_trunc('hour', now()) - interval '9 days'
     FROM gyms g WHERE g.slug = coalesce((SELECT slug FROM gyms WHERE is_demo AND lower(city) = lower(${area}::text) ORDER BY name = 'Iron Gym' DESC LIMIT 1), 'iron-gym-amsterdam')
     ON CONFLICT DO NOTHING`;
 }
@@ -517,9 +519,7 @@ export async function createDemoUser(area: string | null = null) {
     RETURNING id`;
   const userId = user.id as string;
 
-  // A short training history across cities, for the calendar, its notes and Passes.
-  const stays = [72, 48, 95, 60, 55, 80, 65, 40];
-  const notes: Record<number, string> = { 0: 'Legs felt strong. Added 5 kg on squats.', 3: 'Short on sleep, so kept it light. Try mornings next time.' };
+  // A short training history across cities, for the calendar and Passes.
   const history = [
     ['iron-gym-amsterdam', 6], ['iron-gym-berlin', 13], ['iron-gym-lisbon', 19], ['iron-gym-paris', 34],
     ['iron-gym-amsterdam', 41], ['iron-gym-prague', 58], ['iron-gym-barcelona', 77], ['iron-gym-vienna', 96],
@@ -528,19 +528,11 @@ export async function createDemoUser(area: string | null = null) {
     // Believable training times, mostly after work.
     const hour = [17, 7, 18, 16, 6, 17, 8, 18][i];
     await db()`
-      INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at, checked_out_at)
+      INSERT INTO bookings (code, user_id, gym_id, starts_at, price_cents, commission_cents, status, idempotency_key, is_sample, checked_in_at)
       SELECT ${newCode()}, ${userId}::uuid, g.id, date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int),
         g.price_cents, round(g.price_cents * g.commission_bps / 10000.0)::int, 'confirmed', ${`sample-${i}`}, true,
-        date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int),
-        date_trunc('day', now()) + make_interval(hours => ${hour}::int, mins => ${stays[i]}::int) - make_interval(days => ${days}::int)
+        date_trunc('day', now()) + make_interval(hours => ${hour}::int) - make_interval(days => ${days}::int)
       FROM gyms g WHERE g.slug = ${slug}`;
-    if (notes[i]) {
-      await db()`
-        INSERT INTO day_notes (user_id, day, body)
-        SELECT b.user_id, (b.starts_at AT TIME ZONE g.timezone)::date, ${notes[i]}
-        FROM bookings b JOIN gyms g ON g.id = b.gym_id
-        WHERE b.user_id = ${userId}::uuid AND b.idempotency_key = ${`sample-${i}`}`;
-    }
   }
   await addMessage(userId, 'welcome', 'Welcome to Daypass', 'This is a demo account with sample visits. Payments, email, Face ID and Wallet are simulated, so try anything.');
 

@@ -610,6 +610,8 @@ test('entry and exit: a double scan stays in, a later scan lets them out, and th
   const again = await scan();
   assert.equal(again.result, 'used');
   assert.ok(again.leftAt, 'a third scan shows both times');
+  await sql`UPDATE bookings SET checked_in_at = checked_in_at - interval '9 days', checked_out_at = checked_out_at - interval '9 days' WHERE id = ${a.id}::uuid`;
+  assert.match((await scan()).usedAt, /^[A-Z][a-z]{2} \d{1,2} [A-Z][a-z]+, \d\d:\d\d$/, 'a pass from another day says which day');
 });
 
 test('checking out from the pass: only once inside, only your own, can be undone, and not days later', needsDb, async () => {
@@ -680,72 +682,72 @@ test('the owner panel is locked without the admin password', async () => {
   assert.equal((await owner('/api/owner?gym=iron-gym-amsterdam')).status, 401, 'locking the panel locks it');
 });
 
-test('the owner panel: sample guests come and go, the owner can move them, and the totals agree', async () => {
-  const owner = await ownerClient();
-  await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
-  const { data: s } = await owner('/api/owner?gym=iron-gym-amsterdam');
-  assert.equal(s.gym.slug, 'iron-gym-amsterdam');
-  assert.equal(s.stats.inside, s.inside.length);
-  assert.equal(s.hours.reduce((a, b) => a + b, 0), s.stats.entries, 'the hour chart adds up to the entries');
-  assert.ok(s.arriving.length > 0 || s.hourNow === 23, 'someone is always on the way');
-  const next = s.arriving.find((v) => v.kind === 'guest');
-  if (next) {
-    const body = { gym: s.gym.slug, kind: 'guest', id: next.id };
-    const inn = await owner('/api/owner', { method: 'POST', body: { ...body, action: 'in' } });
-    assert.equal(inn.status, 200);
-    assert.ok(inn.data.snapshot.inside.some((v) => v.key === next.key), 'checked in early');
-    assert.equal((await owner('/api/owner', { method: 'POST', body: { ...body, action: 'in' } })).status, 409, 'only once');
-    const out = await owner('/api/owner', { method: 'POST', body: { ...body, action: 'out' } });
-    assert.equal(out.status, 200);
-    assert.ok(!out.data.snapshot.inside.some((v) => v.key === next.key), 'checked out');
-    assert.equal((await owner('/api/owner', { method: 'POST', body: { ...body, action: 'out' } })).status, 409, 'not in the gym any more');
-  }
-  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: s.gym.slug, kind: 'guest', id: '99999', action: 'in' } })).status, 404);
-  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: s.gym.slug, kind: 'guest', id: '1', action: 'wave' } })).status, 400);
-});
-
-test('the owner panel shows demo passes live, and never a real person', needsDb, async () => {
+test('the panel is real: a gym nobody scanned at is all zeros, and a scan makes the entry', needsDb, async () => {
   const owner = await ownerClient();
   await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
 
-  // A demo pass checked in on one phone appears on the other, and the owner can check it out.
-  const member = await demoClient();
-  const { next } = (await member('/api/auth/me')).data;
-  await member(`/api/bookings/${next.id}/checkin`, { method: 'POST', body: {} });
-  const seen = (await owner(`/api/owner?gym=${next.gym_slug}`)).data;
-  assert.ok(seen.inside.some((v) => v.id === next.id && v.name === 'Sam Demo' && v.live));
-  const out = await owner('/api/owner', { method: 'POST', body: { gym: next.gym_slug, kind: 'pass', id: next.id, action: 'out' } });
-  assert.equal(out.status, 200);
-  assert.ok(out.data.snapshot.log.some((e) => e.key === `p${next.id}-out`), 'it is in the log');
-  assert.equal((await member('/api/auth/me')).data.inGym, null, 'and the member sees they have left');
+  // Usually a gym shows nothing at all, because nothing is made up.
+  const [quiet] = await sql`SELECT g.slug FROM gyms g WHERE NOT EXISTS (SELECT 1 FROM bookings b WHERE b.gym_id = g.id AND (b.starts_at > now() - interval '3 days' OR b.checked_in_at > now() - interval '3 days')) LIMIT 1`;
+  const empty = (await owner(`/api/owner?gym=${quiet.slug}`)).data;
+  assert.deepEqual([empty.stats.inside, empty.stats.entries, empty.stats.exits, empty.stats.gross], [0, 0, 0, 0]);
+  assert.deepEqual([empty.inside.length, empty.arriving.length, empty.log.length], [0, 0, 0]);
+  assert.equal(empty.hours.reduce((a, b) => a + b, 0), 0);
+  assert.equal(empty.latestHour, null);
 
-  // A real person's pass at the same gym is not on the panel, and can't be touched from it.
+  // Everything shown anywhere is a real booking.
+  const all = (await owner('/api/owner')).data;
+  const shown = [...new Set([...all.inside, ...all.arriving, ...all.log].map((v) => v.code))];
+  const [{ n }] = await sql`SELECT count(*)::int AS n FROM bookings WHERE code = ANY(${shown}) AND NOT is_sample`;
+  assert.equal(n, shown.length, 'every code on the panel is a real booking');
+
+  // A real person's pass, booked for soon. The admin can scan it, with no account of their own.
   const call = await client();
   const a = await booked(call);
-  await moveTo(a.id, 0.5);
-  await call('/api/staff', { method: 'POST', body: { code: a.code } });
-  const text = JSON.stringify((await owner(`/api/owner?gym=${a.gym.slug}`)).data);
-  assert.ok(!text.includes(a.code), 'their code is not shown');
-  assert.ok(!text.includes('QA Tester'), 'their name is not shown');
-  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: a.gym.slug, kind: 'pass', id: a.id, action: 'out' } })).status, 404);
-  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: a.gym.slug, code: a.code } })).data.desk.result, 'unknown');
-  const [row] = await sql`SELECT checked_out_at FROM bookings WHERE id = ${a.id}::uuid`;
-  assert.equal(row.checked_out_at, null);
+  await moveTo(a.id, 0.1);
+  const before = (await owner(`/api/owner?gym=${a.gym.slug}`)).data;
+  assert.ok(before.arriving.some((v) => v.id === a.id), 'booked for today');
+  const scan = await owner('/api/owner', { method: 'POST', body: { gym: a.gym.slug, code: a.code } });
+  assert.equal(scan.data.desk.result, 'valid');
+  assert.equal(scan.data.desk.holder, 'QA T.', 'first name and last initial at the desk');
+  const inside = scan.data.snapshot.inside.find((v) => v.id === a.id);
+  assert.equal(inside.name, 'QA T.');
+  assert.equal(scan.data.snapshot.stats.inside, before.stats.inside + 1);
+  assert.equal(scan.data.snapshot.stats.entries, before.stats.entries + 1);
+  const text = JSON.stringify(scan.data.snapshot);
+  assert.ok(!text.includes('QA Tester'), 'never the full name');
+  assert.ok(!text.includes('@example.com'), 'never the email');
+  assert.equal((await call('/api/auth/me')).data.inGym.id, a.id, 'and the person sees the timer');
 
-  // A pass for another gym is refused at the door, and not checked in.
-  const second = await demoClient();
-  const other = (await second('/api/auth/me')).data.next;
-  const elsewhere = other.gym_slug === 'iron-gym-amsterdam' ? 'iron-gym-berlin' : 'iron-gym-amsterdam';
-  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: elsewhere, code: other.code } })).data.desk.result, 'other_gym');
-  assert.equal((await second('/api/auth/me')).data.inGym, null);
+  // The all-gyms view has it too, with its gym.
+  assert.ok((await owner('/api/owner')).data.inside.some((v) => v.id === a.id && v.gym.includes(a.gym.name)));
+
+  // A desk at one gym refuses a pass for another. A double scan does not end the visit.
+  const elsewhere = a.gym.slug === 'iron-gym-berlin' ? 'iron-gym-amsterdam' : 'iron-gym-berlin';
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { gym: elsewhere, code: a.code } })).data.desk.result, 'other_gym');
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { code: a.code } })).data.desk.inside, true);
+
+  // Checking out from the panel reaches the person, and goes in the log.
+  const out = await owner('/api/owner', { method: 'POST', body: { id: a.id, action: 'out' } });
+  assert.equal(out.status, 200);
+  assert.ok(out.data.snapshot.log.some((e) => e.key === `${a.id}-out`));
+  assert.equal((await call('/api/auth/me')).data.inGym, null);
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { id: a.id, action: 'out' } })).status, 409, 'not in the gym any more');
+  assert.equal((await owner('/api/owner', { method: 'POST', body: { id: a.id, action: 'wave' } })).status, 400);
 });
 
-test('a new demo account has finished visits with exit times and notes', needsDb, async () => {
-  const call = await demoClient();
-  const { data } = await call('/api/auth/me');
-  const rows = await sql`SELECT b.checked_in_at, b.checked_out_at FROM bookings b JOIN users u ON u.id = b.user_id WHERE u.email = ${data.user.email} AND b.is_sample`;
-  assert.equal(rows.length, 8);
-  assert.ok(rows.every((r) => new Date(r.checked_out_at) > new Date(r.checked_in_at)));
-  const [{ n }] = await sql`SELECT count(*)::int AS n FROM day_notes d JOIN users u ON u.id = d.user_id WHERE u.email = ${data.user.email}`;
-  assert.equal(n, 2);
+test('the door scanner works for anyone with the admin password, and the door rules still apply', needsDb, async () => {
+  const owner = await ownerClient();
+  const call = await client();
+  const a = await booked(call);
+  const stranger = await client();
+  assert.equal((await owner('/api/staff', { method: 'POST', body: { code: a.code } })).status, 401, 'nobody without the password or an account');
+  assert.equal((await stranger('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'unknown', 'an account alone cannot look up a real pass');
+  await owner('/api/owner/session', { method: 'POST', body: { password: 'uxdd' } });
+  assert.equal((await owner('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'wrong_date', 'too soon, even for an admin');
+  await moveTo(a.id, -4);
+  assert.equal((await owner('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'expired', 'an old pass is refused');
+  await moveTo(a.id, 0.1);
+  assert.equal((await owner('/api/staff', { method: 'POST', body: { code: a.code } })).data.result, 'valid');
+  const page = await fetch(`${BASE}/staff`, { redirect: 'manual' });
+  assert.equal(page.status, 307, 'the scanner page still needs one or the other');
 });

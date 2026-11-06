@@ -41,8 +41,8 @@ export function OwnerGate() {
   return (
     <form className="owner-gate" onSubmit={submit}>
       <Link href="/partners" className="round round-solid" aria-label="Back to Daypass"><IconBack /></Link>
-      <h1 className="two-tone">Run a gym <em>for a minute</em></h1>
-      <p>See who is in, when they came and how long they stayed, live. This is a demo with sample guests.</p>
+      <h1 className="two-tone">Front <em>desk</em></h1>
+      <p>See who is in, when they came and how long they stayed. Every entry comes from a real pass being scanned.</p>
       <div className="field">
         <label htmlFor="owner-password">Admin password</label>
         <input id="owner-password" type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" autoCapitalize="none" autoFocus />
@@ -69,7 +69,7 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
   const [busy, setBusy] = useState<string | null>(null);
   const [code, setCode] = useState('');
   const newest = useRef(0);
-  const slug = first.gym.slug;
+  const slug = first.gym?.slug ?? null;
 
   const take = useCallback((data: OwnerSnapshot) => {
     setSnap(data);
@@ -81,7 +81,7 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
   const pull = useCallback(async () => {
     const ask = ++newest.current;
     try {
-      const res = await fetch(`/api/owner?gym=${encodeURIComponent(slug)}`);
+      const res = await fetch(slug ? `/api/owner?gym=${encodeURIComponent(slug)}` : '/api/owner');
       if (res.status === 401) return router.refresh();
       if (!res.ok) throw new Error();
       const data = await res.json();
@@ -126,7 +126,7 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
   };
 
   const door = async (v: Visit, action: 'in' | 'out') => {
-    const desk = await act(v.key, { kind: v.kind, id: v.id, action });
+    const desk = await act(v.id, { id: v.id, action });
     if (desk === undefined) return;
     if (desk) {
       const { text, good } = deskMessage(desk);
@@ -149,7 +149,6 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
   };
 
   const { gym, stats, inside, arriving, log } = snap;
-  const tz = gym.timezone;
 
   return (
     <>
@@ -157,14 +156,14 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
         <Link href="/partners" className="round round-solid" aria-label="Back to Daypass"><IconBack /></Link>
         <div className="owner-title">
           <h1>Front desk</h1>
-          <p>{offline ? <span className="owner-offline">Reconnecting</span> : <><i className="live-dot" aria-hidden="true" /> Live</>} <LiveClock tz={tz} skew={skew} /></p>
+          <p>{offline ? <span className="owner-offline">Reconnecting</span> : <><i className="live-dot" aria-hidden="true" /> Live</>} <LiveClock tz={gym?.timezone} skew={skew} /></p>
         </div>
-        <span className="demo-tag">Demo</span>
       </header>
 
       <div className="field owner-gym">
-        <label htmlFor="owner-gym">Your gym</label>
-        <select id="owner-gym" value={slug} onChange={(e) => router.replace(`/owner?gym=${encodeURIComponent(e.target.value)}`)}>
+        <label htmlFor="owner-gym">Gym</label>
+        <select id="owner-gym" value={slug ?? ''} onChange={(e) => router.replace(e.target.value ? `/owner?gym=${encodeURIComponent(e.target.value)}` : '/owner')}>
+          <option value="">All gyms</option>
           {[...new Set(gyms.map((g) => g.city))].map((city) => (
             <optgroup key={city} label={city}>
               {gyms.filter((g) => g.city === city).map((g) => <option key={g.slug} value={g.slug}>{g.name}, {g.city}</option>)}
@@ -177,25 +176,26 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
         <div className="stat is-main"><dt>In the gym now</dt><dd aria-live="polite">{stats.inside}</dd></div>
         <div className="stat"><dt>Entries today</dt><dd>{stats.entries}</dd></div>
         <div className="stat"><dt>Average stay</dt><dd>{stats.averageStay === null ? 'None yet' : stayLabel(stats.averageStay)}</dd></div>
-        <div className="stat"><dt>You keep today</dt><dd>{money(stats.keep)}</dd><small>{money(stats.gross)} sold, less 15%</small></div>
+        <div className="stat"><dt>{gym ? 'You keep today' : 'Gyms keep today'}</dt><dd>{money(stats.keep)}</dd><small>{money(stats.gross)} in passes, less commission</small></div>
       </dl>
 
-      <HourChart hours={snap.hours} hourNow={snap.hourNow} />
+      <HourChart hours={snap.hours} latest={snap.latestHour} />
 
       <div className="owner-columns">
         <section className="owner-card" aria-labelledby="owner-in">
           <h2 id="owner-in" className="section-title">In the gym <small>{inside.length}</small></h2>
-          {inside.length === 0 ? <p className="note">Nobody is in right now.</p> : (
+          {inside.length === 0 ? <p className="note">Nobody is checked in right now. Scan a pass and they appear here.</p> : (
             <ul className="owner-list">
               {inside.map((v) => (
-                <li key={v.key} className="owner-row">
+                <li key={v.id} className="owner-row">
                   <span className="owner-avatar" aria-hidden="true">{v.name.charAt(0)}</span>
                   <span className="owner-who">
-                    <strong>{v.name}{v.live ? <b className="owner-live">Live pass</b> : null}</strong>
-                    <small>In at {timeLabel(new Date(v.in as number), tz)}, <span className="owner-code">{v.code}</span></small>
+                    <strong>{v.name}</strong>
+                    <small>In at {timeLabel(new Date(v.in as number), v.tz)}, <span className="owner-code">{v.code}</span></small>
+                    {gym ? null : <small>{v.gym}</small>}
                   </span>
                   <StayTimer from={v.in as number} skew={skew} />
-                  <button type="button" className="btn btn-ghost owner-btn" disabled={busy === v.key} aria-label={`Check out ${v.name}`} onClick={() => door(v, 'out')}>Out</button>
+                  <button type="button" className="btn btn-ghost owner-btn" disabled={busy === v.id} aria-label={`Check out ${v.name}`} onClick={() => door(v, 'out')}>Out</button>
                 </li>
               ))}
             </ul>
@@ -203,32 +203,33 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
         </section>
 
         <div className="owner-side">
+          <section className="owner-card" aria-labelledby="owner-door">
+            <h2 id="owner-door" className="section-title">At the door</h2>
+            <Link href="/staff" className="btn btn-volt btn-block"><IconScan width={18} height={18} /> Scan a pass</Link>
+            <form className="staff-form" onSubmit={typed}>
+              <div className="field"><label htmlFor="owner-code">Or type the code</label><input id="owner-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="DP-XXXXX" autoCapitalize="characters" autoComplete="off" /></div>
+              <button type="submit" className="btn btn-white" disabled={busy === 'code' || !code.trim()}>{busy === 'code' ? 'Checking' : 'Check'}</button>
+            </form>
+            <p className="fine">The first scan lets someone in, and a later scan lets them out.</p>
+          </section>
+
           <section className="owner-card" aria-labelledby="owner-next">
-            <h2 id="owner-next" className="section-title">Arriving soon</h2>
-            {arriving.length === 0 ? <p className="note">Nobody else is expected today.</p> : (
+            <h2 id="owner-next" className="section-title">Booked for today</h2>
+            {arriving.length === 0 ? <p className="note">No more bookings today.</p> : (
               <ul className="owner-list">
                 {arriving.map((v) => (
-                  <li key={v.key} className="owner-row">
+                  <li key={v.id} className="owner-row">
                     <span className="owner-avatar" aria-hidden="true">{v.name.charAt(0)}</span>
                     <span className="owner-who">
-                      <strong>{v.name}{v.live ? <b className="owner-live">Live pass</b> : null}</strong>
-                      <small><Arrival at={v.planned} tz={tz} skew={skew} />, <span className="owner-code">{v.code}</span></small>
+                      <strong>{v.name}</strong>
+                      <small><Arrival at={v.planned} tz={v.tz} skew={skew} />, <span className="owner-code">{v.code}</span></small>
+                      {gym ? null : <small>{v.gym}</small>}
                     </span>
-                    <button type="button" className="btn btn-white owner-btn" disabled={busy === v.key} aria-label={`Check in ${v.name}`} onClick={() => door(v, 'in')}>In</button>
+                    <button type="button" className="btn btn-white owner-btn" disabled={busy === v.id} aria-label={`Check in ${v.name}`} onClick={() => door(v, 'in')}>In</button>
                   </li>
                 ))}
               </ul>
             )}
-          </section>
-
-          <section className="owner-card" aria-labelledby="owner-door">
-            <h2 id="owner-door" className="section-title">At the door</h2>
-            <form className="staff-form" onSubmit={typed}>
-              <div className="field"><label htmlFor="owner-code">Pass code</label><input id="owner-code" value={code} onChange={(e) => setCode(e.target.value.toUpperCase())} placeholder="DP-XXXXX" autoCapitalize="characters" autoComplete="off" /></div>
-              <button type="submit" className="btn btn-volt" disabled={busy === 'code' || !code.trim()}>{busy === 'code' ? 'Checking' : 'Check'}</button>
-            </form>
-            <p className="fine">The first check lets someone in, and a later check lets them out. Demo passes work here. A real pass works only on its owner's own account.</p>
-            <Link href="/staff" className="owner-link"><IconScan width={18} height={18} /> Open the camera scanner</Link>
           </section>
         </div>
       </div>
@@ -239,10 +240,10 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
           <ol className="owner-log">
             {log.map((e) => (
               <li key={e.key} className="owner-event">
-                <time>{timeLabel(new Date(e.at), tz)}</time>
+                <time>{timeLabel(new Date(e.at), e.tz)}</time>
                 <i className={e.type === 'in' ? 'is-in' : 'is-out'} aria-hidden="true" />
-                <span><strong>{e.name}</strong> {e.type === 'in' ? 'came in' : `left after ${stayLabel(e.stay as number)}`}{e.live ? <b className="owner-live">Live pass</b> : null}</span>
-                <small>{e.code}</small>
+                <span><strong>{e.name}</strong> {e.type === 'in' ? 'came in' : `left after ${stayLabel(e.stay as number)}`}</span>
+                <small>{e.code}{gym ? '' : `, ${e.gym}`}</small>
               </li>
             ))}
           </ol>
@@ -250,12 +251,12 @@ export function OwnerPanel({ first, gyms }: { first: OwnerSnapshot; gyms: GymCho
         {snap.logTotal > log.length ? <p className="fine">Showing the latest {log.length} of {snap.logTotal} events today.</p> : null}
       </section>
 
-      <p className="fine owner-fine">Student project demo. Guests are made up, and sample traffic runs around the clock so this works at any hour. A live pass is a real check-in from a demo account or your own. No real person's visit is shown to anyone else. <button type="button" className="link" onClick={leave}>Lock the panel</button></p>
+      <p className="fine owner-fine">Every number here comes from real bookings and real scans. Times are each gym's local time. <button type="button" className="link" onClick={leave}>Lock the panel</button></p>
     </>
   );
 }
 
-function LiveClock({ tz, skew }: { tz: string; skew: number }) {
+function LiveClock({ tz, skew }: { tz?: string; skew: number }) {
   const now = useNow(skew);
   return <span className="owner-clock">{now === null ? '--:--:--' : new Intl.DateTimeFormat('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit', hourCycle: 'h23', timeZone: tz }).format(new Date(now))}</span>;
 }
@@ -265,24 +266,24 @@ function Arrival({ at, tz, skew }: { at: number; tz: string; skew: number }) {
   if (now === null) return <>{timeLabel(new Date(at), tz)}</>;
   const minutes = Math.round((at - now) / 60000);
   if (minutes > 60 || minutes < 0) return <>Booked for {timeLabel(new Date(at), tz)}</>;
-  return <>{minutes <= 0 ? 'Any moment' : `In ${minutes} min`}</>;
+  return <>{minutes === 0 ? 'Due now' : `In ${minutes} min`}</>;
 }
 
 // One bar per hour of the gym's day. One series, so the title names it and a tap reads out the exact number.
-function HourChart({ hours, hourNow }: { hours: number[]; hourNow: number }) {
+function HourChart({ hours, latest }: { hours: number[]; latest: number | null }) {
   const [picked, setPicked] = useState<number | null>(null);
-  const shown = picked ?? hourNow;
+  const shown = picked ?? latest;
   const peak = Math.max(1, ...hours);
   const label = (h: number) => `${String(h).padStart(2, '0')}:00`;
   return (
     <section className="owner-card owner-chart" aria-labelledby="owner-chart">
       <div className="owner-chart-head">
         <h2 id="owner-chart" className="section-title">Entries by hour</h2>
-        <p role="status"><strong>{hours[shown]}</strong> {hours[shown] === 1 ? 'entry' : 'entries'} from {label(shown)}</p>
+        <p role="status">{shown === null ? 'No entries yet today' : <><strong>{hours[shown]}</strong> {hours[shown] === 1 ? 'entry' : 'entries'} from {label(shown)}</>}</p>
       </div>
       <div className="hour-bars">
         {hours.map((n, h) => (
-          <button key={h} type="button" data-no-cover="" className={`hour-bar${h === shown ? ' is-picked' : ''}${h > hourNow ? ' is-later' : ''}`} aria-label={`${label(h)}: ${n} ${n === 1 ? 'entry' : 'entries'}`} aria-pressed={h === shown} onClick={() => setPicked(h)} onMouseEnter={() => setPicked(h)}>
+          <button key={h} type="button" data-no-cover="" className={`hour-bar${h === shown ? ' is-picked' : ''}`} aria-label={`${label(h)}: ${n} ${n === 1 ? 'entry' : 'entries'}`} aria-pressed={h === shown} onClick={() => setPicked(h)} onMouseEnter={() => setPicked(h)}>
             <i style={{ height: `${(n / peak) * 100}%` }} />
           </button>
         ))}

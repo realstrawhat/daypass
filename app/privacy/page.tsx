@@ -17,13 +17,15 @@ export default function PrivacyPage() {
         <p>Map images come from OpenFreeMap, which sees the map area you view. City names you type are sent to Open-Meteo to find the place.</p>
         <h2 className="section-title">Your account</h2>
         <p>We keep your name, email, preferences and bookings, the times you check in and out, and any notes you write in your calendar. Passwords are stored as hashes, never as plain text. You are logged out after 30 days without a visit. Demo accounts are removed after 14 days.</p>
+        <h2 className="section-title">At the front desk</h2>
+        <p>The front desk panel shows your first name and last initial, pass code, gym and check-in and check-out times to anyone who has the admin password. It does not show your email. In this student project, that password is shared with the class.</p>
         <h2 className="section-title">Reviews</h2>
         <p>If you review a gym, your name and review appear publicly on its page. Reviews from demo accounts and sample visits stay private.</p>
         <h2 className="section-title">Where it lives</h2>
         <p>The app and its database run in the EU, in Frankfurt, and all traffic uses HTTPS. So passes still open with no signal, your phone keeps a copy of the pages you open, and logging out removes the copies of your personal pages.</p>
         <h2 className="section-title">Simulated features</h2>
         <p>Payments, the Wallet, email and push messages, and demo Face ID are simulated. We never ask for card details and no money moves.</p>
-        <p>The owner panel shows made-up sample guests and demo account passes. A real account's visit only appears there for that account.</p>
+        
         <h2 className="section-title">Deleting your account</h2>
         <p>Delete your account from your <Link href="/account" className="link">account page</Link>. It is erased straight away, with your bookings, ratings, calendar notes and saved gyms, and you are logged out.</p>
         <h2 className="section-title">Credits</h2>

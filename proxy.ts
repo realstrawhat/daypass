@@ -5,6 +5,8 @@ import { NextResponse, type NextRequest } from 'next/server';
 export function proxy(request: NextRequest) {
   if (request.cookies.has('daypass_session')) return NextResponse.next();
   const { pathname, search } = request.nextUrl;
+  // The door scanner also opens with the admin password from the front desk panel.
+  if (pathname === '/staff' && request.cookies.has('daypass_owner')) return NextResponse.next();
   const login = new URL('/login', request.url);
   login.searchParams.set('next', pathname + search);
   return NextResponse.redirect(login);

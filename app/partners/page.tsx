@@ -36,7 +36,7 @@ export default async function PartnersPage() {
         </section>
 
         <Link href="/owner" className="owner-try">
-          <span className="owner-try-copy"><strong><i className="live-dot" aria-hidden="true" /> Try the live owner panel</strong><span>Run a sample gym for a minute: who is in, when they came and how long they stayed.</span></span>
+          <span className="owner-try-copy"><strong><i className="live-dot" aria-hidden="true" /> Open the front desk panel</strong><span>Scan passes and see who is in, when they came and how long they stayed.</span></span>
           <IconArrow />
         </Link>
 

@@ -164,7 +164,7 @@ export function AccountClient({ user, passkeys }: { user: U; passkeys: number })
         <ul className="rows">
           <li><Link href="/partners"><span>List your gym</span><IconChevron /></Link></li>
           <li><Link href="/staff"><span>Door scanner for staff</span><IconChevron /></Link></li>
-          <li><Link href="/owner"><span>Owner panel</span><span className="row-value">Demo</span><IconChevron /></Link></li>
+          <li><Link href="/owner"><span>Front desk panel</span><IconChevron /></Link></li>
         </ul>
       </section>
 
