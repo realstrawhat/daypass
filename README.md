@@ -85,7 +85,7 @@ Gyms win too. They list themselves for free, set their own price and sell their 
 2. **Browse freely.** There's no login wall. Search a city, open the map, look at a gym.
 3. **Book a time.** Pick a slot and swipe to book. Logging in appears only now. Tap **Skip this, use a demo account** to get a throwaway account with some sample visits, which is deleted after 14 days.
 4. **Pay.** It's *Demo Pay*, so no real money moves. Choose **Test decline** first to see a failed payment that books nothing, then **Demo card** to pay.
-5. **Walk in.** On the pass, tap **Show at the desk**, then **Demo: simulate the desk scan**. The phone confirms the check-in and the 1-hour countdown starts. To try it with two real devices, open the scanner at `/staff` on a second device. Ask the student for the front-desk password.
+5. **Walk in.** On the pass, tap **Show at the desk**, then **Demo: simulate the desk scan**. The phone confirms the check-in and the 1-hour countdown starts. To try it with two real devices, open the [front desk](https://daypass-six.vercel.app/owner) on a laptop with the password **`uxdd`**, then scan the phone's QR code with the scanner. The panel shows who's in and their time left, live.
 6. **Look around.** Change the booking (blocked within 24 hours), check *Account* for the training calendar, and scan out to rate the gym.
 
 **Find the coursework evidence**
