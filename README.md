@@ -25,6 +25,7 @@
 
 <p align="center">
   <a href="#see-it-in-action">See it in action</a> ·
+  <a href="#guide-for-the-professor">Professor's guide</a> ·
   <a href="#what-you-can-do">Features</a> ·
   <a href="#every-journey-step-by-step">Journeys</a> ·
   <a href="#screens">Screens</a> ·
@@ -73,6 +74,29 @@ Gyms win too. They list themselves for free, set their own price and sell their 
   </td>
   </tr>
 </table>
+
+## Guide for the professor
+
+<sub>For anyone marking or reviewing this project. It takes about 5 minutes, ideally on a phone.</sub>
+
+**Try the app**
+
+1. **Open [daypass-six.vercel.app](https://daypass-six.vercel.app)** on your phone. To see it as an app, use *Share → Add to Home Screen* on iPhone, or *⋮ → Add to Home screen* on Android.
+2. **Browse freely.** There's no login wall. Search a city, open the map, look at a gym.
+3. **Book a time.** Pick a slot and swipe to book. Logging in appears only now. Tap **Skip this, use a demo account** to get a throwaway account with some sample visits, which is deleted after 14 days.
+4. **Pay.** It's *Demo Pay*, so no real money moves. Choose **Test decline** first to see a failed payment that books nothing, then **Demo card** to pay.
+5. **Walk in.** On the pass, tap **Show at the desk**, then **Demo: simulate the desk scan**. The phone confirms the check-in and the 1-hour countdown starts. To try it with two real devices, open the scanner at `/staff` on a second device. Ask the student for the front-desk password.
+6. **Look around.** Change the booking (blocked within 24 hours), check *Account* for the training calendar, and scan out to rate the gym.
+
+**Find the coursework evidence**
+
+| The brief asks for | Where it is |
+|---|---|
+| A story built with BMad | The specs in [`_bmad-output/implementation-artifacts`](_bmad-output/implementation-artifacts) and the [BMad usage record](_bmad-output/BMAD-usage-record.txt) |
+| A record of failures and corrections | [`process-log.md`](_bmad-output/implementation-artifacts/process-log.md): every problem, what was tried and what fixed it |
+| Feedback from a student outside the team | [`peer-feedback-template.md`](_bmad-output/implementation-artifacts/peer-feedback-template.md), with resulting changes in the process log |
+| User journeys and screens | [`userflow/journeys.md`](userflow/journeys.md), 7 journeys and 86 screens, linked to the build pack |
+| How it measures up | [The brief checklist](#how-it-checks-against-the-brief) below, including what isn't met |
 
 ## What you can do
 
